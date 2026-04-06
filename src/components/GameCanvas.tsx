@@ -247,6 +247,40 @@ function drawFlightPath(
   // Get actual tangent angle from curve derivative
   const angle = getTangentAngle(elMs, gw, gh)
 
+  // Return calculated tip position without drawing
+  // (Drawing will be done by drawFlightPathToPoint with actual plane tail position)
+  return { tipX: tip.x, tipY: tip.y, angle, progress: nx }
+}
+
+/** Draw flight path curve ending EXACTLY at the plane tail position
+ *  This ensures the curve is ALWAYS connected to the tail, no matter the clamping */
+function drawFlightPathToPoint(
+  ctx: CanvasRenderingContext2D, w: number, h: number, elMs: number,
+  globalOffsetY: number = 0,
+  endX: number,  // Actual plane tail X (after clamping)
+  endY: number   // Actual plane tail Y (after clamping)
+) {
+  if (elMs < 8) return
+
+  const gw = w - PAD.left - PAD.right
+  const gh = h - PAD.top - PAD.bottom
+  const baseY = h - PAD.bottom
+
+  // Build point array up to the actual end point
+  const pts: { x: number; y: number }[] = []
+  for (let i = 0; i <= CURVE_STEPS; i++) {
+    const t = (i / CURVE_STEPS) * elMs
+    const { px, py } = flightPos(t, gw, gh)
+    const progress = i / CURVE_STEPS
+    const scaledOffset = globalOffsetY * progress
+    pts.push({ x: px, y: py + scaledOffset })
+  }
+
+  // Replace last point with actual plane tail position
+  pts[pts.length - 1] = { x: endX, y: endY }
+
+  if (pts.length < 2) return
+
   // ── Clip to graph area ────────────────────────────────────────────────
   ctx.save()
   ctx.beginPath()
@@ -261,7 +295,7 @@ function drawFlightPath(
     const my = (pts[i].y + pts[i + 1].y) / 2
     curve.quadraticCurveTo(pts[i].x, pts[i].y, mx, my)
   }
-  curve.lineTo(tip.x, tip.y)
+  curve.lineTo(endX, endY)
 
   // ── Gradient fill under the curve (green/cyan like Spribe) ────────────
   ctx.beginPath()
@@ -271,12 +305,12 @@ function drawFlightPath(
     const my = (pts[i].y + pts[i + 1].y) / 2
     ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my)
   }
-  ctx.lineTo(tip.x, tip.y)
-  ctx.lineTo(tip.x, baseY)
+  ctx.lineTo(endX, endY)
+  ctx.lineTo(endX, baseY)
   ctx.lineTo(pts[0].x, baseY)
   ctx.closePath()
 
-  const grad = ctx.createLinearGradient(0, tip.y, 0, baseY)
+  const grad = ctx.createLinearGradient(0, endY, 0, baseY)
   grad.addColorStop(0,    'rgba(0,199,77,0.90)')    // Electric green #00C74D - very intense at top
   grad.addColorStop(0.2,  'rgba(0,199,77,0.75)')    // Strong green
   grad.addColorStop(0.4,  'rgba(0,199,77,0.55)')    // Medium intensity
@@ -301,7 +335,6 @@ function drawFlightPath(
   ctx.stroke(curve)
 
   ctx.restore()
-  return { tipX: tip.x, tipY: tip.y, angle, progress: nx }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -676,7 +709,7 @@ export function GameCanvas({
       const turbulenceIntensity = Math.pow(progress, 2) * 2.4  // reduced from 2.5
       const turbulenceY = Math.sin(time / 100) * turbulenceIntensity  // vertical only
 
-      // Draw flight path WITH turbulence offset (WHOLE curve moves)
+      // First calculate the TARGET position (with turbulence)
       const pathData = drawFlightPath(ctx, CW, CH, elapsedMs, -turbulenceY)
 
       if (pathData) {
@@ -712,6 +745,10 @@ export function GameCanvas({
         const tailY = clampedTipY
         const noseX = tailX + PLANE_LEN * Math.cos(sm.angle)
         const noseY = tailY - PLANE_LEN * Math.sin(sm.angle)
+
+        // NOW re-draw the flight path UP TO the actual plane tail position
+        // This ensures the curve is ALWAYS connected to the tail
+        drawFlightPathToPoint(ctx, CW, CH, elapsedMs, -turbulenceY, tailX, tailY)
 
         drawExhaust(ctx, tailX, tailY, sm.angle, time)
         drawPlane(ctx, noseX, noseY, sm.angle, false)
