@@ -44,21 +44,10 @@ console.log(`📁 Static files: ${distPath}`)
 const app = express()
 const httpServer = createServer(app)
 
-// CORS for development and production
-const allowedOrigins = [
-  'http://localhost:5175',
-  'http://localhost:3000',
-  process.env.FRONTEND_URL
-].filter(Boolean)
-
+// CORS - allow all origins in production (we serve everything from same domain)
+// In production, static files and API are on same origin, so CORS is permissive
 app.use(cors({ 
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
+  origin: true,
   credentials: true 
 }))
 
