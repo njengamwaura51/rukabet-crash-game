@@ -5,7 +5,24 @@ import { createServer } from 'http'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 
+// Load environment variables first
 dotenv.config()
+
+// Top-level error handling
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason)
+  process.exit(1)
+})
+
+console.log('🔧 Starting RukaBet server...')
+console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
+console.log(`🔌 PORT: ${process.env.PORT || 3001}`)
+console.log(`📦 MONGO_URI: ${process.env.MONGO_URI ? 'SET' : 'NOT SET'}`)
 
 import { connectDB } from './db.js'
 import { initializeSocket } from './socket.js'
@@ -21,14 +38,8 @@ import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// In production, dist-server is at root level, so dist is a sibling folder
-const isProduction = process.env.NODE_ENV === 'production'
 const distPath = path.join(__dirname, '../dist')
-
-console.log('🔧 Server starting...')
-console.log(`📁 __dirname: ${__dirname}`)
-console.log(`📁 distPath: ${distPath}`)
-console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`)
+console.log(`📁 Static files: ${distPath}`)
 
 const app = express()
 const httpServer = createServer(app)
@@ -72,6 +83,7 @@ app.get('/api/settings', adminMiddleware, getSettings)
 app.put('/api/settings', adminMiddleware, updateSettings)
 
 // Production: Serve static files from Vite build
+const isProduction = process.env.NODE_ENV === 'production'
 if (isProduction) {
   console.log(`📂 Serving static files from: ${distPath}`)
   app.use(express.static(distPath))
@@ -92,23 +104,41 @@ const PORT = process.env.PORT || 3001
 
 async function startServer() {
   try {
+    console.log('🔄 Connecting to MongoDB...')
+    
     // Connect to MongoDB
     await connectDB()
     
-    // Ensure settings exist
-    await Settings.findOne() || await Settings.create({
-      adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
-      jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
-    })
+    // Ensure settings exist (no IntaSend keys required at startup)
+    console.log('🔄 Initializing settings...')
+    try {
+      const existingSettings = await Settings.findOne()
+      if (!existingSettings) {
+        await Settings.create({
+          adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
+          jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026',
+          // IntaSend keys are optional - set via admin dashboard
+          intasendPublicKey: '',
+          intasendSecretKey: '',
+          companyName: 'RUKA TECH SOLUTIONS'
+        })
+        console.log('✅ Default settings created (configure IntaSend in admin dashboard)')
+      } else {
+        console.log('✅ Settings loaded')
+      }
+    } catch (settingsError) {
+      console.error('⚠️ Settings initialization error (non-fatal):', settingsError)
+      // Continue anyway - settings can be created later
+    }
     
     httpServer.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║   🚀 RukaBet Production Server                                ║
-║   📡 API: ${process.env.NODE_ENV === 'production' ? 'https://your-app.herokuapp.com' : `http://localhost:${PORT}`}
-║   🔌 WebSocket: Connected with ping/pong keepalive            ║
-║   🗄️  Database: MongoDB Atlas                                 ║
-║   ⚡ Environment: ${process.env.NODE_ENV || 'development'}                              ║
+║   🚀 RukaBet Server Running                                   ║
+║   📡 Port: ${PORT}                                               ║
+║   🔌 WebSocket: Enabled                                       ║
+║   🗄️  Database: MongoDB                                        ║
+║   ⚡ Environment: ${(process.env.NODE_ENV || 'development').padEnd(10)}                         ║
 ╚═══════════════════════════════════════════════════════════════╝
       `)
     })
