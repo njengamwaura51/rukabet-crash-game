@@ -184,14 +184,14 @@ export default function BetPanelRefactored({
       {/* Compact 50/50 Layout */}
       <div className="flex flex-row w-full gap-2 items-stretch">
         {/* Left Block: All Controls (50%) */}
-        <div className="w-1/2 flex flex-col gap-2">
-          {/* Row 1: Amount stepper */}
-          <div className="flex items-center bg-[#0f1318] rounded-full p-1 w-full">
+        <div className="w-1/2 flex flex-col gap-1">
+          {/* Row 1: Amount stepper - reduced height */}
+          <div className="flex items-center bg-[#0f1318] rounded-full p-0.5 w-full">
             <button
               type="button"
               onClick={decrease}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-7 h-7 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-lg font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-6 h-6 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
             >
               −
             </button>
@@ -202,38 +202,38 @@ export default function BetPanelRefactored({
               value={amount.toLocaleString()}
               onChange={handleAmountChange}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="flex-1 bg-transparent text-center font-mono text-sm font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+              className="flex-1 bg-transparent text-center font-mono text-xs font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
             />
             <button
               type="button"
               onClick={increase}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-7 h-7 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-lg font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-6 h-6 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
             >
               +
             </button>
           </div>
 
-          {/* Row 2: Quick bet buttons */}
-          <div className="grid grid-cols-4 gap-1 w-full">
+          {/* Row 2: Quick bet buttons - reduced height */}
+          <div className="grid grid-cols-4 gap-0.5 w-full">
             {QUICK_AMOUNTS.map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setAmount(Math.min(v, maxBalance || v))}
                 disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-7 rounded-md bg-[#0f1318] text-[9px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
+                className="h-5 rounded bg-[#0f1318] text-[8px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
               >
                 {v >= 1000 ? `${v / 1000}k` : v}
               </button>
             ))}
           </div>
 
-          {/* Row 3: Auto toggles - horizontal tight layout */}
-          <div className="flex flex-row flex-wrap items-center justify-between gap-1 bg-[#0f1318] rounded-md px-1.5 py-1 text-[9px] sm:text-[10px]">
+          {/* Row 3: Auto toggles - EXTENDED to full width with better spacing */}
+          <div className="flex flex-row items-center w-full bg-[#0f1318] rounded px-1 py-0.5 text-[8px]">
             {/* Auto Bet */}
-            <div className="flex items-center gap-1">
-              <span className="text-gray-400 font-medium whitespace-nowrap">Auto</span>
+            <div className="flex items-center gap-0.5">
+              <span className="text-gray-400 font-medium">Auto</span>
               <ToggleSwitch
                 enabled={autoBetEnabled}
                 onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
@@ -241,9 +241,12 @@ export default function BetPanelRefactored({
               />
             </div>
 
-            {/* Auto Cash Out */}
-            <div className="flex items-center gap-1">
-              <span className="text-gray-400 font-medium whitespace-nowrap">@</span>
+            {/* Spacer to push Auto Cash Out to the right */}
+            <div className="flex-1" />
+
+            {/* Auto Cash Out - extended to right edge */}
+            <div className="flex items-center gap-0.5">
+              <span className="text-gray-400 font-medium">@</span>
               <ToggleSwitch
                 enabled={autoCashoutEnabled}
                 onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
@@ -258,9 +261,9 @@ export default function BetPanelRefactored({
                     setAutoCashout(val)
                   }}
                   disabled={!autoCashoutEnabled || !isLoggedIn}
-                  className="w-8 h-5 bg-transparent text-white text-[10px] font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-7 h-4 bg-transparent text-white text-[9px] font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-                <span className="text-[10px] text-gray-400 font-bold pr-1">x</span>
+                <span className="text-[9px] text-gray-400 font-bold pr-0.5">x</span>
               </div>
             </div>
           </div>

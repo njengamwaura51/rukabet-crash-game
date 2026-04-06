@@ -161,9 +161,8 @@ const TARGET_WIDTH = 0.88   // 88% across
 const WAITING_ANGLE = 10 * (Math.PI / 180)  // 10 degrees right
 
 /** Convert elapsed ms → pixel coordinates.
- *  Nearly straight diagonal line from origin to upper-right,
- *  with 9% CONVEX bulge DOWNWARD (curve dips below straight line).
- *  Plane starts at low angle and rises toward upper-right corner. */
+ *  Smooth convex curve that INCREASES in curvature as plane approaches turbulence.
+ *  Creates the classic Aviator look: starts shallow, curves dramatically near the end. */
 function flightPos(tMs: number, gw: number, gh: number) {
   // Progress along the path (0 to 1)
   const t = Math.min(1, tMs / 10000)  // 10 seconds for full journey
@@ -171,13 +170,25 @@ function flightPos(tMs: number, gw: number, gh: number) {
   // X: linear movement to target
   const nx = t * TARGET_WIDTH
   
-  // Y: linear rise to target + 9% downward convex bulge (increased from 6%)
-  // Straight line would be: t * TARGET_HEIGHT
-  // Convex bulge down: subtract a parabola that peaks at t=0.5
-  // Parabola: 4 * t * (1-t) peaks at 0.5 with value 1
+  // Y: INCREASING CONVEX EFFECT
+  // - Early flight: shallow curve (small bulge)
+  // - Late flight (turbulence): dramatic curve (large bulge)
+  // 
+  // Formula: bulge increases with t² so it's subtle at start, dramatic at end
+  // Base parabola: 4*t*(1-t) peaks at t=0.5
+  // Multiply by t² to shift the peak toward the end
   const straightY = t * TARGET_HEIGHT
-  const bulge = 4 * t * (1 - t) * 0.09 * TARGET_HEIGHT  // 9% bulge
-  const ny = straightY - bulge  // subtract to bulge DOWNWARD
+  
+  // Dynamic convex bulge that increases with progress
+  // At t=0: bulge = 0 (straight)
+  // At t=0.5: bulge = moderate
+  // At t=0.8+: bulge = maximum (dramatic curve into turbulence wall)
+  const baseBulge = 4 * t * (1 - t)  // Standard parabola
+  const progressiveBulge = baseBulge * Math.pow(t, 0.6)  // Shift peak toward end
+  const bulgeStrength = 0.14 * TARGET_HEIGHT  // 14% max bulge (increased from 9%)
+  const bulge = progressiveBulge * bulgeStrength
+  
+  const ny = straightY - bulge  // subtract to bulge DOWNWARD (convex shape)
   
   return {
     px: PAD.left + nx * gw,
