@@ -3,9 +3,19 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/rukabet'
+const MONGO_URI = process.env.MONGO_URI
 
 export async function connectDB(): Promise<void> {
+  if (!MONGO_URI) {
+    console.error('❌ MONGO_URI environment variable is not set!')
+    console.error('   Please set MONGO_URI in Heroku config vars:')
+    console.error('   heroku config:set MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/rukabet"')
+    process.exit(1)
+  }
+
+  console.log('🔄 Connecting to MongoDB...')
+  console.log(`📍 URI: ${MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`) // Hide credentials
+
   try {
     await mongoose.connect(MONGO_URI)
     console.log('✅ MongoDB connected successfully')

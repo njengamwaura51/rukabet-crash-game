@@ -21,6 +21,18 @@ import { authMiddlewareMongo, adminMiddlewareMongo } from './middleware/authMong
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// In production, dist-server is at root level, so dist is a sibling folder
+// In development, we're in server/ so dist is at ../dist
+const isProduction = process.env.NODE_ENV === 'production'
+const distPath = isProduction 
+  ? path.join(__dirname, '../dist')  // From dist-server/indexProd.js -> dist/
+  : path.join(__dirname, '../dist')
+
+console.log('🔧 Server starting...')
+console.log(`📁 __dirname: ${__dirname}`)
+console.log(`📁 distPath: ${distPath}`)
+console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`)
+
 const app = express()
 const httpServer = createServer(app)
 
@@ -63,8 +75,8 @@ app.get('/api/settings', adminMiddlewareMongo, getSettingsMongo)
 app.put('/api/settings', adminMiddlewareMongo, updateSettingsMongo)
 
 // Production: Serve static files from Vite build
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '../dist')
+if (isProduction) {
+  console.log(`📂 Serving static files from: ${distPath}`)
   app.use(express.static(distPath))
   
   // SPA catch-all - send all non-API routes to index.html
