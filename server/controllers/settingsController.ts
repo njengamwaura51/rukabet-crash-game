@@ -1,33 +1,77 @@
 import { Request, Response } from 'express'
-import { SettingsModel } from '../models/Settings.js'
+import { Settings } from '../models/Settings.js'
 
-export function getSettings(req: Request, res: Response) {
+export async function getSettings(req: Request, res: Response) {
   try {
-    const settings = SettingsModel.get()
-    if (!settings) return res.status(404).json({ error: 'Settings not found' })
-    const { intasend_secret_key, ...publicSettings } = settings
-    return res.json({ success: true, settings: publicSettings })
+    let settings = await Settings.findOne()
+    
+    if (!settings) {
+      settings = await Settings.create({
+        adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
+        jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
+      })
+    }
+
+    // Don't expose secrets in response
+    return res.json({
+      success: true,
+      settings: {
+        intasendPublicKey: settings.intasendPublicKey,
+        companyName: settings.companyName,
+        whatsappSupport: settings.whatsappSupport,
+        minDeposit: settings.minDeposit,
+        minWithdrawal: settings.minWithdrawal,
+        updatedAt: settings.updatedAt
+      }
+    })
   } catch (error: any) {
     return res.status(500).json({ error: error.message })
   }
 }
 
-export function updateSettings(req: Request, res: Response) {
+export async function updateSettings(req: Request, res: Response) {
   try {
-    const { intasend_public_key, intasend_secret_key, company_name, whatsapp_support, min_deposit, min_withdrawal } = req.body
-    const updates: any = {}
-    if (intasend_public_key !== undefined) updates.intasend_public_key = intasend_public_key
-    if (intasend_secret_key !== undefined) updates.intasend_secret_key = intasend_secret_key
-    if (company_name !== undefined) updates.company_name = company_name
-    if (whatsapp_support !== undefined) updates.whatsapp_support = whatsapp_support
-    if (min_deposit !== undefined) updates.min_deposit = min_deposit
-    if (min_withdrawal !== undefined) updates.min_withdrawal = min_withdrawal
-
-    const settings = SettingsModel.update(updates)
-    console.log('✅ Settings updated:', Object.keys(updates).join(', '))
+    const updates = req.body
     
-    const { intasend_secret_key: _, ...publicSettings } = settings
-    return res.json({ success: true, message: 'Settings updated', settings: publicSettings })
+    // Sanitize - only allow specific fields to be updated
+    const allowedFields = [
+      'intasendPublicKey',
+      'intasendSecretKey', 
+      'companyName',
+      'whatsappSupport',
+      'minDeposit',
+      'minWithdrawal'
+    ]
+
+    const sanitizedUpdates: any = {}
+    for (const key of allowedFields) {
+      // Handle both camelCase and snake_case input
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+      if (updates[key] !== undefined) {
+        sanitizedUpdates[key] = updates[key]
+      } else if (updates[snakeKey] !== undefined) {
+        sanitizedUpdates[key] = updates[snakeKey]
+      }
+    }
+
+    const settings = await Settings.findOneAndUpdate(
+      {},
+      { $set: sanitizedUpdates },
+      { new: true, upsert: true }
+    )
+
+    return res.json({
+      success: true,
+      message: 'Settings updated',
+      settings: {
+        intasendPublicKey: settings.intasendPublicKey,
+        companyName: settings.companyName,
+        whatsappSupport: settings.whatsappSupport,
+        minDeposit: settings.minDeposit,
+        minWithdrawal: settings.minWithdrawal,
+        updatedAt: settings.updatedAt
+      }
+    })
   } catch (error: any) {
     return res.status(500).json({ error: error.message })
   }

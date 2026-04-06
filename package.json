@@ -9,11 +9,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:server": "tsx watch server/index.ts",
-    "dev:server:mongo": "tsx watch server/indexProd.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
-    "start": "node dist-server/indexProd.js",
+    "start": "node dist-server/index.js",
     "heroku-postbuild": "npm run build && npm run build:server",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit"
@@ -28,7 +27,6 @@
     "@tanstack/react-query": "^5.56.2",
     "axios": "^1.14.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -49,7 +47,6 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

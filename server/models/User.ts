@@ -1,51 +1,58 @@
-import db from '../database.js'
+import mongoose, { HydratedDocument } from 'mongoose'
 import bcrypt from 'bcryptjs'
 
-export interface User {
-  id: number
-  phone: string
-  password: string
-  username: string
-  balance: number
-  freebet: number
-  freebet_locked: number
-  has_played_with_money: number
-  created_at: string
-  updated_at: string
-}
-
-export interface SafeUser extends Omit<User, 'password'> {}
-
-export class UserModel {
-  static findByPhone(phone: string): User | null {
-    const stmt = db.prepare('SELECT * FROM users WHERE phone = ?')
-    return stmt.get(phone) as User | null
+// Define the schema
+const UserSchema = new mongoose.Schema({
+  phone: {
+    type: String,
+    required: [true, 'Phone number is required'],
+    unique: true,
+    trim: true,
+    index: true
+  },
+  password: {
+    type: String,
+    required: [true, 'Password is required'],
+    minlength: 4
+  },
+  username: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 20
+  },
+  balance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  freebet: {
+    type: Number,
+    default: 150
+  },
+  freebetLocked: {
+    type: Boolean,
+    default: true
+  },
+  hasPlayedWithMoney: {
+    type: Boolean,
+    default: false
   }
-
-  static findById(id: number): User | null {
-    const stmt = db.prepare('SELECT * FROM users WHERE id = ?')
-    return stmt.get(id) as User | null
+}, {
+  timestamps: true,
+  methods: {
+    comparePassword(candidatePassword: string): boolean {
+      return bcrypt.compareSync(candidatePassword, this.password)
+    }
   }
+})
 
-  static create(phone: string, password: string, username: string): SafeUser {
-    const hashedPassword = bcrypt.hashSync(password, 10)
-    const stmt = db.prepare(`INSERT INTO users (phone, password, username, balance, freebet, freebet_locked) VALUES (?, ?, ?, 0, 150, 1)`)
-    const info = stmt.run(phone, hashedPassword, username)
-    const user = this.findById(info.lastInsertRowid as number)!
-    return this.toSafe(user)
+// Hash password before saving - use function syntax for mongoose 9
+UserSchema.pre('save', { document: true }, function() {
+  if (this.isModified('password')) {
+    this.password = bcrypt.hashSync(this.password, 10)
   }
+})
 
-  static verifyPassword(user: User, password: string): boolean {
-    return bcrypt.compareSync(password, user.password)
-  }
-
-  static updateBalance(userId: number, amount: number): void {
-    const stmt = db.prepare('UPDATE users SET balance = balance + ?, updated_at = ? WHERE id = ?')
-    stmt.run(amount, new Date().toISOString(), userId)
-  }
-
-  static toSafe(user: User): SafeUser {
-    const { password, ...safe } = user
-    return safe
-  }
-}
+export const User = mongoose.model('User', UserSchema)
+export type UserDocument = HydratedDocument<mongoose.InferSchemaType<typeof UserSchema>>

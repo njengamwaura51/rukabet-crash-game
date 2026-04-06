@@ -1,47 +1,65 @@
-import db from '../database.js'
+import mongoose, { Schema, Document } from 'mongoose'
 
-export interface Settings {
-  id: number
-  intasend_public_key: string | null
-  intasend_secret_key: string | null
-  company_name: string
-  whatsapp_support: string
-  min_deposit: number
-  min_withdrawal: number
-  updated_at: string
+export interface ISettings extends Document {
+  _id: mongoose.Types.ObjectId
+  intasendPublicKey: string
+  intasendSecretKey: string
+  companyName: string
+  whatsappSupport: string
+  minDeposit: number
+  minWithdrawal: number
+  adminToken: string
+  jwtSecret: string
+  updatedAt: Date
 }
 
-export class SettingsModel {
-  static get(): Settings | null {
-    const stmt = db.prepare('SELECT * FROM settings WHERE id = 1')
-    return stmt.get() as Settings | null
+const SettingsSchema = new Schema<ISettings>({
+  intasendPublicKey: {
+    type: String,
+    default: ''
+  },
+  intasendSecretKey: {
+    type: String,
+    default: ''
+  },
+  companyName: {
+    type: String,
+    default: 'RUKA TECH SOLUTIONS'
+  },
+  whatsappSupport: {
+    type: String,
+    default: '254712345678'
+  },
+  minDeposit: {
+    type: Number,
+    default: 10
+  },
+  minWithdrawal: {
+    type: Number,
+    default: 50
+  },
+  adminToken: {
+    type: String,
+    default: ''
+  },
+  jwtSecret: {
+    type: String,
+    default: ''
   }
+}, {
+  timestamps: true
+})
 
-  static update(data: Partial<Settings>): Settings {
-    const allowed = ['intasend_public_key', 'intasend_secret_key', 'company_name', 'whatsapp_support', 'min_deposit', 'min_withdrawal']
-    const updates: string[] = []
-    const values: any[] = []
-    Object.entries(data).forEach(([key, value]) => {
-      if (allowed.includes(key)) {
-        updates.push(`${key} = ?`)
-        values.push(value)
-      }
+// Singleton pattern - only one settings document
+SettingsSchema.statics.getSettings = async function() {
+  let settings = await this.findOne()
+  if (!settings) {
+    settings = await this.create({
+      adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
+      jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
     })
-    if (updates.length === 0) throw new Error('No valid fields to update')
-    values.push(new Date().toISOString())
-    updates.push('updated_at = ?')
-    const stmt = db.prepare(`UPDATE settings SET ${updates.join(', ')} WHERE id = 1`)
-    stmt.run(...values)
-    return this.get()!
   }
-
-  static getIntaSendConfig(): { publicKey: string; secretKey: string; companyName: string } | null {
-    const settings = this.get()
-    if (!settings?.intasend_public_key || !settings?.intasend_secret_key) return null
-    return {
-      publicKey: settings.intasend_public_key,
-      secretKey: settings.intasend_secret_key,
-      companyName: settings.company_name
-    }
-  }
+  return settings
 }
+
+export const Settings = mongoose.model<ISettings>('Settings', SettingsSchema)
