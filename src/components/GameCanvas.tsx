@@ -502,29 +502,26 @@ function BetModeToggle({
   freebetAmount?: number
 }) {
   return (
-    <div className="flex items-center rounded-full bg-[#0f1318] p-0.5 border border-[#00C74D]/20">
+    <div className="flex items-center rounded-full bg-[#0f1318] p-0.5 border border-[#00C74D]/20 ml-2">
       <button type="button" onClick={() => betMode !== 'money' && onToggle()}
-        className={cn('rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[10px] font-bold tracking-wide transition-all duration-200',
+        className={cn('rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-bold tracking-wide transition-all duration-200',
           betMode === 'money' 
             ? 'bg-[#00C74D] text-black' 
-            : 'text-white/50 hover:text-white/80')}>
+            : 'text-white/60 hover:text-white/90')}>
         Money
       </button>
       <button 
         type="button" 
-        onClick={() => !freebetLocked && betMode !== 'freebet' && onToggle()}
-        disabled={freebetLocked}
-        className={cn('rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[10px] font-bold tracking-wide transition-all duration-200 relative',
-          freebetLocked && 'opacity-50 cursor-not-allowed',
+        onClick={() => betMode !== 'freebet' && onToggle()}
+        className={cn('rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-bold tracking-wide transition-all duration-200 relative',
           betMode === 'freebet' 
             ? 'bg-[#00C74D] text-black' 
-            : 'text-white/50 hover:text-white/80')}
-        title={freebetLocked ? 'Deposit KSH 20+ and place a bet to unlock' : `Freebet: KSH ${freebetAmount.toFixed(0)}`}
+            : 'text-white/60 hover:text-white/90')}
+        title={freebetLocked ? 'Deposit KSH 20+ to unlock bonus' : `Freebet: KSH ${freebetAmount > 0 ? freebetAmount.toFixed(0) : '0'}`}
       >
         Freebet
-        {freebetLocked && <span className="ml-0.5">🔒</span>}
         {!freebetLocked && freebetAmount > 0 && (
-          <span className="ml-1 text-[7px] opacity-80">({freebetAmount.toFixed(0)})</span>
+          <span className="ml-1 text-[8px] opacity-80">({freebetAmount.toFixed(0)})</span>
         )}
       </button>
     </div>
@@ -533,12 +530,12 @@ function BetModeToggle({
 
 function NetworkStatus() {
   return (
-    <div className="flex items-center gap-0.5 sm:gap-1 text-[7px] sm:text-[8px] text-white/40 mt-0.5 ml-0.5 sm:ml-1">
-      <span className="relative flex h-1 w-1">
+    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/70 font-semibold">
+      <span className="relative flex h-1.5 w-1.5">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00C74D] opacity-75" />
-        <span className="relative inline-flex h-1 w-1 rounded-full bg-[#00C74D]" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00C74D]" />
       </span>
-      <span className="font-medium">Online</span>
+      <span>Online</span>
     </div>
   )
 }
@@ -822,14 +819,18 @@ export function GameCanvas({
     <div className="relative w-full h-full overflow-hidden rounded-md sm:rounded-lg">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ display: 'block' }} />
 
-      {/* Top-left controls */}
-      <div className="absolute top-1 sm:top-2 left-1 sm:left-2 z-10 flex flex-col gap-0.5">
+      {/* Top-left: Money/Freebet toggle - moved slightly right with ml-2 */}
+      <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
         <BetModeToggle 
           betMode={betMode} 
           onToggle={onToggleBetMode} 
           freebetLocked={freebetLocked}
           freebetAmount={freebetAmount}
         />
+      </div>
+      
+      {/* Top-left inside canvas: Online status indicator */}
+      <div className="absolute top-2 left-4 z-10" style={{ top: '44px' }}>
         <NetworkStatus />
       </div>
 

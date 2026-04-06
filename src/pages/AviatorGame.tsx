@@ -18,10 +18,9 @@ export default function AviatorGame() {
   const [autoBetPanel1, setAutoBetPanel1] = useState(false)
   const [autoBetPanel2, setAutoBetPanel2] = useState(false)
 
-  // Handle wallet toggle
+  // Handle wallet toggle - allow switching even if locked (validation happens at bet time)
   const handleToggleWallet = useCallback((wallet: 'main' | 'bonus') => {
     if (!auth.user) return
-    if (wallet === 'bonus' && auth.user.freebetLocked) return
     setActiveWallet(wallet)
   }, [auth.user])
 
@@ -125,6 +124,7 @@ export default function AviatorGame() {
                   isLoggedIn={auth.isLoggedIn}
                   isFreebet={isFreebet}
                   maxBalance={maxBalance}
+                  freebetLocked={freebetLocked}
                   autoBetEnabled={autoBetPanel1}
                   onAutoBetToggle={setAutoBetPanel1}
                 />
@@ -139,6 +139,7 @@ export default function AviatorGame() {
                   isLoggedIn={auth.isLoggedIn}
                   isFreebet={isFreebet}
                   maxBalance={maxBalance}
+                  freebetLocked={freebetLocked}
                   autoBetEnabled={autoBetPanel2}
                   onAutoBetToggle={setAutoBetPanel2}
                 />

@@ -359,7 +359,7 @@ export default function HybridBotPanel({
       {/* Settings Grid - Compact */}
       <div className="grid grid-cols-4 gap-1.5">
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Base Bet</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Base Bet</label>
           <input
             type="number"
             value={baseBet}
@@ -369,7 +369,7 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Max Bet</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max Bet</label>
           <input
             type="number"
             value={maxBetLimit}
@@ -379,7 +379,7 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Base @</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Base @</label>
           <input
             type="number"
             step="0.05"
@@ -390,7 +390,7 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Max @</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max @</label>
           <input
             type="number"
             step="0.5"
@@ -405,7 +405,7 @@ export default function HybridBotPanel({
       {/* Advanced Settings - Second Row */}
       <div className="grid grid-cols-3 gap-1.5">
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Recovery ×</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Recovery ×</label>
           <input
             type="number"
             step="0.05"
@@ -416,7 +416,7 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Max Steps</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max Steps</label>
           <input
             type="number"
             value={maxRecoverySteps}
@@ -426,7 +426,7 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-400 font-medium uppercase">Stop Loss</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Stop Loss</label>
           <input
             type="number"
             value={sessionStopLoss}
@@ -440,21 +440,21 @@ export default function HybridBotPanel({
       {/* Live Stats - Primary Row */}
       <div className="grid grid-cols-4 gap-1 bg-[#0f1318] rounded-lg p-2">
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-400 font-medium uppercase">Bet</span>
+          <span className="text-[8px] text-gray-200 font-semibold uppercase">Bet</span>
           <span className="text-[10px] font-mono font-bold text-white">{currentBet}</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-400 font-medium uppercase">Target</span>
+          <span className="text-[8px] text-gray-200 font-semibold uppercase">Target</span>
           <span className="text-[10px] font-mono font-bold text-yellow-500">{dynamicTarget.toFixed(2)}x</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-400 font-medium uppercase">Losses</span>
+          <span className="text-[8px] text-gray-200 font-semibold uppercase">Losses</span>
           <span className={`text-[10px] font-mono font-bold ${consecutiveLosses > 2 ? 'text-red-500' : consecutiveLosses > 0 ? 'text-orange-500' : 'text-gray-500'}`}>
             {consecutiveLosses}/{maxRecoverySteps}
           </span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-400 font-medium uppercase">Wins</span>
+          <span className="text-[8px] text-gray-200 font-semibold uppercase">Wins</span>
           <span className={`text-[10px] font-mono font-bold ${winStreak > 0 ? 'text-[#00C74D]' : 'text-gray-500'}`}>
             {winStreak}🔥
           </span>
@@ -464,21 +464,21 @@ export default function HybridBotPanel({
       {/* Stats Row 2 */}
       <div className="grid grid-cols-4 gap-1 text-center">
         <div>
-          <div className="text-[8px] text-gray-400 font-medium uppercase">Rounds</div>
+          <div className="text-[8px] text-gray-200 font-semibold uppercase">Rounds</div>
           <div className="text-[10px] font-mono font-bold text-white">{roundsPlayed}</div>
         </div>
         <div>
-          <div className="text-[8px] text-gray-400 font-medium uppercase">Skipped</div>
+          <div className="text-[8px] text-gray-200 font-semibold uppercase">Skipped</div>
           <div className="text-[10px] font-mono font-bold text-blue-400">{skippedRounds}</div>
         </div>
         <div>
-          <div className="text-[8px] text-gray-400 font-medium uppercase">Profit</div>
+          <div className="text-[8px] text-gray-200 font-semibold uppercase">Profit</div>
           <div className={`text-[10px] font-mono font-bold ${sessionProfit >= 0 ? 'text-[#00C74D]' : 'text-red-500'}`}>
             {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toFixed(0)}
           </div>
         </div>
         <div>
-          <div className="text-[8px] text-gray-400 font-medium uppercase">At Risk</div>
+          <div className="text-[8px] text-gray-200 font-semibold uppercase">At Risk</div>
           <div className="text-[10px] font-mono font-bold text-orange-500">{accumulatedLoss.toFixed(0)}</div>
         </div>
       </div>

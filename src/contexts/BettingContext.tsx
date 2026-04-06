@@ -29,9 +29,9 @@ interface BettingContextValue {
   bets: PlayerBet[]
   betHistory: BetHistory[]
   
-  // Actions
-  placeBet: (panelId: number, amount: number, isFreebet: boolean) => boolean
-  queueBet: (panelId: number, amount: number, isFreebet: boolean) => boolean
+  // Actions - with balance validation
+  placeBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean) => boolean
+  queueBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number) => boolean
   cancelQueuedBet: (panelId: number) => boolean
   cashOut: (panelId: number, multiplier: number) => { success: boolean; wonAmount?: number }
   
@@ -77,12 +77,24 @@ export function BettingProvider({
   // PHASE 2: STRICT ACTION HANDLERS
   // ─────────────────────────────────────────────────────────────────────────
 
-  const placeBet = useCallback((panelId: number, amount: number, isFreebet: boolean): boolean => {
+  const placeBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean): boolean => {
     // Can only place active bets during WAITING phase
     if (gamePhase !== 'waiting') return false
     
     // Check if panel already has a bet
     if (bets.some(b => b.panelId === panelId)) return false
+    
+    // BALANCE VALIDATION - prevent negative balances
+    if (currentBalance !== undefined && amount > currentBalance) {
+      console.warn('Insufficient funds: bet amount exceeds balance')
+      return false
+    }
+    
+    // FREEBET LOCK VALIDATION - special error for locked bonus
+    if (isFreebet && freebetLocked) {
+      console.warn('Freebet locked: Deposit at least 20 to unlock')
+      return false
+    }
     
     // Deduct balance via callback
     onBalanceChange?.(-amount, isFreebet)
@@ -98,12 +110,18 @@ export function BettingProvider({
     return true
   }, [gamePhase, bets, onBalanceChange])
 
-  const queueBet = useCallback((panelId: number, amount: number, isFreebet: boolean): boolean => {
+  const queueBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number): boolean => {
     // Can only queue bets during FLYING or CRASHED phase
     if (gamePhase !== 'flying' && gamePhase !== 'crashed' && gamePhase !== 'crashing') return false
     
     // Check if panel already has a queued bet
     if (bets.some(b => b.panelId === panelId && b.status === 'QUEUED')) return false
+    
+    // BALANCE VALIDATION
+    if (currentBalance !== undefined && amount > currentBalance) {
+      console.warn('Insufficient funds: bet amount exceeds balance')
+      return false
+    }
     
     // Deduct balance immediately
     onBalanceChange?.(-amount, isFreebet)

@@ -11,6 +11,7 @@ interface BetPanelProps {
   isLoggedIn?: boolean
   isFreebet: boolean
   maxBalance: number
+  freebetLocked?: boolean
   autoBetEnabled?: boolean
   onAutoBetToggle?: (enabled: boolean) => void
 }
@@ -18,6 +19,15 @@ interface BetPanelProps {
 const QUICK_AMOUNTS = [10, 100, 1000, 10000] as const
 const STEP = 5
 const MIN_AMOUNT = 10
+
+// Clean number formatting - no ugly trailing zeros
+function formatNumber(num: number): string {
+  if (num === 0) return '0'
+  if (Number.isInteger(num)) return num.toString()
+  const fixed = num.toFixed(2)
+  // Remove trailing zeros after decimal
+  return fixed.replace(/\.?0+$/, '') || '0'
+}
 
 function ToggleSwitch({ 
   enabled, 
@@ -55,6 +65,7 @@ export default function BetPanelRefactored({
   isLoggedIn = false,
   isFreebet,
   maxBalance,
+  freebetLocked = false,
   autoBetEnabled = false,
   onAutoBetToggle,
 }: BetPanelProps) {
@@ -63,6 +74,7 @@ export default function BetPanelRefactored({
   const [autoCashout, setAutoCashout] = useState('2.00')
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false)
   const [lastBetAmount, setLastBetAmount] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   // Query the centralized state
   const activeBet = betting.getActiveBet(panelId)
@@ -100,13 +112,24 @@ export default function BetPanelRefactored({
   // Auto-bet logic: place bet automatically when new round starts
   useEffect(() => {
     if (autoBetEnabled && gamePhase === 'waiting' && lastBetAmount >= MIN_AMOUNT && isLoggedIn && !activeBet && !queuedBet) {
-      betting.placeBet(panelId, lastBetAmount, isFreebet)
+      if (lastBetAmount <= maxBalance) {
+        betting.placeBet(panelId, lastBetAmount, isFreebet, maxBalance, freebetLocked)
+      }
     }
-  }, [gamePhase, autoBetEnabled, lastBetAmount, isLoggedIn, panelId, betting, isFreebet, activeBet, queuedBet])
+  }, [gamePhase, autoBetEnabled, lastBetAmount, isLoggedIn, panelId, betting, isFreebet, activeBet, queuedBet, maxBalance, freebetLocked])
+
+  // Clear error after 3 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
 
   // Main button click handler
   const handleClick = () => {
     if (!isLoggedIn) return
+    setError(null)
 
     // CASH OUT (during flying with active bet)
     if (activeBet && gamePhase === 'flying') {
@@ -123,9 +146,24 @@ export default function BetPanelRefactored({
     // PLACE BET (during waiting)
     if (gamePhase === 'waiting' && !activeBet && !queuedBet) {
       const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
-      const success = betting.placeBet(panelId, betAmount, isFreebet)
+      
+      // VALIDATION: Check balance
+      if (betAmount > maxBalance) {
+        setError('Insufficient funds')
+        return
+      }
+      
+      // VALIDATION: Check freebet lock
+      if (isFreebet && freebetLocked) {
+        setError('Deposit at least 20 to unlock')
+        return
+      }
+      
+      const success = betting.placeBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
       if (success) {
         setLastBetAmount(betAmount)
+      } else {
+        setError('Insufficient funds')
       }
       return
     }
@@ -133,9 +171,18 @@ export default function BetPanelRefactored({
     // QUEUE BET (during flying/crashed)
     if ((gamePhase === 'flying' || gamePhase === 'crashed' || gamePhase === 'crashing') && !activeBet && !queuedBet) {
       const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
-      const success = betting.queueBet(panelId, betAmount, isFreebet)
+      
+      // VALIDATION: Check balance
+      if (betAmount > maxBalance) {
+        setError('Insufficient funds')
+        return
+      }
+      
+      const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance)
       if (success) {
         setLastBetAmount(betAmount)
+      } else {
+        setError('Insufficient funds')
       }
       return
     }
@@ -146,13 +193,13 @@ export default function BetPanelRefactored({
   // ─────────────────────────────────────────────────────────────────────────
 
   let buttonText = 'BET'
-  let buttonSubtext = `${amount.toFixed(2)} ${currency}`
+  let buttonSubtext = `${formatNumber(amount)} ${currency}`
   let buttonBg = '#00C74D'
   let isDisabled = false
 
   if (!isLoggedIn) {
     buttonText = 'BET'
-    buttonSubtext = `${amount.toFixed(2)} ${currency}`
+    buttonSubtext = `${formatNumber(amount)} ${currency}`
     buttonBg = '#00C74D'
   } else if (cashedOutBet && gamePhase !== 'waiting') {
     buttonText = 'WAIT'
@@ -164,23 +211,29 @@ export default function BetPanelRefactored({
     buttonSubtext = `Next Round`
     buttonBg = '#ef4444'
   } else if (activeBet && gamePhase === 'flying') {
-    const potentialWin = (activeBet.amount * currentMultiplier).toFixed(2)
+    const potentialWin = formatNumber(activeBet.amount * currentMultiplier)
     buttonText = 'CASH OUT'
     buttonSubtext = `${potentialWin} ${currency}`
     buttonBg = '#f59e0b'
   } else if (activeBet && gamePhase === 'waiting') {
     buttonText = 'ACTIVE'
-    buttonSubtext = `${activeBet.amount.toFixed(2)} ${currency}`
+    buttonSubtext = `${formatNumber(activeBet.amount)} ${currency}`
     buttonBg = '#374151'
     isDisabled = true
   } else if (gamePhase === 'crashed' || gamePhase === 'crashing') {
     buttonText = 'BET NEXT'
-    buttonSubtext = `${amount.toFixed(2)} ${currency}`
+    buttonSubtext = `${formatNumber(amount)} ${currency}`
     buttonBg = '#00C74D'
   }
 
   return (
     <div className="bg-[#1a1d24] rounded-xl p-2 border border-white/5 w-full max-w-full overflow-hidden">
+      {/* Error Toast */}
+      {error && (
+        <div className="mb-2 px-2 py-1.5 bg-red-500/20 border border-red-500/50 rounded-lg text-center">
+          <span className="text-red-400 text-[10px] font-bold">{error}</span>
+        </div>
+      )}
       {/* Compact 50/50 Layout */}
       <div className="flex flex-row w-full gap-2 items-stretch">
         {/* Left Block: All Controls (50%) */}
@@ -222,7 +275,7 @@ export default function BetPanelRefactored({
                 type="button"
                 onClick={() => setAmount(Math.min(v, maxBalance || v))}
                 disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-5 rounded bg-[#0f1318] text-[8px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
+                className="h-5 rounded bg-[#0f1318] text-[8px] font-mono font-bold text-gray-100 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
               >
                 {v >= 1000 ? `${v / 1000}k` : v}
               </button>
@@ -233,7 +286,7 @@ export default function BetPanelRefactored({
           <div className="flex flex-row items-center w-full bg-[#0f1318] rounded px-1 py-0.5 text-[8px]">
             {/* Auto Bet */}
             <div className="flex items-center gap-0.5">
-              <span className="text-gray-400 font-medium">Auto</span>
+              <span className="text-gray-200 font-semibold">Auto</span>
               <ToggleSwitch
                 enabled={autoBetEnabled}
                 onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
@@ -246,7 +299,7 @@ export default function BetPanelRefactored({
 
             {/* Auto Cash Out - extended to right edge */}
             <div className="flex items-center gap-0.5">
-              <span className="text-gray-400 font-medium">@</span>
+              <span className="text-gray-200 font-semibold">@</span>
               <ToggleSwitch
                 enabled={autoCashoutEnabled}
                 onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
@@ -263,7 +316,7 @@ export default function BetPanelRefactored({
                   disabled={!autoCashoutEnabled || !isLoggedIn}
                   className="w-7 h-4 bg-transparent text-white text-[9px] font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-                <span className="text-[9px] text-gray-400 font-bold pr-0.5">x</span>
+                <span className="text-[9px] text-gray-200 font-bold pr-0.5">x</span>
               </div>
             </div>
           </div>
