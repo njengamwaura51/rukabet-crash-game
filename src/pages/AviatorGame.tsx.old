@@ -1,0 +1,253 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useGameState } from '@/hooks/useGameState'
+import { useAuth } from '@/hooks/useAuth'
+import { GameCanvas } from '@/components/GameCanvas'
+import { Header } from '@/components/Header'
+import { RoundHistory } from '@/components/RoundHistory'
+import { LiveBetsSidebar, UserBetHistory } from '@/components/LiveBetsSidebar'
+import BetPanel from '@/components/BetPanel'
+import { CashoutPopup } from '@/components/CashoutPopup'
+
+export default function AviatorGame() {
+  const game = useGameState()
+  const auth = useAuth()
+  const [activeWallet, setActiveWallet] = useState<'main' | 'bonus'>('main')
+  const [activeBets, setActiveBets] = useState<{ panelId: number; amount: number; cashedOut: boolean; won: number; isFreebet: boolean }[]>([])
+  const [userBetHistory, setUserBetHistory] = useState<UserBetHistory[]>([])
+  const [cashoutPopup, setCashoutPopup] = useState<{ multiplier: number; amount: number } | null>(null)
+  const [autoBetPanel1, setAutoBetPanel1] = useState(false)
+  const [autoBetPanel2, setAutoBetPanel2] = useState(false)
+  const roundIdRef = useRef(0)
+
+  // Handle wallet toggle
+  const handleToggleWallet = useCallback((wallet: 'main' | 'bonus') => {
+    if (!auth.user) return
+    if (wallet === 'bonus' && auth.user.freebetLocked) return
+    setActiveWallet(wallet)
+  }, [auth.user])
+
+  const handleBet = useCallback((panelId: number, amount: number, isQueued = false) => {
+    if (!auth.user) return false
+    
+    // CRITICAL: Determine which balance to use based on activeWallet
+    const isFreebet = activeWallet === 'bonus'
+    const availableBalance = isFreebet ? auth.user.freebet : auth.user.balance
+
+    if (amount > availableBalance) return false
+
+    // Deduct from appropriate balance IMMEDIATELY (even for queued bets)
+    auth.updateBalance(-amount, isFreebet)
+    
+    if (!isQueued) {
+      // Active bet for current round
+      setActiveBets(prev => [...prev, { panelId, amount, cashedOut: false, won: 0, isFreebet }])
+    }
+
+    // If betting with real money, mark as played
+    if (!isFreebet) {
+      auth.markPlayedWithMoney()
+    }
+
+    return true
+  }, [auth, activeWallet])
+
+  const handleCashout = useCallback((panelId: number): { success: boolean; multiplier?: number; amount?: number } => {
+    if (!auth.user) return { success: false }
+    if (game.phase !== 'flying') return { success: false }
+    
+    const bet = activeBets.find(b => b.panelId === panelId && !b.cashedOut)
+    if (!bet) return { success: false }
+    
+    const winAmount = Math.round(bet.amount * game.multiplier * 100) / 100
+    const cashoutMultiplier = Math.round(game.multiplier * 100) / 100
+    
+    // Freebet winnings: only profit goes to real balance
+    if (bet.isFreebet) {
+      const profit = winAmount - bet.amount
+      if (profit > 0) {
+        auth.updateBalance(profit, false)
+      }
+    } else {
+      auth.updateBalance(winAmount, false)
+    }
+
+    // Update active bet state
+    setActiveBets(prev => prev.map(b => 
+      b.panelId === panelId && !b.cashedOut 
+        ? { ...b, cashedOut: true, won: winAmount }
+        : b
+    ))
+
+    // Add to user bet history
+    const historyEntry: UserBetHistory = {
+      id: `bet_${Date.now()}_${panelId}`,
+      roundId: roundIdRef.current,
+      amount: bet.amount,
+      cashoutMultiplier: cashoutMultiplier,
+      won: winAmount,
+      isFreebet: bet.isFreebet,
+      timestamp: Date.now(),
+    }
+    setUserBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+
+    // Show cashout popup
+    setCashoutPopup({ multiplier: cashoutMultiplier, amount: winAmount })
+
+    return { success: true, multiplier: cashoutMultiplier, amount: winAmount }
+  }, [auth, game.phase, game.multiplier, activeBets])
+
+  const handleCancelQueue = useCallback((panelId: number) => {
+    // Refund the queued bet amount
+    const bet = activeBets.find(b => b.panelId === panelId && !b.cashedOut)
+    if (bet) {
+      auth.updateBalance(bet.amount, bet.isFreebet)
+      setActiveBets(prev => prev.filter(b => !(b.panelId === panelId && !b.cashedOut)))
+    }
+  }, [auth, activeBets])
+
+  // Handle round end - record lost bets
+  useEffect(() => {
+    if (game.phase === 'crashed') {
+      // Record any uncashed bets as losses
+      activeBets.forEach(bet => {
+        if (!bet.cashedOut) {
+          const historyEntry: UserBetHistory = {
+            id: `bet_${Date.now()}_${bet.panelId}`,
+            roundId: roundIdRef.current,
+            amount: bet.amount,
+            cashoutMultiplier: null,
+            won: null,
+            isFreebet: bet.isFreebet,
+            timestamp: Date.now(),
+          }
+          setUserBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+        }
+      })
+    }
+  }, [game.phase, activeBets])
+
+  // Reset bets when new round starts
+  useEffect(() => {
+    if (game.phase === 'waiting') {
+      setActiveBets([])
+      roundIdRef.current++
+    }
+  }, [game.phase])
+
+  // Determine bet mode based on active wallet
+  const betMode = activeWallet === 'bonus' ? 'freebet' : 'money'
+  const displayBalance = auth.user?.balance ?? 0
+  const displayFreebet = auth.user?.freebet ?? 0
+  const freebetLocked = auth.user?.freebetLocked ?? true
+
+  return (
+    <div className="min-h-screen bg-[#0b0e11] flex flex-col">
+      {/* Header with dynamic wallet display */}
+      <Header 
+        user={auth.user}
+        onLogin={auth.login}
+        onRegister={auth.register}
+        onLogout={auth.logout}
+        onDeposit={auth.deposit}
+        activeWallet={activeWallet}
+      />
+
+      {/* Body: sidebar + main game - responsive layout */}
+      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+
+        {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
+        <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] h-full">
+          <LiveBetsSidebar 
+            phase={game.phase} 
+            multiplier={game.multiplier}
+            userBetHistory={userBetHistory}
+            username={auth.user?.username}
+          />
+        </aside>
+
+        {/* Main column: history + canvas + bet panels */}
+        <main className="flex flex-col flex-1 min-w-0 p-2 lg:pl-0 gap-2">
+
+          {/* Multiplier history bar */}
+          <RoundHistory history={game.roundHistory} />
+
+          {/* Game canvas - constrained height on all screen sizes */}
+          <div className="flex-shrink-0 h-[200px] sm:h-[240px] md:h-[280px] lg:h-[320px] xl:h-[360px] relative">
+            <GameCanvas
+              phase={game.phase}
+              multiplier={game.multiplier}
+              crashPoint={game.crashPoint}
+              waitProgress={game.waitProgress}
+              elapsedMs={game.elapsedMs}
+              plane={game.plane}
+              betMode={betMode}
+              onToggleBetMode={() => handleToggleWallet(activeWallet === 'main' ? 'bonus' : 'main')}
+              freebetLocked={freebetLocked}
+              freebetAmount={displayFreebet}
+            />
+            
+            {/* Cashout popup overlay */}
+            {cashoutPopup && (
+              <CashoutPopup
+                multiplier={cashoutPopup.multiplier}
+                amount={cashoutPopup.amount}
+                onComplete={() => setCashoutPopup(null)}
+              />
+            )}
+          </div>
+
+          {/* Bet panels — stacked on mobile, side by side on xl+ */}
+          <div className="flex-shrink-0 flex flex-col xl:flex-row w-full gap-2">
+            <div className="w-full">
+              <BetPanel 
+                panelId={1}
+                defaultAmount={25} 
+                currency="KSH" 
+                phase={game.phase}
+                multiplier={game.multiplier}
+                onBet={handleBet}
+                onCashout={handleCashout}
+                onCancelQueue={handleCancelQueue}
+                activeBet={activeBets.find(b => b.panelId === 1 && !b.cashedOut)}
+                isLoggedIn={auth.isLoggedIn}
+                betMode={betMode}
+                maxBet={activeWallet === 'bonus' ? displayFreebet : displayBalance}
+                autoBetEnabled={autoBetPanel1}
+                onAutoBetToggle={setAutoBetPanel1}
+              />
+            </div>
+            <div className="w-full">
+              <BetPanel 
+                panelId={2}
+                defaultAmount={18} 
+                currency="KSH"
+                phase={game.phase}
+                multiplier={game.multiplier}
+                onBet={handleBet}
+                onCashout={handleCashout}
+                onCancelQueue={handleCancelQueue}
+                activeBet={activeBets.find(b => b.panelId === 2 && !b.cashedOut)}
+                isLoggedIn={auth.isLoggedIn}
+                betMode={betMode}
+                maxBet={activeWallet === 'bonus' ? displayFreebet : displayBalance}
+                autoBetEnabled={autoBetPanel2}
+                onAutoBetToggle={setAutoBetPanel2}
+              />
+            </div>
+          </div>
+
+          {/* Live bets — mobile/tablet only (below lg), at bottom */}
+          <div className="flex-shrink-0 min-h-[180px] lg:hidden">
+            <LiveBetsSidebar 
+              phase={game.phase} 
+              variant="bottom" 
+              multiplier={game.multiplier}
+              userBetHistory={userBetHistory}
+              username={auth.user?.username}
+            />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
