@@ -1,9 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Frontend build (rebuilt by Heroku)
 dist/
-dist-server/
 
 # Environment files
 .env
