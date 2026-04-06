@@ -15,7 +15,7 @@ interface GameCanvasProps {
   freebetAmount?: number
 }
 
-const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
+const PAD = { left: 10, right: 16, top: 20, bottom: 20 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SMOOTH INTERPOLATION — lerp values for buttery animation
@@ -653,7 +653,7 @@ export function GameCanvas({
       // Tail is at origin, nose extends from there
       const tailX = originX
       const tailY = originY
-      const noseX = tailX + PLANE_LEN * Math.cos(angle)
+      const noseX = Math.min(tailX + PLANE_LEN * Math.cos(angle), CW - 10)
       const noseY = tailY - PLANE_LEN * Math.sin(angle)
       drawExhaust(ctx, tailX, tailY, angle, time)
       drawPlane(ctx, noseX, noseY, angle, false)
@@ -701,8 +701,15 @@ export function GameCanvas({
         }
 
         // Plane follows the curve tip (which already has turbulence applied)
-        const tailX = sm.tipX
-        const tailY = sm.tipY
+        const PLANE_WIDTH = PLANE_LEN  // approximate plane width
+        const maxPlaneX = CW - PLANE_WIDTH - 10  // prevent right overflow
+        
+        // Clamp plane position to screen bounds
+        const clampedTipX = Math.min(sm.tipX, maxPlaneX)
+        const clampedTipY = Math.max(PAD.top, Math.min(sm.tipY, CH - PAD.bottom))
+        
+        const tailX = clampedTipX
+        const tailY = clampedTipY
         const noseX = tailX + PLANE_LEN * Math.cos(sm.angle)
         const noseY = tailY - PLANE_LEN * Math.sin(sm.angle)
 

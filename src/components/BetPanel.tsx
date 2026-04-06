@@ -180,18 +180,18 @@ export default function BetPanelRefactored({
   }
 
   return (
-    <div className="bg-[#1a1d24] rounded-xl p-3 border border-white/5 flex flex-col gap-3 w-full max-w-full overflow-hidden">
-      {/* Upper Section: Responsive layout */}
-      <div className="flex flex-col xs:flex-row gap-3 w-full">
-        {/* Left Column: Inputs */}
-        <div className="flex-[3] flex flex-col gap-2 min-w-0">
-          {/* Amount stepper - dark pill container */}
+    <div className="bg-[#1a1d24] rounded-xl p-2 border border-white/5 w-full max-w-full overflow-hidden">
+      {/* Compact 50/50 Layout */}
+      <div className="flex flex-row w-full gap-2 items-stretch">
+        {/* Left Block: All Controls (50%) */}
+        <div className="w-1/2 flex flex-col gap-2">
+          {/* Row 1: Amount stepper */}
           <div className="flex items-center bg-[#0f1318] rounded-full p-1 w-full">
             <button
               type="button"
               onClick={decrease}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-9 h-9 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-xl font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-7 h-7 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-lg font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
             >
               −
             </button>
@@ -202,85 +202,84 @@ export default function BetPanelRefactored({
               value={amount.toLocaleString()}
               onChange={handleAmountChange}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="flex-1 bg-transparent text-center font-mono text-base sm:text-lg font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+              className="flex-1 bg-transparent text-center font-mono text-sm font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
             />
             <button
               type="button"
               onClick={increase}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-9 h-9 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-xl font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-7 h-7 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-lg font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
             >
               +
             </button>
           </div>
 
-          {/* Quick bet buttons - 4 column grid */}
-          <div className="grid grid-cols-4 gap-1.5 w-full">
+          {/* Row 2: Quick bet buttons */}
+          <div className="grid grid-cols-4 gap-1 w-full">
             {QUICK_AMOUNTS.map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setAmount(Math.min(v, maxBalance || v))}
                 disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-8 rounded-lg bg-[#0f1318] text-[10px] sm:text-[11px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
+                className="h-7 rounded-md bg-[#0f1318] text-[9px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
               >
                 {v >= 1000 ? `${v / 1000}k` : v}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Right Column: BET Button - full width on xs, shrink on sm+ */}
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={isDisabled}
-          style={{ backgroundColor: buttonBg }}
-          className="flex-[2] w-full xs:min-w-[100px] min-h-[80px] flex flex-col items-center justify-center rounded-xl hover:brightness-110 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
-        >
-          <span className="text-lg sm:text-xl font-black text-white tracking-wide">{buttonText}</span>
-          <span className="text-xs font-bold text-white/90 font-mono mt-0.5 truncate max-w-full px-2">
-            {buttonSubtext}
-          </span>
-        </button>
-      </div>
+          {/* Row 3: Auto toggles - horizontal tight layout */}
+          <div className="flex flex-row flex-wrap items-center justify-between gap-1 bg-[#0f1318] rounded-md px-1.5 py-1 text-[9px] sm:text-[10px]">
+            {/* Auto Bet */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 font-medium whitespace-nowrap">Auto</span>
+              <ToggleSwitch
+                enabled={autoBetEnabled}
+                onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
+                disabled={!isLoggedIn}
+              />
+            </div>
 
-      {/* Lower Section: Auto controls - responsive stacking */}
-      <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2 xs:gap-0 bg-[#0f1318] rounded-lg px-3 py-2 w-full overflow-x-auto">
-        {/* Auto Bet */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Auto Bet</span>
-          <ToggleSwitch
-            enabled={autoBetEnabled}
-            onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
-            disabled={!isLoggedIn}
-          />
-        </div>
-
-        {/* Divider */}
-        <div className="hidden xs:block w-px h-5 bg-white/10 flex-shrink-0" />
-
-        {/* Auto Cash Out */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Auto Cash Out</span>
-          <ToggleSwitch
-            enabled={autoCashoutEnabled}
-            onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
-            disabled={!isLoggedIn}
-          />
-          <div className="flex items-center bg-[#1a1d24] rounded-md border border-white/10 overflow-hidden flex-shrink-0">
-            <input
-              type="text"
-              value={autoCashout}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.]/g, '')
-                setAutoCashout(val)
-              }}
-              disabled={!autoCashoutEnabled || !isLoggedIn}
-              className="w-12 h-6 bg-transparent text-white text-xs font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <span className="text-xs text-gray-400 font-bold pr-2">x</span>
+            {/* Auto Cash Out */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 font-medium whitespace-nowrap">@</span>
+              <ToggleSwitch
+                enabled={autoCashoutEnabled}
+                onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
+                disabled={!isLoggedIn}
+              />
+              <div className="flex items-center bg-[#1a1d24] rounded border border-white/10 overflow-hidden">
+                <input
+                  type="text"
+                  value={autoCashout}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9.]/g, '')
+                    setAutoCashout(val)
+                  }}
+                  disabled={!autoCashoutEnabled || !isLoggedIn}
+                  className="w-8 h-5 bg-transparent text-white text-[10px] font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span className="text-[10px] text-gray-400 font-bold pr-1">x</span>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Right Block: Giant BET Button (50%) */}
+        <div className="w-1/2">
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={isDisabled}
+            style={{ backgroundColor: buttonBg }}
+            className="h-full w-full rounded-xl flex flex-col justify-center items-center text-lg font-bold hover:brightness-110 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
+          >
+            <span className="text-base sm:text-lg font-black text-white tracking-wide">{buttonText}</span>
+            <span className="text-[10px] sm:text-xs font-bold text-white/90 font-mono mt-0.5 truncate max-w-full px-2">
+              {buttonSubtext}
+            </span>
+          </button>
         </div>
       </div>
     </div>
