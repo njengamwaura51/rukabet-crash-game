@@ -15,7 +15,11 @@ interface GameCanvasProps {
   freebetAmount?: number
 }
 
-const PAD = { left: 10, right: 16, top: 20, bottom: 20 }
+const PAD = { left: 18, right: 16, top: 20, bottom: 20 }  // Increased left padding to 18 for Y-axis visibility
+
+// Mobile-optimized plane dimensions
+const PLANE_WIDTH = 45   // Smaller plane width for mobile
+const PLANE_HEIGHT = 20  // Proportional height
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SMOOTH INTERPOLATION — lerp values for buttery animation
@@ -115,12 +119,14 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
   }
   
   // Left axis dots (moving TOP to BOTTOM toward origin) - GREEN
+  // Position dots at PAD.left - 8 to keep them visible within the left margin
+  const dotX = Math.max(6, PAD.left - 10)  // Ensure dots stay visible
   for (let i = 0; i < 6; i++) {
     const t = ((time * 0.00010 + i / 6) % 1)
     const pos = 1 - t  // reverse direction: move toward origin
     const fade = pos < 0.15 ? pos / 0.15 : 1  // fade as approaching origin
     ctx.beginPath()
-    ctx.arc(ox - 8, oy - pos * lLen, 4, 0, Math.PI * 2)
+    ctx.arc(dotX, oy - pos * lLen, 4, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,120,${0.8 * fade})`
     ctx.fill()
   }
@@ -341,13 +347,15 @@ function drawFlightPathToPoint(
    
    Local coords: nose at (0,0) pointing right, tail extends left.
    Call with ctx.translate(noseX, noseY) + ctx.rotate(-angle)
+   Scale parameter allows for mobile-friendly sizing.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function drawPlane(
   ctx: CanvasRenderingContext2D,
   noseX: number, noseY: number,
   angleRad: number,
-  crashed = false
+  crashed = false,
+  scale = 0.5  // Default 50% scale for mobile-friendly size
 ) {
   // Electric green plane to match site theme - flat design
   const body = crashed ? 'rgba(100,100,100,0.82)' : '#00C74D'  // Electric green
@@ -359,11 +367,12 @@ function drawPlane(
   ctx.save()
   ctx.translate(noseX, noseY)
   ctx.rotate(-angleRad)
+  ctx.scale(scale, scale)  // Apply scaling for mobile
 
   // No shadows - flat design
   ctx.shadowColor = 'transparent'
   ctx.shadowBlur = 0
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1 / scale  // Adjust line width for scale
 
   // Wing (underneath)
   const w = new Path2D()
@@ -672,7 +681,10 @@ export function GameCanvas({
     drawAxes(ctx, CW, CH)
     drawDots(ctx, CW, CH, time)
 
-    const PLANE_LEN = 66  // nose-to-tail pixel length (reduced 30% from 94)
+    // Scaled plane dimensions for mobile
+    const PLANE_SCALE = 0.5  // 50% scale
+    const PLANE_LEN = 94 * PLANE_SCALE  // Effective length: 47px (scaled from 94)
+    const PLANE_ACTUAL_LEN = 94  // Full unscaled length for coordinate calc
 
     // ═══════════════ WAITING ═══════════════════════════════════════════
     if (phase === 'waiting') {
@@ -680,15 +692,16 @@ export function GameCanvas({
       // Reset smooth interpolation for next flying phase
       smoothRef.current.initialized = false
 
-      // Plane sits at origin, tilted 6° RIGHT (tail is fixed pivot point)
+      // Plane sits at origin, tilted slightly RIGHT (tail is fixed pivot point)
       const angle = WAITING_ANGLE
-      // Tail is at origin, nose extends from there
+      // Tail is at origin (curve endpoint), nose extends from there
       const tailX = originX
       const tailY = originY
-      const noseX = Math.min(tailX + PLANE_LEN * Math.cos(angle), CW - 10)
+      // Calculate nose position based on scaled length
+      const noseX = Math.min(tailX + PLANE_LEN * Math.cos(angle), CW - PAD.right)
       const noseY = tailY - PLANE_LEN * Math.sin(angle)
       drawExhaust(ctx, tailX, tailY, angle, time)
-      drawPlane(ctx, noseX, noseY, angle, false)
+      drawPlane(ctx, noseX, noseY, angle, false, PLANE_SCALE)
     }
 
     // ═══════════════ FLYING ════════════════════════════════════════════
@@ -732,14 +745,16 @@ export function GameCanvas({
           sm.angle = smoothDamp(sm.angle, targetAngle, sm.velAngle, smoothTime * 1.5, deltaTime)
         }
 
-        // Plane follows the curve tip (which already has turbulence applied)
-        const PLANE_WIDTH = PLANE_LEN  // approximate plane width
-        const maxPlaneX = CW - PLANE_WIDTH - 10  // prevent right overflow
+        // STRICT RIGHT BOUNDARY CLAMP
+        // maxX = canvas width - plane width - left padding (so plane doesn't overflow)
+        const maxX = CW - PLANE_LEN - PAD.left
         
         // Clamp plane position to screen bounds
-        const clampedTipX = Math.min(sm.tipX, maxPlaneX)
+        // Once at maxX, plane hovers while Y continues animating
+        const clampedTipX = Math.min(sm.tipX, maxX)
         const clampedTipY = Math.max(PAD.top, Math.min(sm.tipY, CH - PAD.bottom))
         
+        // Tail is at curve endpoint, nose extends forward
         const tailX = clampedTipX
         const tailY = clampedTipY
         const noseX = tailX + PLANE_LEN * Math.cos(sm.angle)
@@ -750,12 +765,12 @@ export function GameCanvas({
         drawFlightPathToPoint(ctx, CW, CH, elapsedMs, -turbulenceY, tailX, tailY)
 
         drawExhaust(ctx, tailX, tailY, sm.angle, time)
-        drawPlane(ctx, noseX, noseY, sm.angle, false)
+        drawPlane(ctx, noseX, noseY, sm.angle, false, PLANE_SCALE)
       } else {
         // Frame 0: plane at origin with waiting angle
         const a = WAITING_ANGLE
         drawExhaust(ctx, originX, originY, a, time)
-        drawPlane(ctx, originX + PLANE_LEN * Math.cos(a), originY - PLANE_LEN * Math.sin(a), a, false)
+        drawPlane(ctx, originX + PLANE_LEN * Math.cos(a), originY - PLANE_LEN * Math.sin(a), a, false, PLANE_SCALE)
       }
     }
 
@@ -788,7 +803,7 @@ export function GameCanvas({
         if (flyX < CW + 100 && flyY > -100) {
           const noseX = flyX + PLANE_LEN * Math.cos(fa.angle)
           const noseY = flyY - PLANE_LEN * Math.sin(fa.angle)
-          drawPlane(ctx, noseX, noseY, fa.angle, true)
+          drawPlane(ctx, noseX, noseY, fa.angle, true, PLANE_SCALE)
         }
       }
     }
