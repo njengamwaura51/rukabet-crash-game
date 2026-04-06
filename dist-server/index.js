@@ -71,7 +71,8 @@ if (isProduction) {
     console.log(`📂 Serving static files from: ${distPath}`);
     app.use(express.static(distPath));
     // SPA catch-all - send all non-API routes to index.html
-    app.get('*', (req, res) => {
+    // Express 5 requires named parameter for catch-all routes
+    app.get('/{*splat}', (req, res) => {
         if (!req.path.startsWith('/api')) {
             res.sendFile(path.join(distPath, 'index.html'));
         }
