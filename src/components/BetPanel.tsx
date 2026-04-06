@@ -180,13 +180,13 @@ export default function BetPanelRefactored({
   }
 
   return (
-    <div className="bg-[#1a1d24] rounded-xl p-3 border border-white/5 flex flex-col gap-3">
-      {/* Upper Section: Two-column grid (60% inputs, 40% button) */}
-      <div className="flex gap-3">
-        {/* Left Column: Inputs (60%) */}
-        <div className="flex-[3] flex flex-col gap-2">
+    <div className="bg-[#1a1d24] rounded-xl p-3 border border-white/5 flex flex-col gap-3 w-full max-w-full overflow-hidden">
+      {/* Upper Section: Responsive layout */}
+      <div className="flex flex-col xs:flex-row gap-3 w-full">
+        {/* Left Column: Inputs */}
+        <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* Amount stepper - dark pill container */}
-          <div className="flex items-center bg-[#0f1318] rounded-full p-1">
+          <div className="flex items-center bg-[#0f1318] rounded-full p-1 w-full">
             <button
               type="button"
               onClick={decrease}
@@ -202,7 +202,7 @@ export default function BetPanelRefactored({
               value={amount.toLocaleString()}
               onChange={handleAmountChange}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="flex-1 bg-transparent text-center font-mono text-lg font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="flex-1 bg-transparent text-center font-mono text-base sm:text-lg font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
             />
             <button
               type="button"
@@ -215,14 +215,14 @@ export default function BetPanelRefactored({
           </div>
 
           {/* Quick bet buttons - 4 column grid */}
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-4 gap-1.5 w-full">
             {QUICK_AMOUNTS.map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setAmount(Math.min(v, maxBalance || v))}
                 disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-8 rounded-lg bg-[#0f1318] text-[11px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+                className="h-8 rounded-lg bg-[#0f1318] text-[10px] sm:text-[11px] font-mono font-bold text-white/70 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
               >
                 {v >= 1000 ? `${v / 1000}k` : v}
               </button>
@@ -230,26 +230,26 @@ export default function BetPanelRefactored({
           </div>
         </div>
 
-        {/* Right Column: BET Button (40%) - spans full height */}
+        {/* Right Column: BET Button - full width on xs, shrink on sm+ */}
         <button
           type="button"
           onClick={handleClick}
           disabled={isDisabled}
           style={{ backgroundColor: buttonBg }}
-          className="flex-[2] min-w-[100px] flex flex-col items-center justify-center rounded-xl hover:brightness-110 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
+          className="flex-[2] w-full xs:min-w-[100px] min-h-[80px] flex flex-col items-center justify-center rounded-xl hover:brightness-110 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
         >
-          <span className="text-xl font-black text-white tracking-wide">{buttonText}</span>
-          <span className="text-xs font-bold text-white/90 font-mono mt-0.5">
+          <span className="text-lg sm:text-xl font-black text-white tracking-wide">{buttonText}</span>
+          <span className="text-xs font-bold text-white/90 font-mono mt-0.5 truncate max-w-full px-2">
             {buttonSubtext}
           </span>
         </button>
       </div>
 
-      {/* Lower Section: Auto controls - full width row */}
-      <div className="flex items-center justify-between bg-[#0f1318] rounded-lg px-3 py-2">
+      {/* Lower Section: Auto controls - responsive stacking */}
+      <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2 xs:gap-0 bg-[#0f1318] rounded-lg px-3 py-2 w-full overflow-x-auto">
         {/* Auto Bet */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 font-medium">Auto Bet</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Auto Bet</span>
           <ToggleSwitch
             enabled={autoBetEnabled}
             onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
@@ -258,17 +258,17 @@ export default function BetPanelRefactored({
         </div>
 
         {/* Divider */}
-        <div className="w-px h-5 bg-white/10" />
+        <div className="hidden xs:block w-px h-5 bg-white/10 flex-shrink-0" />
 
         {/* Auto Cash Out */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 font-medium">Auto Cash Out</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">Auto Cash Out</span>
           <ToggleSwitch
             enabled={autoCashoutEnabled}
             onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
             disabled={!isLoggedIn}
           />
-          <div className="flex items-center bg-[#1a1d24] rounded-md border border-white/10 overflow-hidden">
+          <div className="flex items-center bg-[#1a1d24] rounded-md border border-white/10 overflow-hidden flex-shrink-0">
             <input
               type="text"
               value={autoCashout}

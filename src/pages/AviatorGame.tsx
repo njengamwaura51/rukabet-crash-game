@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { RoundHistory } from '@/components/RoundHistory'
 import { LiveBetsSidebar } from '@/components/LiveBetsSidebar'
 import BetPanel from '@/components/BetPanel'
+import HybridBotPanel from '@/components/HybridBotPanel'
 import { CashoutPopup } from '@/components/CashoutPopup'
 
 export default function AviatorGame() {
@@ -58,7 +59,7 @@ export default function AviatorGame() {
       onBalanceChange={handleBalanceChange}
       onCashoutSuccess={handleCashoutSuccess}
     >
-      <div className="min-h-screen bg-[#0b0e11] flex flex-col">
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col overflow-x-hidden">
         {/* Header with dynamic wallet display */}
         <Header 
           user={auth.user}
@@ -70,7 +71,7 @@ export default function AviatorGame() {
         />
 
         {/* Body: sidebar + main game - responsive layout */}
-        <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden w-full">
 
           {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
           <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] h-full">
@@ -82,13 +83,13 @@ export default function AviatorGame() {
           </aside>
 
           {/* Main column: history + canvas + bet panels */}
-          <main className="flex flex-col flex-1 min-w-0 p-2 lg:pl-0 gap-2">
+          <main className="flex flex-col flex-1 min-w-0 w-full p-2 lg:pl-0 gap-2 max-w-full">
 
             {/* Multiplier history bar */}
             <RoundHistory history={game.roundHistory} />
 
             {/* Game canvas - constrained height on all screen sizes */}
-            <div className="flex-shrink-0 h-[200px] sm:h-[240px] md:h-[280px] lg:h-[320px] xl:h-[360px] relative">
+            <div className="flex-shrink-0 h-[200px] sm:h-[240px] md:h-[280px] lg:h-[320px] xl:h-[360px] relative w-full max-w-full">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}
@@ -113,8 +114,8 @@ export default function AviatorGame() {
             </div>
 
             {/* Bet panels — stacked on mobile, side by side on xl+ */}
-            <div className="flex-shrink-0 flex flex-col xl:flex-row w-full gap-2">
-              <div className="w-full">
+            <div className="flex-shrink-0 flex flex-col xl:flex-row w-full gap-2 max-w-full">
+              <div className="w-full max-w-full">
                 <BetPanel 
                   panelId={1}
                   defaultAmount={25} 
@@ -128,7 +129,7 @@ export default function AviatorGame() {
                   onAutoBetToggle={setAutoBetPanel1}
                 />
               </div>
-              <div className="w-full">
+              <div className="w-full max-w-full">
                 <BetPanel 
                   panelId={2}
                   defaultAmount={18} 
@@ -144,8 +145,21 @@ export default function AviatorGame() {
               </div>
             </div>
 
+            {/* Hybrid Bot Panel */}
+            <div className="flex-shrink-0 w-full max-w-full">
+              <HybridBotPanel
+                panelId={3}
+                gamePhase={game.phase}
+                currentMultiplier={game.multiplier}
+                isLoggedIn={auth.isLoggedIn}
+                isFreebet={isFreebet}
+                maxBalance={maxBalance}
+                currency="KSH"
+              />
+            </div>
+
             {/* Live bets — mobile/tablet only (below lg), at bottom */}
-            <div className="flex-shrink-0 min-h-[180px] lg:hidden">
+            <div className="flex-shrink-0 min-h-[180px] lg:hidden w-full max-w-full">
               <LiveBetsSidebar 
                 phase={game.phase} 
                 variant="bottom" 
