@@ -152,6 +152,7 @@ export default function AviatorGame() {
                 panelId={3}
                 gamePhase={game.phase}
                 currentMultiplier={game.multiplier}
+                roundHistory={game.roundHistory}
                 isLoggedIn={auth.isLoggedIn}
                 isFreebet={isFreebet}
                 maxBalance={maxBalance}

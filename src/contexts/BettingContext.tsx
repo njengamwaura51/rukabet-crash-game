@@ -46,6 +46,7 @@ interface BettingContextValue {
 }
 
 const BettingContext = createContext<BettingContextValue | null>(null)
+const BET_HISTORY_STORAGE_KEY = 'rukabet_bet_history'
 
 export function useBetting() {
   const ctx = useContext(BettingContext)
@@ -69,7 +70,17 @@ export function BettingProvider({
   onCashoutSuccess 
 }: BettingProviderProps) {
   const [bets, setBets] = useState<PlayerBet[]>([])
-  const [betHistory, setBetHistory] = useState<BetHistory[]>([])
+  const [betHistory, setBetHistory] = useState<BetHistory[]>(() => {
+    try {
+      const raw = localStorage.getItem(BET_HISTORY_STORAGE_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed.slice(0, 50)
+    } catch {
+      return []
+    }
+  })
   const roundIdRef = useRef(0)
   const prevPhaseRef = useRef<Phase>(gamePhase)
 
@@ -237,6 +248,10 @@ export function BettingProvider({
       ))
     }
   }, [gamePhase, bets])
+
+  useEffect(() => {
+    localStorage.setItem(BET_HISTORY_STORAGE_KEY, JSON.stringify(betHistory))
+  }, [betHistory])
 
   // ─────────────────────────────────────────────────────────────────────────
   // QUERY HELPERS

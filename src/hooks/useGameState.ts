@@ -28,6 +28,7 @@ const WAIT_MS           = 5000
 const CRASH_DISPLAY_MS  = 3000
 const FLY_AWAY_MS       = 700
 const MAX_HISTORY       = 20
+const ROUND_HISTORY_STORAGE_KEY = 'rukabet_round_history'
 
 export function computeMultiplier(ms: number): number {
   return Math.pow(Math.E, 0.00006 * ms)
@@ -103,11 +104,24 @@ const DEFAULT_PLANE: PlaneTransform = {
 }
 
 export function useGameState(): GameState {
+  const getInitialHistory = () => {
+    try {
+      const raw = localStorage.getItem(ROUND_HISTORY_STORAGE_KEY)
+      if (!raw) return INITIAL_HISTORY
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return INITIAL_HISTORY
+      const valid = parsed.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v))
+      return valid.length > 0 ? valid.slice(-MAX_HISTORY) : INITIAL_HISTORY
+    } catch {
+      return INITIAL_HISTORY
+    }
+  }
+
   const [phase, setPhase]           = useState<Phase>('waiting')
   const [multiplier, setMultiplier] = useState(1.0)
   const [crashPoint, setCrashPoint] = useState(0)
   const [waitProgress, setWaitProg] = useState(0)
-  const [roundHistory, setHistory]  = useState<number[]>(INITIAL_HISTORY)
+  const [roundHistory, setHistory]  = useState<number[]>(getInitialHistory)
   const [elapsedMs, setElapsedMs]   = useState(0)
   const [plane, setPlane]           = useState<PlaneTransform>(DEFAULT_PLANE)
 
@@ -256,6 +270,10 @@ export function useGameState(): GameState {
     startWait()
     return () => { stop(); if (timeout.current) clearTimeout(timeout.current) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    localStorage.setItem(ROUND_HISTORY_STORAGE_KEY, JSON.stringify(roundHistory.slice(-MAX_HISTORY)))
+  }, [roundHistory])
 
   return {
     phase, multiplier, crashPoint, waitProgress, roundHistory, elapsedMs, plane,

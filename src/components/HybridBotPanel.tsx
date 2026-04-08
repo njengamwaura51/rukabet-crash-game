@@ -6,6 +6,7 @@ interface HybridBotPanelProps {
   panelId: number
   gamePhase: Phase
   currentMultiplier: number
+  roundHistory: number[]
   isLoggedIn: boolean
   isFreebet: boolean
   maxBalance: number
@@ -16,6 +17,7 @@ export default function HybridBotPanel({
   panelId,
   gamePhase,
   currentMultiplier,
+  roundHistory,
   isLoggedIn,
   isFreebet,
   maxBalance,
@@ -74,6 +76,10 @@ export default function HybridBotPanel({
   
   const activeBet = betting.getActiveBet(panelId)
   const queuedBet = betting.getQueuedBet(panelId)
+
+  useEffect(() => {
+    crashHistoryRef.current = roundHistory.slice(-20)
+  }, [roundHistory])
 
   // Reset bet placed flag when phase changes to waiting
   useEffect(() => {
@@ -214,9 +220,6 @@ export default function HybridBotPanel({
     
     // Get crash multiplier from the current game (use currentMultiplier as it holds the crash point)
     const crashMultiplier = currentMultiplier
-    
-    // Update crash history (keep max 20)
-    crashHistoryRef.current = [...crashHistoryRef.current.slice(-19), crashMultiplier]
     
     // Check if we won or lost
     const bet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
