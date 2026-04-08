@@ -223,7 +223,7 @@ export default function HybridBotPanel({
     
     if (bet) {
       // ═══ WON ═══
-      const profit = bet.winAmount! - bet.amount
+      const profit = (bet.wonAmount ?? 0) - bet.amount
       console.log(`Bot ${panelId}: WON ${profit.toFixed(2)} KSH`)
       
       // Reset loss tracking
