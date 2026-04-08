@@ -110,7 +110,12 @@ export function useGameState(): GameState {
       if (!raw) return INITIAL_HISTORY
       const parsed = JSON.parse(raw)
       if (!Array.isArray(parsed)) return INITIAL_HISTORY
-      const valid = parsed.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v))
+      const valid = parsed.filter((v: unknown): v is number => (
+        typeof v === 'number' &&
+        Number.isFinite(v) &&
+        v >= 1 &&
+        v <= 200
+      ))
       return valid.length > 0 ? valid.slice(-MAX_HISTORY) : INITIAL_HISTORY
     } catch {
       return INITIAL_HISTORY

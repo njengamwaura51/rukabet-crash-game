@@ -24,6 +24,23 @@ export interface BetHistory {
   timestamp: number
 }
 
+function isValidBetHistoryEntry(value: unknown): value is BetHistory {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === 'string' &&
+    typeof v.roundId === 'number' &&
+    Number.isFinite(v.roundId) &&
+    typeof v.amount === 'number' &&
+    Number.isFinite(v.amount) &&
+    (v.cashoutMultiplier === null || (typeof v.cashoutMultiplier === 'number' && Number.isFinite(v.cashoutMultiplier))) &&
+    (v.won === null || (typeof v.won === 'number' && Number.isFinite(v.won))) &&
+    typeof v.isFreebet === 'boolean' &&
+    typeof v.timestamp === 'number' &&
+    Number.isFinite(v.timestamp)
+  )
+}
+
 interface BettingContextValue {
   // Current bets
   bets: PlayerBet[]
@@ -77,7 +94,7 @@ export function BettingProvider({
       if (!raw) return []
       const parsed = JSON.parse(raw)
       if (!Array.isArray(parsed)) return []
-      return parsed.slice(0, MAX_BET_HISTORY)
+      return parsed.filter(isValidBetHistoryEntry).slice(0, MAX_BET_HISTORY)
     } catch {
       return []
     }
