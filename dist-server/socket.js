@@ -11,7 +11,7 @@ const CRASHING_MS = 700;
 const TICK_MS = 100;
 const MAX_HISTORY = 20;
 const MAX_LIVE_BETS = 10;
-const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || crypto.randomBytes(16).toString('hex');
+const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || process.env.JWT_SECRET || 'rukabet-unified-client-seed';
 const BOT_NAMES = [
     'dk**29', 'km**93', 'mp**17', 'ja**41', 'ar**84', 'pt**66', 'su**52', 'ra**78',
     'bo**35', 'ct**10', 'fx**63', 'gu**97', 'hy**42', 'lm**89', 'nk**34', 'tw**16',
@@ -222,12 +222,11 @@ function startCrashing() {
     gameState.revealedSeed = currentServerSeed;
     emitGameSnapshot();
     crashingTimer = setTimeout(async () => {
-        const crashPoint = Math.round(gameState.crashPoint * 100) / 100;
         gameState.phase = 'crashed';
-        gameState.multiplier = crashPoint;
+        gameState.multiplier = gameState.crashPoint;
         gameState.elapsedMs = Date.now() - crashingStartedAt;
-        gameState.roundHistory = [...gameState.roundHistory, crashPoint].slice(-MAX_HISTORY);
-        await markRoundLostBets(gameState.roundId, crashPoint);
+        gameState.roundHistory = [...gameState.roundHistory, gameState.crashPoint].slice(-MAX_HISTORY);
+        await markRoundLostBets(gameState.roundId, gameState.crashPoint);
         emitGameSnapshot();
         crashedTimer = setTimeout(() => {
             gameState.nonce += 1;
