@@ -11,9 +11,19 @@ const CRASHING_MS = 700;
 const TICK_MS = 100;
 const MAX_HISTORY = 20;
 const MAX_LIVE_BETS = 10;
-const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || 'rukabet-unified-client-seed';
 const MIN_BOT_BETS = 22;
 const BOT_BET_VARIANCE = 14;
+const INITIAL_NONCE = 1;
+function getServerClientSeed() {
+    const configuredSeed = process.env.GAME_CLIENT_SEED;
+    if (configuredSeed)
+        return configuredSeed;
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('GAME_CLIENT_SEED must be configured in production');
+    }
+    return 'rukabet-dev-client-seed';
+}
+const SERVER_CLIENT_SEED = getServerClientSeed();
 const BOT_NAMES = [
     'dk**29', 'km**93', 'mp**17', 'ja**41', 'ar**84', 'pt**66', 'su**52', 'ra**78',
     'bo**35', 'ct**10', 'fx**63', 'gu**97', 'hy**42', 'lm**89', 'nk**34', 'tw**16',
@@ -23,12 +33,12 @@ const BOT_NAMES = [
 ];
 const gameState = {
     phase: 'waiting',
-    roundId: 'round-1',
-    nonce: 1,
+    nonce: INITIAL_NONCE,
+    roundId: `round-${INITIAL_NONCE}`,
     multiplier: 1,
     crashPoint: 0,
     waitProgress: 0,
-    roundHistory: [1.89, 25.04, 1.33, 1.27, 4.4, 2.36, 15.64],
+    roundHistory: [],
     elapsedMs: 0,
     serverSeedHash: '',
     revealedSeed: '',
@@ -238,7 +248,7 @@ function startCrashing() {
 }
 function initializeGameLoop() {
     stopTimers();
-    gameState.nonce = 1;
+    gameState.nonce = INITIAL_NONCE;
     startWaiting();
 }
 export function initializeSocket(httpServer) {

@@ -93,7 +93,7 @@ const INITIAL_STATE: GameState = {
   multiplier: 1,
   crashPoint: 0,
   waitProgress: 0,
-  roundHistory: [1.89, 25.04, 1.33, 1.27, 4.4, 2.36, 15.64],
+  roundHistory: [],
   elapsedMs: 0,
   plane: DEFAULT_PLANE,
   serverSeedHash: '',
