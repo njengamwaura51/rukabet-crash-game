@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useBetting } from '@/contexts/BettingContext'
-import { Phase } from '@/hooks/useGameState'
+import { Phase, MAX_HISTORY } from '@/hooks/useGameState'
 
 interface HybridBotPanelProps {
   panelId: number
@@ -78,7 +78,7 @@ export default function HybridBotPanel({
   const queuedBet = betting.getQueuedBet(panelId)
 
   useEffect(() => {
-    crashHistoryRef.current = roundHistory.slice(-20)
+    crashHistoryRef.current = roundHistory.slice(-MAX_HISTORY)
   }, [roundHistory])
 
   // Reset bet placed flag when phase changes to waiting

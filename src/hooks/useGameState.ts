@@ -27,7 +27,7 @@ export interface GameState {
 const WAIT_MS           = 5000
 const CRASH_DISPLAY_MS  = 3000
 const FLY_AWAY_MS       = 700
-const MAX_HISTORY       = 20
+export const MAX_HISTORY = 20
 const ROUND_HISTORY_STORAGE_KEY = 'rukabet_round_history'
 
 export function computeMultiplier(ms: number): number {
@@ -138,6 +138,7 @@ export function useGameState(): GameState {
   const planeRef     = useRef<PlaneTransform>(DEFAULT_PLANE)
   const nonceRef     = useRef(1)
   const serverSeedRef = useRef<string>('')
+  const lastPersistedHistoryRef = useRef('')
 
   const stop = useCallback(() => {
     if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0 }
@@ -272,7 +273,10 @@ export function useGameState(): GameState {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    localStorage.setItem(ROUND_HISTORY_STORAGE_KEY, JSON.stringify(roundHistory.slice(-MAX_HISTORY)))
+    const serialized = JSON.stringify(roundHistory.slice(-MAX_HISTORY))
+    if (serialized === lastPersistedHistoryRef.current) return
+    localStorage.setItem(ROUND_HISTORY_STORAGE_KEY, serialized)
+    lastPersistedHistoryRef.current = serialized
   }, [roundHistory])
 
   return {
