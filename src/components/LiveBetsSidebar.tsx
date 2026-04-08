@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useBetting } from '@/contexts/BettingContext'
+import { SharedLiveBet } from '@/hooks/useGameState'
 
 type SidebarTab = 'live' | 'mine' | 'top'
 
@@ -136,16 +137,18 @@ interface LiveBetsSidebarProps {
   multiplier?: number
   userBetHistory?: UserBetHistory[]
   username?: string
+  sharedBets?: SharedLiveBet[]
 }
 
 export function LiveBetsSidebar({ 
   phase, 
   variant = 'sidebar', 
   multiplier = 1,
-  username = 'You'
+  username = 'You',
+  sharedBets = []
 }: LiveBetsSidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('live')
-  const [bets, setBets] = useState<LiveBet[]>(() => generateBotBets())
+  const [bets, setBets] = useState<LiveBet[]>(() => sharedBets.length > 0 ? sharedBets.slice(0, 10) : generateBotBets())
   const [topWins] = useState<TopWin[]>(() => generateTopWins())
   const lastPhaseRef = useRef(phase)
   
@@ -154,13 +157,21 @@ export function LiveBetsSidebar({
   const userBetHistory = betting?.betHistory ?? []
   
   useEffect(() => {
+    if (sharedBets.length > 0) {
+      setBets(sharedBets.slice(0, 10))
+    }
+  }, [sharedBets])
+
+  useEffect(() => {
+    if (sharedBets.length > 0) return
     if (phase === 'waiting' && lastPhaseRef.current !== 'waiting') {
       setBets(generateBotBets())
     }
     lastPhaseRef.current = phase
-  }, [phase])
+  }, [phase, sharedBets])
   
   useEffect(() => {
+    if (sharedBets.length > 0) return
     if (phase === 'flying' && multiplier > 1) {
       setBets(prevBets => 
         prevBets.map(bet => {
@@ -176,7 +187,7 @@ export function LiveBetsSidebar({
         })
       )
     }
-  }, [phase, multiplier])
+  }, [phase, multiplier, sharedBets])
 
   // Render a single bet pill - reduced padding
   const renderBetPill = (row: LiveBet, index: number) => {
