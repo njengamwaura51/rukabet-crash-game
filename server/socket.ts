@@ -15,7 +15,7 @@ const CRASHING_MS = 700
 const TICK_MS = 100
 const MAX_HISTORY = 20
 const MAX_LIVE_BETS = 10
-const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || 'rukabet-unified-client-seed'
+const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || crypto.randomBytes(16).toString('hex')
 
 const BOT_NAMES = [
   'dk**29', 'km**93', 'mp**17', 'ja**41', 'ar**84', 'pt**66', 'su**52', 'ra**78',
@@ -434,7 +434,7 @@ export function initializeSocket(httpServer: HttpServer): Server {
           return socket.emit('CASHOUT_ERROR', { error: 'Bet not found' })
         }
 
-        const winAmount = Math.floor(existingBet.amount * serverMultiplier * 100) / 100
+        const winAmount = Math.round(existingBet.amount * serverMultiplier * 100) / 100
 
         const bet = await Bet.findOneAndUpdate(
           { _id: betId, userId, status: 'active' },

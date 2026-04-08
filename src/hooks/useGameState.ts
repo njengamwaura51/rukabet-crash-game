@@ -101,6 +101,7 @@ const INITIAL_STATE: GameState = {
   revealedSeed: '',
   liveBets: []
 }
+const MAX_SHARED_LIVE_BETS = 10
 
 function derivePlane(snapshot: ServerSnapshot, prevPlane: PlaneTransform): PlaneTransform {
   if (snapshot.phase === 'flying') {
@@ -174,7 +175,7 @@ export function useGameState(): GameState {
     }
 
     const applyLiveBets = (liveBets: SharedLiveBet[]) => {
-      setState(prev => ({ ...prev, liveBets: liveBets.slice(0, 10) }))
+      setState(prev => ({ ...prev, liveBets: liveBets.slice(0, MAX_SHARED_LIVE_BETS) }))
     }
 
     socket.on('GAME_SNAPSHOT', applySnapshot)
