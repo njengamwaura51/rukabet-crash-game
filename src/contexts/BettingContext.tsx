@@ -47,6 +47,7 @@ interface BettingContextValue {
 
 const BettingContext = createContext<BettingContextValue | null>(null)
 const BET_HISTORY_STORAGE_KEY = 'rukabet_bet_history'
+const MAX_BET_HISTORY = 50
 
 export function useBetting() {
   const ctx = useContext(BettingContext)
@@ -76,7 +77,7 @@ export function BettingProvider({
       if (!raw) return []
       const parsed = JSON.parse(raw)
       if (!Array.isArray(parsed)) return []
-      return parsed.slice(0, 50)
+      return parsed.slice(0, MAX_BET_HISTORY)
     } catch {
       return []
     }
@@ -198,7 +199,7 @@ export function BettingProvider({
       isFreebet: activeBet.isFreebet,
       timestamp: Date.now(),
     }
-    setBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+    setBetHistory(prev => [historyEntry, ...prev].slice(0, MAX_BET_HISTORY))
     
     // Notify success
     onCashoutSuccess?.(wonAmount, cashoutMultiplier)
@@ -228,7 +229,7 @@ export function BettingProvider({
             isFreebet: bet.isFreebet,
             timestamp: Date.now(),
           }
-          setBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+          setBetHistory(prev => [historyEntry, ...prev].slice(0, MAX_BET_HISTORY))
         }
       })
       
@@ -249,8 +250,12 @@ export function BettingProvider({
     }
   }, [gamePhase, bets])
 
+  const lastPersistedHistoryRef = useRef('')
   useEffect(() => {
-    localStorage.setItem(BET_HISTORY_STORAGE_KEY, JSON.stringify(betHistory))
+    const serialized = JSON.stringify(betHistory)
+    if (serialized === lastPersistedHistoryRef.current) return
+    localStorage.setItem(BET_HISTORY_STORAGE_KEY, serialized)
+    lastPersistedHistoryRef.current = serialized
   }, [betHistory])
 
   // ─────────────────────────────────────────────────────────────────────────
