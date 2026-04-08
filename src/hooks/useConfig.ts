@@ -8,11 +8,19 @@ interface AppConfig {
 }
 
 const STORAGE_KEY = 'rukabet_config'
+const LOCAL_API_BASE_URL = 'http://localhost:3001'
+
+function getDefaultApiBaseUrl(): string {
+  if (typeof window === 'undefined') return LOCAL_API_BASE_URL
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  return isLocal ? LOCAL_API_BASE_URL : ''
+}
 
 const DEFAULT_CONFIG: AppConfig = {
   brandName: 'RukaBet',
   whatsappSupportNumber: '254713934411',
-  apiBaseUrl: 'http://localhost:3001',
+  apiBaseUrl: getDefaultApiBaseUrl(),
 }
 
 // Custom hook for config management

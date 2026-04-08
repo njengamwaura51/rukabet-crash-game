@@ -223,7 +223,11 @@ export default function HybridBotPanel({
     
     if (bet) {
       // ═══ WON ═══
-      const profit = bet.winAmount! - bet.amount
+      if (bet.wonAmount == null) {
+        console.warn(`Bot ${panelId}: CASHED_OUT bet missing wonAmount, skipping profit calculation`)
+        return
+      }
+      const profit = bet.wonAmount - bet.amount
       console.log(`Bot ${panelId}: WON ${profit.toFixed(2)} KSH`)
       
       // Reset loss tracking
