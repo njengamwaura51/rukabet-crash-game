@@ -4,6 +4,23 @@ import { useConfig } from '@/hooks/useConfig'
 
 const ADMIN_TOKEN_STORAGE_KEY = 'rukabet_admin_token'
 
+type SettingsPayload = {
+  intasendPublicKey?: string
+  intasend_public_key?: string
+  intasendSecretKey?: string
+  intasend_secret_key?: string
+  companyName?: string
+  company_name?: string
+}
+
+function normalizeSettings(settings: SettingsPayload) {
+  return {
+    intasendPublicKey: settings.intasendPublicKey || settings.intasend_public_key || '',
+    intasendSecretKey: settings.intasendSecretKey || settings.intasend_secret_key || '',
+    companyName: settings.companyName || settings.company_name || 'RUKA TECH SOLUTIONS',
+  }
+}
+
 export default function AdminDashboard() {
   const { config, updateConfig } = useConfig()
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '')
@@ -53,12 +70,7 @@ export default function AdminDashboard() {
 
         const data = await response.json()
         const settings = data.settings || data
-
-        setPaymentConfig({
-          intasendPublicKey: settings.intasendPublicKey || settings.intasend_public_key || '',
-          intasendSecretKey: settings.intasendSecretKey || settings.intasend_secret_key || '',
-          companyName: settings.companyName || settings.company_name || 'RUKA TECH SOLUTIONS',
-        })
+        setPaymentConfig(normalizeSettings(settings))
         setIsAuthenticated(true)
         setAuthError('')
         setPaymentError('')
