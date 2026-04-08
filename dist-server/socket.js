@@ -11,7 +11,9 @@ const CRASHING_MS = 700;
 const TICK_MS = 100;
 const MAX_HISTORY = 20;
 const MAX_LIVE_BETS = 10;
-const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || process.env.JWT_SECRET || 'rukabet-unified-client-seed';
+const SERVER_CLIENT_SEED = process.env.GAME_CLIENT_SEED || 'rukabet-unified-client-seed';
+const MIN_BOT_BETS = 22;
+const BOT_BET_VARIANCE = 14;
 const BOT_NAMES = [
     'dk**29', 'km**93', 'mp**17', 'ja**41', 'ar**84', 'pt**66', 'su**52', 'ra**78',
     'bo**35', 'ct**10', 'fx**63', 'gu**97', 'hy**42', 'lm**89', 'nk**34', 'tw**16',
@@ -92,7 +94,7 @@ function getRandomBotCashoutTarget() {
     return 2.5 + Math.random() * 5;
 }
 function seedRoundBotBets() {
-    const count = 22 + Math.floor(Math.random() * 14);
+    const count = MIN_BOT_BETS + Math.floor(Math.random() * BOT_BET_VARIANCE);
     const highRollerCount = Math.ceil(count * 0.1);
     for (let i = 0; i < count; i++) {
         const botBet = {

@@ -148,7 +148,7 @@ export function LiveBetsSidebar({
   sharedBets = []
 }: LiveBetsSidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('live')
-  const [bets, setBets] = useState<LiveBet[]>(() => sharedBets.length > 0 ? sharedBets.slice(0, 10) : generateBotBets())
+  const [bets, setBets] = useState<LiveBet[]>(() => generateBotBets())
   const [topWins] = useState<TopWin[]>(() => generateTopWins())
   const lastPhaseRef = useRef(phase)
   
