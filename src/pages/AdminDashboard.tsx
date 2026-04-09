@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link } from 'wouter'
 import { useConfig } from '@/hooks/useConfig'
 
-const ADMIN_AUTH_STORAGE_KEY = 'rukabet_admin_auth'
-
 type SettingsPayload = {
   intasendPublicKey?: string
   intasend_public_key?: string
@@ -23,27 +21,11 @@ function normalizeSettings(settings: SettingsPayload) {
 
 export default function AdminDashboard() {
   const { config, updateConfig } = useConfig()
-  const [adminUsername, setAdminUsername] = useState(() => {
-    const stored = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY)
-    if (!stored) return ''
-    try {
-      return JSON.parse(stored).username || ''
-    } catch {
-      return ''
-    }
-  })
-  const [adminPassword, setAdminPassword] = useState(() => {
-    const stored = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY)
-    if (!stored) return ''
-    try {
-      return JSON.parse(stored).password || ''
-    } catch {
-      return ''
-    }
-  })
-  const [usernameInput, setUsernameInput] = useState(adminUsername)
-  const [passwordInput, setPasswordInput] = useState(adminPassword)
-  const [isAuthenticated, setIsAuthenticated] = useState(!!adminUsername && !!adminPassword)
+  const [adminUsername, setAdminUsername] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [usernameInput, setUsernameInput] = useState('')
+  const [passwordInput, setPasswordInput] = useState('')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authError, setAuthError] = useState('')
   const [whatsapp, setWhatsapp] = useState(config.whatsappSupportNumber)
   const [saved, setSaved] = useState(false)
@@ -75,7 +57,6 @@ export default function AdminDashboard() {
         })
 
         if (response.status === 403) {
-          localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY)
           setAdminUsername('')
           setAdminPassword('')
           setIsAuthenticated(false)
@@ -113,14 +94,12 @@ export default function AdminDashboard() {
       return
     }
 
-    localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, JSON.stringify({ username, password }))
     setAdminUsername(username)
     setAdminPassword(password)
     setAuthError('')
   }
 
   const handleAdminLogout = () => {
-    localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY)
     setAdminUsername('')
     setAdminPassword('')
     setUsernameInput('')
@@ -166,7 +145,6 @@ export default function AdminDashboard() {
       } else {
         const data = await response.json()
         if (response.status === 403) {
-          localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY)
           setAdminUsername('')
           setAdminPassword('')
           setIsAuthenticated(false)

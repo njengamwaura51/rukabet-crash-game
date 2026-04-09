@@ -29,10 +29,12 @@ export async function adminMiddleware(req, res, next) {
         const adminPassword = req.headers['x-admin-password'];
         const settings = await Settings.findOne();
         const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026';
-        const validAdminUsername = process.env.ADMIN_USERNAME || 'pirate101';
-        const validAdminPassword = process.env.ADMIN_PASSWORD || 'Texas99$';
+        const validAdminUsername = process.env.ADMIN_USERNAME;
+        const validAdminPassword = process.env.ADMIN_PASSWORD;
         const isTokenValid = !!adminToken && adminToken === validToken;
-        const isCredentialValid = !!adminUsername &&
+        const isCredentialValid = !!validAdminUsername &&
+            !!validAdminPassword &&
+            !!adminUsername &&
             !!adminPassword &&
             adminUsername === validAdminUsername &&
             adminPassword === validAdminPassword;
