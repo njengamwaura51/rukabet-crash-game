@@ -19,6 +19,10 @@ function normalizeSettings(settings: SettingsPayload) {
   }
 }
 
+function buildAdminAuthHeader(username: string, password: string) {
+  return `Basic ${btoa(`${username}:${password}`)}`
+}
+
 export default function AdminDashboard() {
   const { config, updateConfig } = useConfig()
   const [adminUsername, setAdminUsername] = useState('')
@@ -51,8 +55,7 @@ export default function AdminDashboard() {
       try {
         const response = await fetch(`${config.apiBaseUrl}/api/settings`, {
           headers: {
-            'X-Admin-Username': adminUsername,
-            'X-Admin-Password': adminPassword,
+            Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
           },
         })
 
@@ -129,8 +132,7 @@ export default function AdminDashboard() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Username': adminUsername,
-          'X-Admin-Password': adminPassword,
+          Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
         },
         body: JSON.stringify({
           intasend_public_key: paymentConfig.intasendPublicKey,

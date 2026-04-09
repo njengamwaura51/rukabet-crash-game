@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import { User } from '../models/User.js'
 import { Settings } from '../models/Settings.js'
 
@@ -8,6 +9,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
 export interface AuthRequest extends Request {
   user?: any
   userId?: string
+}
+
+function safeCompare(a: string, b: string): boolean {
+  const aBuffer = Buffer.from(a)
+  const bBuffer = Buffer.from(b)
+  if (aBuffer.length !== bBuffer.length) {
+    return false
+  }
+  return crypto.timingSafeEqual(aBuffer, bBuffer)
 }
 
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
@@ -38,20 +48,28 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
     const adminToken = req.headers['x-admin-token'] as string
     const adminUsername = req.headers['x-admin-username'] as string
     const adminPassword = req.headers['x-admin-password'] as string
+    const authorizationHeader = req.headers.authorization
     const settings = await Settings.findOne()
     
     const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026'
     const validAdminUsername = process.env.ADMIN_USERNAME
     const validAdminPassword = process.env.ADMIN_PASSWORD
+    const basicAuthEncoded = authorizationHeader?.startsWith('Basic ') ? authorizationHeader.slice(6) : ''
+    const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : ''
+    const separatorIndex = basicAuthDecoded.indexOf(':')
+    const basicAuthUsername = separatorIndex >= 0 ? basicAuthDecoded.slice(0, separatorIndex) : ''
+    const basicAuthPassword = separatorIndex >= 0 ? basicAuthDecoded.slice(separatorIndex + 1) : ''
+    const providedUsername = adminUsername || basicAuthUsername
+    const providedPassword = adminPassword || basicAuthPassword
     
     const isTokenValid = !!adminToken && adminToken === validToken
     const isCredentialValid =
       !!validAdminUsername &&
       !!validAdminPassword &&
-      !!adminUsername &&
-      !!adminPassword &&
-      adminUsername === validAdminUsername &&
-      adminPassword === validAdminPassword
+      !!providedUsername &&
+      !!providedPassword &&
+      safeCompare(providedUsername, validAdminUsername) &&
+      safeCompare(providedPassword, validAdminPassword)
 
     if (!isTokenValid && !isCredentialValid) {
       return res.status(403).json({ error: 'Admin access required (invalid token or credentials)' })
