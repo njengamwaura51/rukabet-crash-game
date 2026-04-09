@@ -1,7 +1,19 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User } from '../models/User.js';
 import { Settings } from '../models/Settings.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
+function safeCompare(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') {
+        return false;
+    }
+    const aBuffer = Buffer.from(a);
+    const bBuffer = Buffer.from(b);
+    if (aBuffer.length !== bBuffer.length) {
+        return false;
+    }
+    return crypto.timingSafeEqual(aBuffer, bBuffer);
+}
 export async function authMiddleware(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
@@ -25,9 +37,28 @@ export async function authMiddleware(req, res, next) {
 export async function adminMiddleware(req, res, next) {
     try {
         const adminToken = req.headers['x-admin-token'];
+        const adminUsername = req.headers['x-admin-username'];
+        const adminPassword = req.headers['x-admin-password'];
+        const authorizationHeader = req.headers.authorization;
         const settings = await Settings.findOne();
         const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026';
-        if (!adminToken || adminToken !== validToken) {
+        const validAdminUsername = process.env.ADMIN_USERNAME;
+        const validAdminPassword = process.env.ADMIN_PASSWORD;
+        const basicAuthEncoded = authorizationHeader?.startsWith('Basic ') ? authorizationHeader.slice(6) : '';
+        const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : '';
+        const separatorIndex = basicAuthDecoded.indexOf(':');
+        const basicAuthUsername = separatorIndex >= 0 ? basicAuthDecoded.slice(0, separatorIndex) : '';
+        const basicAuthPassword = separatorIndex >= 0 ? basicAuthDecoded.substring(separatorIndex + 1) : '';
+        const providedUsername = adminUsername || basicAuthUsername;
+        const providedPassword = adminPassword || basicAuthPassword;
+        const isTokenValid = !!adminToken && safeCompare(adminToken, validToken);
+        const isCredentialValid = !!validAdminUsername &&
+            !!validAdminPassword &&
+            !!providedUsername &&
+            !!providedPassword &&
+            safeCompare(providedUsername, validAdminUsername) &&
+            safeCompare(providedPassword, validAdminPassword);
+        if (!isTokenValid && !isCredentialValid) {
             return res.status(403).json({ error: 'Admin access required' });
         }
         next();

@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link } from 'wouter'
 import { useConfig } from '@/hooks/useConfig'
 
-const ADMIN_TOKEN_STORAGE_KEY = 'rukabet_admin_token'
-
 type SettingsPayload = {
   intasendPublicKey?: string
   intasend_public_key?: string
@@ -21,11 +19,23 @@ function normalizeSettings(settings: SettingsPayload) {
   }
 }
 
+function buildAdminAuthHeader(username: string, password: string) {
+  const raw = `${username}:${password}`
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return `Basic ${btoa(binary)}`
+}
+
 export default function AdminDashboard() {
   const { config, updateConfig } = useConfig()
-  const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '')
-  const [tokenInput, setTokenInput] = useState(adminToken)
-  const [isAuthenticated, setIsAuthenticated] = useState(!!adminToken)
+  const [adminUsername, setAdminUsername] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [usernameInput, setUsernameInput] = useState('')
+  const [passwordInput, setPasswordInput] = useState('')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authError, setAuthError] = useState('')
   const [whatsapp, setWhatsapp] = useState(config.whatsappSupportNumber)
   const [saved, setSaved] = useState(false)
@@ -40,8 +50,8 @@ export default function AdminDashboard() {
   const [paymentError, setPaymentError] = useState('')
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (!adminToken) {
+      const fetchSettings = async () => {
+      if (!adminUsername || !adminPassword) {
         setIsAuthenticated(false)
         setPaymentLoading(false)
         return
@@ -51,15 +61,15 @@ export default function AdminDashboard() {
       try {
         const response = await fetch(`${config.apiBaseUrl}/api/settings`, {
           headers: {
-            'X-Admin-Token': adminToken,
+            Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
           },
         })
 
         if (response.status === 403) {
-          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
-          setAdminToken('')
+          setAdminUsername('')
+          setAdminPassword('')
           setIsAuthenticated(false)
-          setAuthError('Invalid admin token')
+          setAuthError('Invalid admin credentials')
           return
         }
 
@@ -82,23 +92,27 @@ export default function AdminDashboard() {
       }
     }
     fetchSettings()
-  }, [config.apiBaseUrl, adminToken])
+  }, [config.apiBaseUrl, adminUsername, adminPassword])
 
   const handleAdminLogin = () => {
-    const token = tokenInput.trim()
-    if (!token) {
-      setAuthError('Admin token is required')
+    const username = usernameInput.trim()
+    const password = passwordInput
+
+    if (!username || !password) {
+      setAuthError('Username and password are required')
       return
     }
-    localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token)
-    setAdminToken(token)
+
+    setAdminUsername(username)
+    setAdminPassword(password)
     setAuthError('')
   }
 
   const handleAdminLogout = () => {
-    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
-    setAdminToken('')
-    setTokenInput('')
+    setAdminUsername('')
+    setAdminPassword('')
+    setUsernameInput('')
+    setPasswordInput('')
     setIsAuthenticated(false)
   }
 
@@ -110,9 +124,9 @@ export default function AdminDashboard() {
   }
 
   const handlePaymentSave = async () => {
-    if (!adminToken) {
+    if (!adminUsername || !adminPassword) {
       setIsAuthenticated(false)
-      setAuthError('Admin token is required')
+      setAuthError('Username and password are required')
       return
     }
 
@@ -124,7 +138,7 @@ export default function AdminDashboard() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminToken,
+          Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
         },
         body: JSON.stringify({
           intasend_public_key: paymentConfig.intasendPublicKey,
@@ -139,10 +153,10 @@ export default function AdminDashboard() {
       } else {
         const data = await response.json()
         if (response.status === 403) {
-          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
-          setAdminToken('')
+          setAdminUsername('')
+          setAdminPassword('')
           setIsAuthenticated(false)
-          setAuthError('Invalid admin token')
+          setAuthError('Invalid admin credentials')
           return
         }
         setPaymentError(data.error || 'Failed to save settings')
@@ -171,17 +185,24 @@ export default function AdminDashboard() {
           </div>
 
           <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6">
-            <h2 className="text-lg font-bold mb-4">Enter Admin Token</h2>
+            <h2 className="text-lg font-bold mb-4">Admin Login</h2>
             {authError && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
                 {authError}
               </div>
             )}
             <input
+              type="text"
+              value={usernameInput}
+              onChange={e => setUsernameInput(e.target.value)}
+              placeholder="Username"
+              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
+            />
+            <input
               type="password"
-              value={tokenInput}
-              onChange={e => setTokenInput(e.target.value)}
-              placeholder="Admin token"
+              value={passwordInput}
+              onChange={e => setPasswordInput(e.target.value)}
+              placeholder="Password"
               className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
             />
             <button
