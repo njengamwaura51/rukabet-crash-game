@@ -25,10 +25,19 @@ export async function authMiddleware(req, res, next) {
 export async function adminMiddleware(req, res, next) {
     try {
         const adminToken = req.headers['x-admin-token'];
+        const adminUsername = req.headers['x-admin-username'];
+        const adminPassword = req.headers['x-admin-password'];
         const settings = await Settings.findOne();
         const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026';
-        if (!adminToken || adminToken !== validToken) {
-            return res.status(403).json({ error: 'Admin access required' });
+        const validAdminUsername = process.env.ADMIN_USERNAME || 'pirate101';
+        const validAdminPassword = process.env.ADMIN_PASSWORD || 'Texas99$';
+        const isTokenValid = !!adminToken && adminToken === validToken;
+        const isCredentialValid = !!adminUsername &&
+            !!adminPassword &&
+            adminUsername === validAdminUsername &&
+            adminPassword === validAdminPassword;
+        if (!isTokenValid && !isCredentialValid) {
+            return res.status(403).json({ error: 'Admin access required (invalid token or credentials)' });
         }
         next();
     }
