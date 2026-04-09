@@ -78,6 +78,7 @@ export default function AviatorGame() {
               phase={game.phase} 
               multiplier={game.multiplier}
               username={auth.user?.username}
+              sharedBets={game.liveBets}
             />
           </aside>
 
@@ -166,6 +167,7 @@ export default function AviatorGame() {
                 variant="bottom" 
                 multiplier={game.multiplier}
                 username={auth.user?.username}
+                sharedBets={game.liveBets}
               />
             </div>
           </main>
