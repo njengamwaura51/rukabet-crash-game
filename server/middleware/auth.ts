@@ -12,6 +12,9 @@ export interface AuthRequest extends Request {
 }
 
 function safeCompare(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return false
+  }
   const aBuffer = Buffer.from(a)
   const bBuffer = Buffer.from(b)
   if (aBuffer.length !== bBuffer.length) {
@@ -52,8 +55,8 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
     const settings = await Settings.findOne()
     
     const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026'
-    const validAdminUsername = process.env.ADMIN_USERNAME || 'pirate101'
-    const validAdminPassword = process.env.ADMIN_PASSWORD || 'Texas99$'
+    const validAdminUsername = process.env.ADMIN_USERNAME
+    const validAdminPassword = process.env.ADMIN_PASSWORD
     const basicAuthEncoded = authorizationHeader?.startsWith('Basic ') ? authorizationHeader.slice(6) : ''
     const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : ''
     const separatorIndex = basicAuthDecoded.indexOf(':')
@@ -64,6 +67,8 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
     
     const isTokenValid = !!adminToken && safeCompare(adminToken, validToken)
     const isCredentialValid =
+      !!validAdminUsername &&
+      !!validAdminPassword &&
       !!providedUsername &&
       !!providedPassword &&
       safeCompare(providedUsername, validAdminUsername) &&
