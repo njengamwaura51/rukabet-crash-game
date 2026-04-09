@@ -20,7 +20,13 @@ function normalizeSettings(settings: SettingsPayload) {
 }
 
 function buildAdminAuthHeader(username: string, password: string) {
-  return `Basic ${btoa(`${username}:${password}`)}`
+  const raw = `${username}:${password}`
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return `Basic ${btoa(binary)}`
 }
 
 export default function AdminDashboard() {

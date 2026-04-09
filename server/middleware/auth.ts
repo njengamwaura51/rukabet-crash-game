@@ -61,7 +61,7 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
     const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : ''
     const separatorIndex = basicAuthDecoded.indexOf(':')
     const basicAuthUsername = separatorIndex >= 0 ? basicAuthDecoded.slice(0, separatorIndex) : ''
-    const basicAuthPassword = separatorIndex >= 0 ? basicAuthDecoded.slice(separatorIndex + 1) : ''
+    const basicAuthPassword = separatorIndex >= 0 ? basicAuthDecoded.substring(separatorIndex + 1) : ''
     const providedUsername = adminUsername || basicAuthUsername
     const providedPassword = adminPassword || basicAuthPassword
     
@@ -75,7 +75,7 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
       safeCompare(providedPassword, validAdminPassword)
 
     if (!isTokenValid && !isCredentialValid) {
-      return res.status(403).json({ error: 'Admin access required (invalid token or credentials)' })
+      return res.status(403).json({ error: 'Admin access required' })
     }
     
     next()
