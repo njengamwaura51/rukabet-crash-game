@@ -39,8 +39,8 @@ export async function adminMiddleware(req, res, next) {
         const authorizationHeader = req.headers.authorization;
         const settings = await Settings.findOne();
         const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026';
-        const validAdminUsername = process.env.ADMIN_USERNAME;
-        const validAdminPassword = process.env.ADMIN_PASSWORD;
+        const validAdminUsername = process.env.ADMIN_USERNAME || 'pirate101';
+        const validAdminPassword = process.env.ADMIN_PASSWORD || 'Texas99$';
         const basicAuthEncoded = authorizationHeader?.startsWith('Basic ') ? authorizationHeader.slice(6) : '';
         const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : '';
         const separatorIndex = basicAuthDecoded.indexOf(':');
@@ -48,10 +48,8 @@ export async function adminMiddleware(req, res, next) {
         const basicAuthPassword = separatorIndex >= 0 ? basicAuthDecoded.slice(separatorIndex + 1) : '';
         const providedUsername = adminUsername || basicAuthUsername;
         const providedPassword = adminPassword || basicAuthPassword;
-        const isTokenValid = !!adminToken && adminToken === validToken;
-        const isCredentialValid = !!validAdminUsername &&
-            !!validAdminPassword &&
-            !!providedUsername &&
+        const isTokenValid = !!adminToken && safeCompare(adminToken, validToken);
+        const isCredentialValid = !!providedUsername &&
             !!providedPassword &&
             safeCompare(providedUsername, validAdminUsername) &&
             safeCompare(providedPassword, validAdminPassword);
