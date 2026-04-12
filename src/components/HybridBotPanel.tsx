@@ -188,24 +188,24 @@ export default function HybridBotPanel({
       const lastWasVeryLow = wasLastCrashVeryLow()
       const recentSignals = getRecentWindowSignals()
       const skipLimitReached = skippedRounds >= 2
-      const hasEnoughHistory = recentSignals.sampleSize >= 5
+      const warmupBypass = recentSignals.sampleSize < 5 && skippedRounds >= 1
       const shouldEnterNow =
-        !hasEnoughHistory ||
         lowCrashStreak >= 2 ||
         lastWasVeryLow ||
         recentSignals.hasSignal ||
+        warmupBypass ||
         skipLimitReached
       
       // Only bet if conditions are favorable
       if (!shouldEnterNow) {
         // Skip this round - conditions not favorable
-        console.log(`Bot ${panelId}: Skipping round (low crash streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow})`)
+        console.log(`Bot ${panelId}: Skipping round (streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow}, sample: ${recentSignals.sampleSize})`)
         setRoundSkipped(true)
         setSkippedRounds(prev => prev + 1)
         return
       }
       
-      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, low15: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
+      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, lowCrashes: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
     }
     
     // Place bet
