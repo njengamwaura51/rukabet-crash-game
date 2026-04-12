@@ -35,6 +35,7 @@ import { intasendWebhook } from './controllers/webhookController.js'
 import { getSettings, updateSettings } from './controllers/settingsController.js'
 import { getAdminOverview } from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
+import { adminRateLimit } from './middleware/rateLimit.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -69,9 +70,9 @@ app.post('/api/deposit', authMiddleware, initiateDeposit)
 app.post('/api/webhooks/intasend', intasendWebhook)
 
 // Admin routes
-app.get('/api/settings', adminMiddleware, getSettings)
-app.put('/api/settings', adminMiddleware, updateSettings)
-app.get('/api/admin/overview', adminMiddleware, getAdminOverview)
+app.get('/api/settings', adminRateLimit, adminMiddleware, getSettings)
+app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings)
+app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview)
 
 // Production: Serve static files from Vite build
 const isProduction = process.env.NODE_ENV === 'production'

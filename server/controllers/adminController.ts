@@ -7,7 +7,7 @@ export async function getAdminOverview(req: Request, res: Response) {
   try {
     const [
       totalUsers,
-      newUsers24h,
+      usersCreatedPast24Hours,
       totalBets,
       activeBets,
       completedDeposits,
@@ -89,7 +89,7 @@ export async function getAdminOverview(req: Request, res: Response) {
       overview: {
         totals: {
           users: totalUsers,
-          newUsers24h,
+          newUsers24h: usersCreatedPast24Hours,
           bets: totalBets,
           activeBets,
           completedDeposits,
