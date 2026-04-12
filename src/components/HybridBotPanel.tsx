@@ -13,6 +13,15 @@ interface HybridBotPanelProps {
   currency?: string
 }
 
+const LOW_CRASH_THRESHOLD = 1.85
+const VERY_LOW_CRASH_THRESHOLD = 1.5
+const HISTORY_WINDOW_SIZE = 15
+const MIN_LOW_CRASHES_FOR_SIGNAL = 5
+const MIN_VERY_LOW_CRASHES_FOR_SIGNAL = 2
+const FORCED_ENTRY_SKIP_LIMIT = 2
+const WARMUP_MIN_SAMPLE_SIZE = 5
+const WARMUP_SKIP_BEFORE_ENTRY = 1
+
 export default function HybridBotPanel({
   panelId,
   gamePhase,
@@ -97,7 +106,7 @@ export default function HybridBotPanel({
     
     let streak = 0
     for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i] < 1.85) {
+      if (history[i] < LOW_CRASH_THRESHOLD) {
         streak++
       } else {
         break
@@ -110,26 +119,26 @@ export default function HybridBotPanel({
   const wasLastCrashVeryLow = useCallback(() => {
     const history = crashHistoryRef.current
     if (history.length === 0) return false
-    return history[history.length - 1] < 1.50
+    return history[history.length - 1] < VERY_LOW_CRASH_THRESHOLD
   }, [])
 
   const getRecentWindowSignals = useCallback(() => {
-    const recent = crashHistoryRef.current.slice(-15)
-    const lowCrashes = recent.filter(multiplier => multiplier < 1.85).length
-    const veryLowCrashes = recent.filter(multiplier => multiplier < 1.5).length
+    const recent = crashHistoryRef.current.slice(-HISTORY_WINDOW_SIZE)
+    const lowCrashes = recent.filter(multiplier => multiplier < LOW_CRASH_THRESHOLD).length
+    const veryLowCrashes = recent.filter(multiplier => multiplier < VERY_LOW_CRASH_THRESHOLD).length
 
     return {
       sampleSize: recent.length,
       lowCrashes,
       veryLowCrashes,
-      hasSignal: lowCrashes >= 5 || veryLowCrashes >= 2
+      hasSignal: lowCrashes >= MIN_LOW_CRASHES_FOR_SIGNAL || veryLowCrashes >= MIN_VERY_LOW_CRASHES_FOR_SIGNAL
     }
   }, [])
 
   // Continuously sync latest server round history so entry logic is never starved
   useEffect(() => {
     if (!Array.isArray(roundHistory) || roundHistory.length === 0) return
-    crashHistoryRef.current = roundHistory.slice(-15)
+    crashHistoryRef.current = roundHistory.slice(-HISTORY_WINDOW_SIZE)
   }, [roundHistory])
 
   // Auto-place bet when round starts (with ENTRY HUNTING)
@@ -187,8 +196,8 @@ export default function HybridBotPanel({
       const lowCrashStreak = getLowCrashStreak()
       const lastWasVeryLow = wasLastCrashVeryLow()
       const recentSignals = getRecentWindowSignals()
-      const skipLimitReached = skippedRounds >= 2
-      const warmupBypass = recentSignals.sampleSize < 5 && skippedRounds >= 1
+      const skipLimitReached = skippedRounds >= FORCED_ENTRY_SKIP_LIMIT
+      const warmupBypass = recentSignals.sampleSize < WARMUP_MIN_SAMPLE_SIZE && skippedRounds >= WARMUP_SKIP_BEFORE_ENTRY
       const shouldEnterNow =
         lowCrashStreak >= 2 ||
         lastWasVeryLow ||
