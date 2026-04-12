@@ -6,6 +6,7 @@ interface HybridBotPanelProps {
   panelId: number
   gamePhase: Phase
   currentMultiplier: number
+  roundHistory: number[]
   isLoggedIn: boolean
   isFreebet: boolean
   maxBalance: number
@@ -16,6 +17,7 @@ export default function HybridBotPanel({
   panelId,
   gamePhase,
   currentMultiplier,
+  roundHistory,
   isLoggedIn,
   isFreebet,
   maxBalance,
@@ -111,6 +113,25 @@ export default function HybridBotPanel({
     return history[history.length - 1] < 1.50
   }, [])
 
+  const getRecentWindowSignals = useCallback(() => {
+    const recent = crashHistoryRef.current.slice(-15)
+    const lowCrashes = recent.filter(multiplier => multiplier < 1.85).length
+    const veryLowCrashes = recent.filter(multiplier => multiplier < 1.5).length
+
+    return {
+      sampleSize: recent.length,
+      lowCrashes,
+      veryLowCrashes,
+      hasSignal: lowCrashes >= 5 || veryLowCrashes >= 2
+    }
+  }, [])
+
+  // Continuously sync latest server round history so entry logic is never starved
+  useEffect(() => {
+    if (!Array.isArray(roundHistory) || roundHistory.length === 0) return
+    crashHistoryRef.current = roundHistory.slice(-15)
+  }, [roundHistory])
+
   // Auto-place bet when round starts (with ENTRY HUNTING)
   useEffect(() => {
     if (!isActive || !isLoggedIn || emergencyStop) return
@@ -165,9 +186,18 @@ export default function HybridBotPanel({
       // BASE MODE: Apply entry hunting
       const lowCrashStreak = getLowCrashStreak()
       const lastWasVeryLow = wasLastCrashVeryLow()
+      const recentSignals = getRecentWindowSignals()
+      const skipLimitReached = skippedRounds >= 2
+      const hasEnoughHistory = recentSignals.sampleSize >= 5
+      const shouldEnterNow =
+        !hasEnoughHistory ||
+        lowCrashStreak >= 2 ||
+        lastWasVeryLow ||
+        recentSignals.hasSignal ||
+        skipLimitReached
       
       // Only bet if conditions are favorable
-      if (lowCrashStreak < 2 && !lastWasVeryLow) {
+      if (!shouldEnterNow) {
         // Skip this round - conditions not favorable
         console.log(`Bot ${panelId}: Skipping round (low crash streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow})`)
         setRoundSkipped(true)
@@ -175,7 +205,7 @@ export default function HybridBotPanel({
         return
       }
       
-      console.log(`Bot ${panelId}: Entry conditions met (low crash streak: ${lowCrashStreak}) - placing bet`)
+      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, low15: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
     }
     
     // Place bet
@@ -184,10 +214,11 @@ export default function HybridBotPanel({
       console.log(`Bot ${panelId}: Placed bet ${currentBet} KSH at target ${dynamicTarget.toFixed(2)}x`)
       setBetPlacedThisRound(true)
       setRoundsPlayed(prev => prev + 1)
+      setSkippedRounds(0)
     }
   }, [isActive, isLoggedIn, emergencyStop, gamePhase, currentBet, maxBalance, maxBetLimit, 
       panelId, betting, isFreebet, activeBet, queuedBet, betPlacedThisRound, dynamicTarget,
-      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, getLowCrashStreak, wasLastCrashVeryLow])
+      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PHASE 2: MULTIPLIER_UPDATE - AUTO CASHOUT
@@ -211,12 +242,9 @@ export default function HybridBotPanel({
     if (!isActive) return
     if (gamePhase !== 'crashed') return
     if (!betPlacedThisRound) return
-    
+
     // Get crash multiplier from the current game (use currentMultiplier as it holds the crash point)
     const crashMultiplier = currentMultiplier
-    
-    // Update crash history (keep max 20)
-    crashHistoryRef.current = [...crashHistoryRef.current.slice(-19), crashMultiplier]
     
     // Check if we won or lost
     const bet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
