@@ -6,16 +6,27 @@ interface HybridBotPanelProps {
   panelId: number
   gamePhase: Phase
   currentMultiplier: number
+  roundHistory: number[]
   isLoggedIn: boolean
   isFreebet: boolean
   maxBalance: number
   currency?: string
 }
 
+const LOW_CRASH_THRESHOLD = 1.85
+const VERY_LOW_CRASH_THRESHOLD = 1.5
+const HISTORY_WINDOW_SIZE = 15
+const MIN_LOW_CRASHES_FOR_SIGNAL = 5
+const MIN_VERY_LOW_CRASHES_FOR_SIGNAL = 2
+const FORCED_ENTRY_SKIP_LIMIT = 2
+const WARMUP_MIN_SAMPLE_SIZE = 5
+const WARMUP_SKIP_BEFORE_ENTRY = 1
+
 export default function HybridBotPanel({
   panelId,
   gamePhase,
   currentMultiplier,
+  roundHistory,
   isLoggedIn,
   isFreebet,
   maxBalance,
@@ -95,7 +106,7 @@ export default function HybridBotPanel({
     
     let streak = 0
     for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i] < 1.85) {
+      if (history[i] < LOW_CRASH_THRESHOLD) {
         streak++
       } else {
         break
@@ -108,8 +119,27 @@ export default function HybridBotPanel({
   const wasLastCrashVeryLow = useCallback(() => {
     const history = crashHistoryRef.current
     if (history.length === 0) return false
-    return history[history.length - 1] < 1.50
+    return history[history.length - 1] < VERY_LOW_CRASH_THRESHOLD
   }, [])
+
+  const getRecentWindowSignals = useCallback(() => {
+    const recent = crashHistoryRef.current.slice(-HISTORY_WINDOW_SIZE)
+    const lowCrashes = recent.filter(multiplier => multiplier < LOW_CRASH_THRESHOLD).length
+    const veryLowCrashes = recent.filter(multiplier => multiplier < VERY_LOW_CRASH_THRESHOLD).length
+
+    return {
+      sampleSize: recent.length,
+      lowCrashes,
+      veryLowCrashes,
+      hasSignal: lowCrashes >= MIN_LOW_CRASHES_FOR_SIGNAL || veryLowCrashes >= MIN_VERY_LOW_CRASHES_FOR_SIGNAL
+    }
+  }, [])
+
+  // Continuously sync latest server round history so entry logic is never starved
+  useEffect(() => {
+    if (!Array.isArray(roundHistory) || roundHistory.length === 0) return
+    crashHistoryRef.current = roundHistory.slice(-HISTORY_WINDOW_SIZE)
+  }, [roundHistory])
 
   // Auto-place bet when round starts (with ENTRY HUNTING)
   useEffect(() => {
@@ -165,17 +195,26 @@ export default function HybridBotPanel({
       // BASE MODE: Apply entry hunting
       const lowCrashStreak = getLowCrashStreak()
       const lastWasVeryLow = wasLastCrashVeryLow()
+      const recentSignals = getRecentWindowSignals()
+      const skipLimitReached = skippedRounds >= FORCED_ENTRY_SKIP_LIMIT
+      const warmupBypass = recentSignals.sampleSize < WARMUP_MIN_SAMPLE_SIZE && skippedRounds >= WARMUP_SKIP_BEFORE_ENTRY
+      const shouldEnterNow =
+        lowCrashStreak >= 2 ||
+        lastWasVeryLow ||
+        recentSignals.hasSignal ||
+        warmupBypass ||
+        skipLimitReached
       
       // Only bet if conditions are favorable
-      if (lowCrashStreak < 2 && !lastWasVeryLow) {
+      if (!shouldEnterNow) {
         // Skip this round - conditions not favorable
-        console.log(`Bot ${panelId}: Skipping round (low crash streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow})`)
+        console.log(`Bot ${panelId}: Skipping round (streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow}, sample: ${recentSignals.sampleSize})`)
         setRoundSkipped(true)
         setSkippedRounds(prev => prev + 1)
         return
       }
       
-      console.log(`Bot ${panelId}: Entry conditions met (low crash streak: ${lowCrashStreak}) - placing bet`)
+      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, lowCrashes: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
     }
     
     // Place bet
@@ -184,10 +223,11 @@ export default function HybridBotPanel({
       console.log(`Bot ${panelId}: Placed bet ${currentBet} KSH at target ${dynamicTarget.toFixed(2)}x`)
       setBetPlacedThisRound(true)
       setRoundsPlayed(prev => prev + 1)
+      setSkippedRounds(0)
     }
   }, [isActive, isLoggedIn, emergencyStop, gamePhase, currentBet, maxBalance, maxBetLimit, 
       panelId, betting, isFreebet, activeBet, queuedBet, betPlacedThisRound, dynamicTarget,
-      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, getLowCrashStreak, wasLastCrashVeryLow])
+      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PHASE 2: MULTIPLIER_UPDATE - AUTO CASHOUT
@@ -211,12 +251,9 @@ export default function HybridBotPanel({
     if (!isActive) return
     if (gamePhase !== 'crashed') return
     if (!betPlacedThisRound) return
-    
+
     // Get crash multiplier from the current game (use currentMultiplier as it holds the crash point)
     const crashMultiplier = currentMultiplier
-    
-    // Update crash history (keep max 20)
-    crashHistoryRef.current = [...crashHistoryRef.current.slice(-19), crashMultiplier]
     
     // Check if we won or lost
     const bet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
