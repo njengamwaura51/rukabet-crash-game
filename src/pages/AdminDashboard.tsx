@@ -316,7 +316,7 @@ export default function AdminDashboard() {
           <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6">
             <h2 className="text-lg font-bold mb-4">Admin Login</h2>
             {authError && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
                 {authError}
               </div>
             )}
@@ -443,7 +443,7 @@ export default function AdminDashboard() {
           </h2>
 
           {paymentError && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
               {paymentError}
             </div>
           )}
@@ -519,7 +519,7 @@ export default function AdminDashboard() {
           </h2>
 
           {overviewError && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
               {overviewError}
             </div>
           )}

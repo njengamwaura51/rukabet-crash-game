@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useBetting } from '@/contexts/BettingContext'
 import { Phase } from '@/hooks/useGameState'
+import { Link } from 'wouter'
 
 interface HybridBotPanelProps {
   panelId: number
@@ -9,6 +10,7 @@ interface HybridBotPanelProps {
   roundHistory: number[]
   isLoggedIn: boolean
   isFreebet: boolean
+  freebetLocked?: boolean
   maxBalance: number
   currency?: string
 }
@@ -65,6 +67,7 @@ export default function HybridBotPanel({
   roundHistory,
   isLoggedIn,
   isFreebet,
+  freebetLocked = false,
   maxBalance,
   currency = 'KSH'
 }: HybridBotPanelProps) {
@@ -221,16 +224,7 @@ export default function HybridBotPanel({
       return
     }
     
-    // Gate 2: Max recovery steps exceeded
-    if (consecutiveLosses >= maxRecoveryStepsRef.current) {
-      console.log(`Bot ${panelId}: EMERGENCY STOP - Max recovery steps (${maxRecoveryStepsRef.current}) exceeded`)
-      setEmergencyStop(true)
-      setEmergencyReason('Max recovery steps exceeded')
-      setIsActive(false)
-      return
-    }
-    
-    // Gate 3: Session stop-loss hit
+    // Gate 2: Session stop-loss hit
     if (sessionProfit <= sessionStopLossRef.current) {
       console.log(`Bot ${panelId}: EMERGENCY STOP - Session stop-loss (${sessionStopLossRef.current}) hit`)
       setEmergencyStop(true)
@@ -239,7 +233,7 @@ export default function HybridBotPanel({
       return
     }
 
-    // Gate 4: Session take-profit hit
+    // Gate 3: Session take-profit hit
     if (sessionProfit >= takeProfitRef.current) {
       console.log(`Bot ${panelId}: TARGET HIT - Session take-profit (${takeProfitRef.current}) reached`)
       setEmergencyStop(true)
@@ -248,7 +242,7 @@ export default function HybridBotPanel({
       return
     }
     
-    // Gate 5: Insufficient balance
+    // Gate 4: Insufficient balance
     if (currentBet > maxBalance) {
       console.log(`Bot ${panelId}: EMERGENCY STOP - Insufficient balance`)
       setEmergencyStop(true)
@@ -294,7 +288,7 @@ export default function HybridBotPanel({
     }
     
     // Place bet
-    const success = betting.placeBet(panelId, currentBet, isFreebet)
+    const success = betting.placeBet(panelId, currentBet, isFreebet, maxBalance, freebetLocked)
     if (success) {
       console.log(`Bot ${panelId}: Placed bet ${currentBet} KSH at target ${dynamicTarget.toFixed(2)}x`)
       setBetPlacedThisRound(true)
@@ -302,8 +296,8 @@ export default function HybridBotPanel({
       setSkippedRounds(0)
     }
   }, [isActive, isLoggedIn, emergencyStop, gamePhase, currentBet, maxBalance, maxBetLimit, 
-      panelId, betting, isFreebet, activeBet, queuedBet, betPlacedThisRound, dynamicTarget,
-      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals, getRecentAverageMultiplier])
+      panelId, betting, isFreebet, freebetLocked, activeBet, queuedBet, betPlacedThisRound, dynamicTarget,
+      sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals, getRecentAverageMultiplier])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PHASE 2: MULTIPLIER_UPDATE - AUTO CASHOUT
@@ -370,14 +364,16 @@ export default function HybridBotPanel({
       
       // Update loss tracking
       const newAccumulatedLoss = accumulatedLoss + lossAmount
+      const nextLossStreak = Math.min(consecutiveLosses + 1, maxRecoveryStepsRef.current)
       setAccumulatedLoss(newAccumulatedLoss)
-      setConsecutiveLosses(prev => prev + 1)
+      setConsecutiveLosses(nextLossStreak)
       setWinStreak(0)
       setSessionProfit(prev => prev - lossAmount)
       
-      // SOFT PROGRESSION: Use recovery factor instead of doubling
+      // SOFT PROGRESSION: grow bet until recovery cap, then keep it stable
+      const shouldIncreaseBet = nextLossStreak < maxRecoveryStepsRef.current
       const newCurrentBet = Math.min(
-        Math.round(currentBet * recoveryFactorRef.current),
+        shouldIncreaseBet ? Math.round(currentBet * recoveryFactorRef.current) : currentBet,
         maxBetLimit
       )
       setCurrentBet(newCurrentBet)
@@ -394,7 +390,7 @@ export default function HybridBotPanel({
       console.log(`Bot ${panelId}: Soft progression - New bet: ${newCurrentBet} KSH, Target: ${newTarget.toFixed(2)}x`)
     }
   }, [gamePhase, isActive, betPlacedThisRound, panelId, betting.betHistory, currentBet, 
-      accumulatedLoss, baseBet, currentMultiplier, maxBetLimit])
+      accumulatedLoss, baseBet, currentMultiplier, maxBetLimit, consecutiveLosses])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // BOT CONTROLS
@@ -442,128 +438,71 @@ export default function HybridBotPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#00C74D] animate-pulse' : emergencyStop ? 'bg-red-500' : 'bg-gray-500'}`} />
-          <h3 className="text-xs font-bold text-white">Advanced Algorithm Bot</h3>
+          <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#00C74D] animate-pulse' : emergencyStop ? 'bg-[#00E65A]' : 'bg-gray-500'}`} />
+          <h3 className="text-xs font-bold text-white">Smart Bot</h3>
         </div>
-        <button
-          onClick={handleToggleActive}
-          disabled={!isLoggedIn}
-          className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-            isActive 
-              ? 'bg-red-600 hover:bg-red-700 text-white' 
-              : 'bg-[#00C74D] hover:brightness-110 text-[#0b0e11]'
-          }`}
-        >
-          {isActive ? 'STOP' : 'START'}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <Link
+            to="/bot-help"
+            className="w-6 h-6 rounded-full bg-[#0f1318] border border-[#00C74D]/35 text-[#00C74D] text-xs font-black flex items-center justify-center hover:bg-[#00C74D]/15 transition-colors"
+            aria-label="How to use bot"
+          >
+            ?
+          </Link>
+          <button
+            onClick={handleToggleActive}
+            disabled={!isLoggedIn}
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              isActive
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-[#00C74D] hover:brightness-110 text-[#0b0e11]'
+            }`}
+          >
+            {isActive ? 'STOP' : 'START'}
+          </button>
+        </div>
       </div>
 
       {/* Emergency Alert */}
       {emergencyStop && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center justify-between">
-          <p className="text-[10px] text-red-400 font-bold">
+        <div className="bg-[#00C74D]/15 border border-[#00C74D]/35 rounded-lg p-2 flex items-center justify-between">
+          <p className="text-[10px] text-[#00E65A] font-bold">
             ⚠️ {emergencyReason}
           </p>
           <button
             onClick={handleDismissEmergency}
-            className="text-[10px] text-red-400 hover:text-red-300 font-bold"
+            className="text-[10px] text-[#00E65A] hover:text-[#7BFFAE] font-bold"
           >
             DISMISS
           </button>
         </div>
       )}
 
-      {/* Settings Grid - Compact */}
-      <div className="flex items-center gap-2">
-        <label className="text-[8px] text-gray-200 font-semibold uppercase min-w-fit">Strategy</label>
-        <select
-          value={strategyPreset}
-          onChange={(e) => setStrategyPreset(e.target.value as StrategyPreset)}
-          disabled={isActive || !isLoggedIn}
-          className="flex-1 bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50"
-        >
-          <option value="conservative">Conservative</option>
-          <option value="moderate">Moderate</option>
-          <option value="aggressive">Aggressive</option>
-        </select>
-      </div>
-
-      {/* Settings Grid - Compact */}
-      <div className="grid grid-cols-4 gap-1.5">
+      {/* Simplified Settings */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Strategy</label>
+          <select
+            value={strategyPreset}
+            onChange={(e) => setStrategyPreset(e.target.value as StrategyPreset)}
+            disabled={isActive || !isLoggedIn}
+            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50"
+          >
+            <option value="conservative">Conservative</option>
+            <option value="moderate">Moderate</option>
+            <option value="aggressive">Aggressive</option>
+          </select>
+        </div>
         <div className="flex flex-col gap-0.5">
           <label className="text-[8px] text-gray-200 font-semibold uppercase">Base Bet</label>
           <input
             type="number"
             value={baseBet}
-            onChange={(e) => setBaseBet(Math.max(10, parseInt(e.target.value) || 10))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max Bet</label>
-          <input
-            type="number"
-            value={maxBetLimit}
-            onChange={(e) => setMaxBetLimit(Math.max(baseBet, parseInt(e.target.value) || 1000))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Base @</label>
-          <input
-            type="number"
-            step="0.05"
-            value={baseTarget}
-            onChange={(e) => setBaseTarget(Math.max(1.1, parseFloat(e.target.value) || 1.65))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max @</label>
-          <input
-            type="number"
-            step="0.5"
-            value={maxTarget}
-            onChange={(e) => setMaxTarget(Math.max(2, parseFloat(e.target.value) || 5))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-      </div>
-
-      {/* Advanced Settings - Second Row */}
-      <div className="grid grid-cols-5 gap-1.5">
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Recovery ×</label>
-          <input
-            type="number"
-            step="0.05"
-            value={recoveryFactor}
-            onChange={(e) => setRecoveryFactor(Math.max(1.1, parseFloat(e.target.value) || 1.85))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Max Steps</label>
-          <input
-            type="number"
-            value={maxRecoverySteps}
-            onChange={(e) => setMaxRecoverySteps(Math.max(2, parseInt(e.target.value) || 5))}
-            disabled={isActive || !isLoggedIn}
-            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Avg Threshold</label>
-          <input
-            type="number"
-            step="0.05"
-            value={averageMultiplierThreshold}
-            onChange={(e) => setAverageMultiplierThreshold(Math.max(1.1, parseFloat(e.target.value) || DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD))}
+            onChange={(e) => {
+              const nextBase = Math.max(10, parseInt(e.target.value) || 10)
+              setBaseBet(nextBase)
+              setMaxBetLimit(Math.max(nextBase, maxBetLimit))
+            }}
             disabled={isActive || !isLoggedIn}
             className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
           />
@@ -644,15 +583,6 @@ export default function HybridBotPanel({
             : 'bg-[#00C74D]/20 text-[#00C74D]'
         }`}>
           {accumulatedLoss > 0 ? '🔄 RECOVERY MODE' : '🎯 HUNTING MODE'}
-        </div>
-      )}
-
-      {/* Warnings */}
-      {isActive && consecutiveLosses >= maxRecoverySteps - 1 && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-1.5">
-          <p className="text-[9px] text-red-400 font-medium text-center">
-            ⚠️ Final recovery step - next loss triggers emergency stop
-          </p>
         </div>
       )}
 

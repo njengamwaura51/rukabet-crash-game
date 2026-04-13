@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import AviatorGame from "@/pages/AviatorGame";
 import AdminDashboard from "@/pages/AdminDashboard";
-import { ProfilePage, ReferralsPage, BonusesPage, SupportPage } from "@/pages/PlaceholderPages";
+import { ProfilePage, ReferralsPage, BonusesPage, SupportPage, BotHelpPage } from "@/pages/PlaceholderPages";
 import { useConfigState, ConfigContext } from "@/hooks/useConfig";
 
 const queryClient = new QueryClient();
@@ -19,6 +19,7 @@ function Router() {
       <Route path="/referrals" component={ReferralsPage} />
       <Route path="/bonuses" component={BonusesPage} />
       <Route path="/support" component={SupportPage} />
+      <Route path="/bot-help" component={BotHelpPage} />
       <Route component={NotFound} />
     </Switch>
   );

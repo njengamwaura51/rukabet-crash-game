@@ -32,7 +32,7 @@ interface BettingContextValue {
   
   // Actions - with balance validation
   placeBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean) => boolean
-  queueBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number) => boolean
+  queueBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean) => boolean
   cancelQueuedBet: (panelId: number) => boolean
   cashOut: (panelId: number, multiplier: number) => { success: boolean; wonAmount?: number }
   
@@ -47,6 +47,7 @@ interface BettingContextValue {
 }
 
 const BettingContext = createContext<BettingContextValue | null>(null)
+const BET_HISTORY_STORAGE_KEY = 'aspirebet_bet_history'
 
 export function useBetting() {
   const ctx = useContext(BettingContext)
@@ -70,9 +71,22 @@ export function BettingProvider({
   onCashoutSuccess 
 }: BettingProviderProps) {
   const [bets, setBets] = useState<PlayerBet[]>([])
-  const [betHistory, setBetHistory] = useState<BetHistory[]>([])
+  const [betHistory, setBetHistory] = useState<BetHistory[]>(() => {
+    try {
+      const raw = localStorage.getItem(BET_HISTORY_STORAGE_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })
   const roundIdRef = useRef(0)
   const prevPhaseRef = useRef<Phase>(gamePhase)
+
+  useEffect(() => {
+    localStorage.setItem(BET_HISTORY_STORAGE_KEY, JSON.stringify(betHistory.slice(0, 50)))
+  }, [betHistory])
 
   // ─────────────────────────────────────────────────────────────────────────
   // PHASE 2: STRICT ACTION HANDLERS
@@ -111,7 +125,7 @@ export function BettingProvider({
     return true
   }, [gamePhase, bets, onBalanceChange])
 
-  const queueBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number): boolean => {
+  const queueBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean): boolean => {
     // Can only queue bets during FLYING or CRASHED phase
     if (gamePhase !== 'flying' && gamePhase !== 'crashed' && gamePhase !== 'crashing') return false
     
@@ -121,6 +135,12 @@ export function BettingProvider({
     // BALANCE VALIDATION
     if (currentBalance !== undefined && amount > currentBalance) {
       console.warn('Insufficient funds: bet amount exceeds balance')
+      return false
+    }
+
+    // FREEBET LOCK VALIDATION
+    if (isFreebet && freebetLocked) {
+      console.warn('Freebet locked: Deposit at least 20 to unlock')
       return false
     }
     

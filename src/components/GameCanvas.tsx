@@ -368,7 +368,7 @@ function drawPlane(
   ctx.translate(noseX, noseY)
   ctx.rotate(-angleRad)
   const scaleX = scale
-  const scaleY = scale * 1.25  // Increase vertical height by 25% without extending length
+  const scaleY = scale * 1.625  // Prior +25%, then +30% more height without extending length
   ctx.scale(scaleX, scaleY)
 
   // No shadows - flat design

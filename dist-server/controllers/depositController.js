@@ -10,10 +10,13 @@ export async function initiateDeposit(req, res) {
     try {
         const { amount, phone } = req.body;
         const userId = req.userId;
+        const normalizedInputPhone = typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
+        const accountPhone = typeof req.user?.phone === 'string' ? req.user.phone.replace(/\D/g, '') : '';
+        const resolvedPhone = normalizedInputPhone || accountPhone;
         if (!amount || amount < 10) {
             return res.status(400).json({ error: 'Minimum deposit is KSH 10' });
         }
-        if (!phone || !/^[17]\d{8}$/.test(phone)) {
+        if (!/^[17]\d{8}$/.test(resolvedPhone)) {
             return res.status(400).json({ error: 'Invalid phone number' });
         }
         // Get IntaSend config from database
@@ -21,8 +24,8 @@ export async function initiateDeposit(req, res) {
         if (!settings?.intasendPublicKey || !settings?.intasendSecretKey) {
             return res.status(500).json({ error: 'Payment gateway not configured' });
         }
-        const normalizedPhone = `254${phone}`;
-        const apiRef = `${phone}-RUKABET-${Date.now()}`;
+        const normalizedPhone = `254${resolvedPhone}`;
+        const apiRef = `${resolvedPhone}-RUKABET-${Date.now()}`;
         // Create pending deposit record
         const deposit = await Deposit.create({
             userId,

@@ -148,7 +148,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
           {/* Phone input - Safaricom only */}
           <div>
             <label className="block text-white/60 text-[10px] font-medium mb-1">
-              Phone Number <span className="text-white/30">(Safaricom only)</span>
+              Phone Number
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-xs">🇰🇪</span>
@@ -156,14 +156,11 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
                 type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                placeholder="0712 345 678"
+                placeholder="Phone number"
                 className="w-full bg-[#0f1318] border border-white/10 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
                 required
               />
             </div>
-            {validation.error && phone && (
-              <p className="text-[#00C74D] text-[10px] mt-1 font-medium">ENTER SAFARICOM NUMBER</p>
-            )}
           </div>
 
           {/* Password input */}
@@ -198,7 +195,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
           {/* Error message */}
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-red-400 text-[11px] text-center">
+            <div className="bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg px-3 py-2 text-[#00E65A] text-[11px] text-center">
               {error}
             </div>
           )}

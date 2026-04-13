@@ -13,12 +13,12 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
 
   useEffect(() => {
     // Start animation sequence
-    const enterTimer = setTimeout(() => setAnimState('float'), 100)
-    const floatTimer = setTimeout(() => setAnimState('exit'), 2000)
+    const enterTimer = setTimeout(() => setAnimState('float'), 40)
+    const floatTimer = setTimeout(() => setAnimState('exit'), 700)
     const exitTimer = setTimeout(() => {
       setVisible(false)
       onComplete?.()
-    }, 2500)
+    }, 1000)
 
     return () => {
       clearTimeout(enterTimer)
@@ -43,7 +43,7 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
           flex flex-col items-center gap-0.5
           border border-[#00C74D]/30
           shadow-xl shadow-[#00C74D]/20
-          transform transition-all duration-500 ease-out
+          transform transition-all duration-220 ease-out
           ${animClasses[animState]}
         `}
       >

@@ -178,7 +178,7 @@ export default function BetPanelRefactored({
         return
       }
       
-      const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance)
+      const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
       if (success) {
         setLastBetAmount(betAmount)
       } else {
@@ -230,8 +230,8 @@ export default function BetPanelRefactored({
     <div className="bg-[#1a1d24] rounded-xl p-2 border border-white/5 w-full max-w-full overflow-hidden">
       {/* Error Toast */}
       {error && (
-        <div className="mb-2 px-2 py-1.5 bg-red-500/20 border border-red-500/50 rounded-lg text-center">
-          <span className="text-red-400 text-[10px] font-bold">{error}</span>
+        <div className="mb-2 px-2 py-1.5 bg-[#00C74D]/15 border border-[#00C74D]/40 rounded-lg text-center">
+          <span className="text-[#00E65A] text-[10px] font-bold">{error}</span>
         </div>
       )}
       {/* Compact 50/50 Layout */}

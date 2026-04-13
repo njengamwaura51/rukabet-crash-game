@@ -156,6 +156,7 @@ export default function AviatorGame() {
                 roundHistory={game.roundHistory}
                 isLoggedIn={auth.isLoggedIn}
                 isFreebet={isFreebet}
+                freebetLocked={freebetLocked}
                 maxBalance={maxBalance}
                 currency="KSH"
               />

@@ -60,7 +60,7 @@ function generateTopWins(): TopWin[] {
 }
 
 function generateBotBets(): LiveBet[] {
-  const count = 22 + Math.floor(Math.random() * 14)
+  const count = 42 + Math.floor(Math.random() * 14)
   const bets: LiveBet[] = []
   
   // Calculate how many should be high-rollers (10% of pool)

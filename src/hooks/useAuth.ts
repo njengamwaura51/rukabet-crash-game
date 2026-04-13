@@ -21,7 +21,8 @@ interface StoredUserCredential {
   username?: string
 }
 
-const STORAGE_KEY = 'aspirebet_user'
+const USER_STORAGE_KEYS = ['aspirebet_user', 'rukabet_user', 'user'] as const
+const PRIMARY_USER_KEY = USER_STORAGE_KEYS[0]
 const USERS_STORAGE_KEY = 'aspirebet_users'
 const TOKEN_STORAGE_KEYS = ['rukabet_token', 'token', 'aspirebet_token'] as const
 const PRIMARY_TOKEN_KEY = TOKEN_STORAGE_KEYS[0]
@@ -58,6 +59,25 @@ function setStoredToken(token: string) {
 
 function clearStoredToken() {
   for (const key of TOKEN_STORAGE_KEYS) {
+    localStorage.removeItem(key)
+  }
+}
+
+function getStoredUserRaw() {
+  return USER_STORAGE_KEYS
+    .map(key => localStorage.getItem(key))
+    .find((value): value is string => !!value)
+}
+
+function setStoredUserRaw(userData: User) {
+  for (const key of USER_STORAGE_KEYS) {
+    localStorage.removeItem(key)
+  }
+  localStorage.setItem(PRIMARY_USER_KEY, JSON.stringify(userData))
+}
+
+function clearStoredUserRaw() {
+  for (const key of USER_STORAGE_KEYS) {
     localStorage.removeItem(key)
   }
 }
@@ -109,9 +129,9 @@ export function useAuth() {
   // Persist user to localStorage
   const persistUser = useCallback((userData: User | null) => {
     if (userData) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData))
+      setStoredUserRaw(userData)
     } else {
-      localStorage.removeItem(STORAGE_KEY)
+      clearStoredUserRaw()
     }
     setUser(userData)
   }, [])
@@ -217,14 +237,14 @@ export function useAuth() {
   useEffect(() => {
     const loadAuth = async () => {
       let storedUser: User | null = null
-      const stored = localStorage.getItem(STORAGE_KEY)
+      const stored = getStoredUserRaw()
 
       if (stored) {
         try {
           storedUser = JSON.parse(stored)
           setUser(storedUser)
         } catch {
-          localStorage.removeItem(STORAGE_KEY)
+          clearStoredUserRaw()
         }
       }
 
@@ -379,7 +399,7 @@ export function useAuth() {
 
     clearStoredToken()
 
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = getStoredUserRaw()
     if (stored) {
       try {
         const userData = JSON.parse(stored)
@@ -389,7 +409,7 @@ export function useAuth() {
           return { success: true }
         }
       } catch {
-        localStorage.removeItem(STORAGE_KEY)
+        clearStoredUserRaw()
       }
     }
 
@@ -425,7 +445,7 @@ export function useAuth() {
         balance: isFreebet ? prev.balance : prev.balance + delta,
         freebet: isFreebet ? Math.max(0, prev.freebet + delta) : prev.freebet,
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      setStoredUserRaw(updated)
       return updated
     })
   }, [])
@@ -442,7 +462,7 @@ export function useAuth() {
         // Unlock freebet if deposited 20+ and has played
         freebetLocked: hasMetDepositRequirement && prev.hasPlayedWithMoney ? false : prev.freebetLocked,
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      setStoredUserRaw(updated)
       return updated
     })
   }, [])
@@ -457,7 +477,7 @@ export function useAuth() {
         // Unlock freebet if deposited and now played
         freebetLocked: prev.hasDeposited ? false : prev.freebetLocked,
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      setStoredUserRaw(updated)
       return updated
     })
   }, [])

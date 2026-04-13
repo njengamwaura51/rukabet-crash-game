@@ -5,42 +5,34 @@ interface DepositModalProps {
   balance: number
   freebet: number
   freebetLocked: boolean
+  userPhone?: string
   onClose: () => void
   onDeposit: (amount: number) => void
 }
 
 type WalletTab = 'deposit' | 'withdraw' | 'transactions'
 
-// Phone validation regex: 9 digits starting with 7 or 1 (no leading 0)
-const PHONE_REGEX = /^[17][0-9]{8}$/
 const TOKEN_STORAGE_KEYS = ['rukabet_token', 'token', 'aspirebet_token'] as const
 
-export function DepositModal({ balance, freebet, freebetLocked, onClose, onDeposit }: DepositModalProps) {
+function normalizeToNineDigitPhone(phone?: string): string {
+  if (!phone) return ''
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.length === 9 && /^[17]\d{8}$/.test(cleaned)) return cleaned
+  if (cleaned.length === 10 && cleaned.startsWith('0') && /^[17]\d{8}$/.test(cleaned.slice(1))) return cleaned.slice(1)
+  if (cleaned.length === 12 && cleaned.startsWith('254') && /^[17]\d{8}$/.test(cleaned.slice(3))) return cleaned.slice(3)
+  return ''
+}
+
+export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClose, onDeposit }: DepositModalProps) {
   const { config } = useConfig()
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
-  const [phone, setPhone] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [transactions] = useState<{ id: string; type: string; amount: number; date: string; status: string }[]>([])
-  const [phoneError, setPhoneError] = useState('')
+  const registeredPhone = normalizeToNineDigitPhone(userPhone)
 
   const quickAmounts = [50, 100, 500, 1000]
-
-  // Validate phone on change
-  const handlePhoneChange = (value: string) => {
-    // Only allow digits, max 9
-    const cleaned = value.replace(/\D/g, '').slice(0, 9)
-    setPhone(cleaned)
-    
-    if (cleaned.length > 0 && cleaned.length < 9) {
-      setPhoneError('Enter 9 digits (e.g., 712345678)')
-    } else if (cleaned.length === 9 && !PHONE_REGEX.test(cleaned)) {
-      setPhoneError('Must start with 7 or 1')
-    } else {
-      setPhoneError('')
-    }
-  }
 
   const handleDeposit = async () => {
     const depositAmount = parseFloat(amount)
@@ -49,9 +41,8 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
       return
     }
 
-    // Validate phone: must be 9 digits starting with 7 or 1
-    if (!PHONE_REGEX.test(phone)) {
-      setStatus({ type: 'error', message: 'Enter valid phone: 9 digits starting with 7 or 1' })
+    if (!registeredPhone) {
+      setStatus({ type: 'error', message: 'No registered M-Pesa number found on your account' })
       return
     }
 
@@ -78,7 +69,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
         },
         body: JSON.stringify({
           amount: depositAmount,
-          phone: phone,
+          phone: registeredPhone,
         }),
       })
 
@@ -108,7 +99,6 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
             onDeposit(depositAmount)
             setStatus({ type: 'success', message: `KSH ${depositAmount.toFixed(2)} deposited successfully!` })
             setAmount('')
-            setPhone('')
             setIsProcessing(false)
           }
         }, 10000)
@@ -159,7 +149,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
           <div className="flex-1 bg-gradient-to-br from-[#252525] to-[#1a1a1a] rounded-xl p-4 border border-[#00C74D]/20 relative overflow-hidden shadow-inner">
             <div className={`absolute top-1.5 right-1.5 text-[8px] px-2 py-0.5 rounded-full font-black ${
               freebetLocked 
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                ? 'bg-[#00C74D]/20 text-[#00E65A] border border-[#00C74D]/30' 
                 : 'bg-[#00C74D]/20 text-[#00C74D] border border-[#00C74D]/30'
             }`}>
               {freebetLocked ? '🔒 locked' : '✓ unlocked'}
@@ -201,7 +191,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
         {status && (
           <div className={`mx-5 mb-4 px-4 py-3 rounded-lg text-xs text-center font-bold ${
             status.type === 'success' ? 'bg-[#00C74D]/10 border border-[#00C74D]/30 text-[#00C74D]' :
-            status.type === 'error' ? 'bg-red-500/10 border border-red-500/30 text-red-400' :
+            status.type === 'error' ? 'bg-[#00C74D]/10 border border-[#00C74D]/30 text-[#00E65A]' :
             'bg-blue-500/10 border border-blue-500/30 text-blue-400'
           }`}>
             {status.message}
@@ -211,26 +201,11 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
         {/* Content */}
         {tab === 'deposit' && (
           <div className="px-5 pb-5">
-            {/* Phone input */}
-            <div className="mb-3">
-              <label className="text-white/70 text-xs font-bold mb-1.5 block">M-Pesa Phone Number</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">🇰🇪 +254</span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => handlePhoneChange(e.target.value)}
-                  placeholder="712345678"
-                  maxLength={9}
-                  className={`w-full bg-[#252525] border rounded-lg pl-20 pr-4 py-3.5 text-white text-base font-bold focus:outline-none transition-colors placeholder-white/30 ${
-                    phoneError ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-[#00C74D]'
-                  }`}
-                  disabled={isProcessing}
-                />
+            <div className="mb-4 rounded-lg border border-white/10 bg-[#252525] px-4 py-3">
+              <div className="text-white/60 text-[10px] font-bold mb-1">STK will be sent to your registered number</div>
+              <div className="text-white text-sm font-black">
+                {registeredPhone ? `+254${registeredPhone}` : 'No registered number'}
               </div>
-              {phoneError && (
-                <p className="text-red-400 text-[10px] mt-1 font-bold">{phoneError}</p>
-              )}
             </div>
 
             <div className="text-white/70 text-xs font-bold mb-1.5">Amount to Deposit</div>
@@ -266,7 +241,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
             <button
               type="button"
               onClick={handleDeposit}
-              disabled={isProcessing || !amount || !phone || !!phoneError}
+              disabled={isProcessing || !amount || !registeredPhone}
               className="w-full py-4 bg-[#00C74D] hover:brightness-110 rounded-lg text-black font-black text-sm tracking-wider transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#00C74D]/20"
             >
               {isProcessing ? (
@@ -281,14 +256,6 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
                 'DEPOSIT VIA M-PESA'
               )}
             </button>
-
-            {/* Help text */}
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <p className="text-white/40 text-[11px] leading-relaxed text-center">
-                Need help? WhatsApp us at{' '}
-                <span className="text-[#00C74D] font-bold">+{config.whatsappSupportNumber}</span>
-              </p>
-            </div>
           </div>
         )}
 

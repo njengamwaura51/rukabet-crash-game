@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import axios from 'axios'
 import { AuthRequest } from '../middleware/auth.js'
 import { Deposit } from '../models/Deposit.js'
@@ -14,12 +14,15 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
   try {
     const { amount, phone } = req.body
     const userId = req.userId!
+    const normalizedInputPhone = typeof phone === 'string' ? phone.replace(/\D/g, '') : ''
+    const accountPhone = typeof req.user?.phone === 'string' ? req.user.phone.replace(/\D/g, '') : ''
+    const resolvedPhone = normalizedInputPhone || accountPhone
 
     if (!amount || amount < 10) {
       return res.status(400).json({ error: 'Minimum deposit is KSH 10' })
     }
 
-    if (!phone || !/^[17]\d{8}$/.test(phone)) {
+    if (!/^[17]\d{8}$/.test(resolvedPhone)) {
       return res.status(400).json({ error: 'Invalid phone number' })
     }
 
@@ -29,8 +32,8 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       return res.status(500).json({ error: 'Payment gateway not configured' })
     }
 
-    const normalizedPhone = `254${phone}`
-    const apiRef = `${phone}-RUKABET-${Date.now()}`
+    const normalizedPhone = `254${resolvedPhone}`
+    const apiRef = `${resolvedPhone}-RUKABET-${Date.now()}`
 
     // Create pending deposit record
     const deposit = await Deposit.create({

@@ -75,7 +75,7 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
                 }`}>
                   KSH {balanceLabel}
                 </span>
-                <span className={`font-black font-mono text-xs sm:text-sm transition-colors duration-300 ${balanceColor}`}>
+                <span className={`font-black font-sans text-xs sm:text-sm transition-colors duration-300 ${balanceColor}`}>
                   {displayBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -145,6 +145,7 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
           balance={user.balance}
           freebet={user.freebet}
           freebetLocked={user.freebetLocked}
+          userPhone={user.phone}
           onClose={() => setShowDeposit(false)}
           onDeposit={onDeposit}
         />
