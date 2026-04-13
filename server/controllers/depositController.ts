@@ -6,6 +6,7 @@ import { Settings } from '../models/Settings.js'
 
 const INTASEND_SANDBOX_URL = 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
 const INTASEND_LIVE_URL = 'https://payment.intasend.com/api/v1/payment/mpesa-stk-push/'
+const INTASEND_CHALLENGE = 117402
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
   try {
@@ -45,6 +46,7 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     // Call IntaSend STK Push API
     const response = await axios.post(apiUrl, {
       public_key: settings.intasendPublicKey,
+      challenge: INTASEND_CHALLENGE,
       amount: amount,
       phone_number: normalizedPhone,
       api_ref: apiRef,
