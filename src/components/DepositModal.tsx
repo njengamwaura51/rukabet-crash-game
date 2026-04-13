@@ -83,11 +83,11 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
         }),
       })
 
-      const data = await response.json()
-
       if (response.status === 401) {
         throw new Error('Session expired. Please login again.')
       }
+
+      const data = await response.json()
 
       if (response.ok && data.success) {
         setStatus({ type: 'success', message: 'STK Push sent! Check your phone and enter M-Pesa PIN' })
