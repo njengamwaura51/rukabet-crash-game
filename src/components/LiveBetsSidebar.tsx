@@ -60,18 +60,18 @@ function generateTopWins(): TopWin[] {
 }
 
 function generateBotBets(): LiveBet[] {
-  const count = 42 + Math.floor(Math.random() * 14)
+  const count = 58 + Math.floor(Math.random() * 16)
   const bets: LiveBet[] = []
   
-  // Calculate how many should be high-rollers (10% of pool)
-  const highRollerCount = Math.ceil(count * 0.1)
+  // Calculate how many should be high-rollers (20% of pool)
+  const highRollerCount = Math.ceil(count * 0.2)
   
   for (let i = 0; i < count; i++) {
     let bet: number
     
-    // First 10% are high-rollers (5,000 - 9,000 KSH)
+    // First 20% are high-rollers (5,000 - 10,000 KSH)
     if (i < highRollerCount) {
-      bet = Math.floor(5000 + Math.random() * 4000)
+      bet = Math.floor(5000 + Math.random() * 5001)
     } else {
       // Rest distributed normally
       const roll = Math.random()
@@ -147,21 +147,13 @@ export function LiveBetsSidebar({
   const userBetHistory = betting?.betHistory ?? []
   
   useEffect(() => {
-    if (sharedBets.length > 0) {
-      setBets(sharedBets)
-    }
-  }, [sharedBets])
-
-  useEffect(() => {
-    if (sharedBets.length > 0) return
     if (phase === 'waiting' && lastPhaseRef.current !== 'waiting') {
       setBets(generateBotBets())
     }
     lastPhaseRef.current = phase
-  }, [phase, sharedBets])
+  }, [phase])
   
   useEffect(() => {
-    if (sharedBets.length > 0) return
     if (phase === 'flying' && multiplier > 1) {
       setBets(prevBets => 
         prevBets.map(bet => {
@@ -177,7 +169,11 @@ export function LiveBetsSidebar({
         })
       )
     }
-  }, [phase, multiplier, sharedBets])
+  }, [phase, multiplier])
+
+  const liveRows: LiveBet[] = sharedBets.length > 0
+    ? [...sharedBets, ...bets].sort((a, b) => b.bet - a.bet)
+    : bets
 
   // Render a single bet pill - reduced padding
   const renderBetPill = (row: LiveBet, index: number) => {
@@ -391,7 +387,7 @@ export function LiveBetsSidebar({
 
         {/* Bet pills list */}
         <div className="flex-1 min-h-0 w-full overflow-y-auto hide-scrollbar py-2">
-          {tab === 'live' && bets.map((row, index) => renderBetPill(row, index))}
+          {tab === 'live' && liveRows.map((row, index) => renderBetPill(row, index))}
           {tab === 'mine' && renderUserBetHistory()}
           {tab === 'top' && renderTopWins()}
         </div>

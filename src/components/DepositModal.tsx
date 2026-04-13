@@ -202,9 +202,8 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
         {tab === 'deposit' && (
           <div className="px-5 pb-5">
             <div className="mb-4 rounded-lg border border-white/10 bg-[#252525] px-4 py-3">
-              <div className="text-white/60 text-[10px] font-bold mb-1">STK will be sent to your registered number</div>
-              <div className="text-white text-sm font-black">
-                {registeredPhone ? `+254${registeredPhone}` : 'No registered number'}
+              <div className="text-white/60 text-[10px] font-bold">
+                STK push will be sent to your registered M-Pesa number.
               </div>
             </div>
 

@@ -8,38 +8,42 @@ interface AuthModalProps {
   onSwitchMode: () => void
 }
 
-// Safaricom prefixes: 070, 071, 072, 074, 075, 076, 079, 0110-0115
-const SAFARICOM_REGEX = /^(07[01245679]\d{7}|011[0-5]\d{6})$/
+// Safaricom prefixes in 9-digit format (without country code or leading zero):
+// 7xx... (70,71,72,74,75,76,79) and 11x... (110-115)
+const SAFARICOM_REGEX = /^(7[01245679]\d{7}|11[0-5]\d{6})$/
 
-function validateSafaricomNumber(phone: string): { valid: boolean; error?: string } {
-  // Remove spaces and any leading +254 or 254
-  let cleaned = phone.replace(/\s+/g, '')
-  
-  // Convert +254 or 254 prefix to 0
-  if (cleaned.startsWith('+254')) {
-    cleaned = '0' + cleaned.slice(4)
-  } else if (cleaned.startsWith('254')) {
-    cleaned = '0' + cleaned.slice(3)
+function normalizePhoneInput(phone: string): string {
+  let cleaned = phone.replace(/\D/g, '')
+
+  // Gracefully accept pasted 254... / 0... inputs, but store as 9 digits
+  if (cleaned.startsWith('254') && cleaned.length > 9) {
+    cleaned = cleaned.slice(3)
   }
-  
-  if (!cleaned.startsWith('0')) {
-    return { valid: false, error: 'Phone number must start with 0, 254, or +254' }
+  if (cleaned.startsWith('0') && cleaned.length > 9) {
+    cleaned = cleaned.slice(1)
   }
-  
-  // Check length
-  if (cleaned.length !== 10) {
-    return { valid: false, error: 'Phone number must be 10 digits (e.g., 0712345678)' }
+
+  return cleaned.slice(0, 9)
+}
+
+function validateSafaricomNumber(phone: string): { valid: boolean; normalized: string; isComplete: boolean; error?: string } {
+  const normalized = normalizePhoneInput(phone)
+  const isComplete = normalized.length === 9
+
+  if (!isComplete) {
+    return { valid: false, normalized, isComplete: false }
   }
-  
-  // Check Safaricom prefixes
-  if (!SAFARICOM_REGEX.test(cleaned)) {
-    return { 
-      valid: false, 
-      error: 'Only Safaricom numbers allowed (070, 071, 072, 074, 075, 076, 079, 0110-0115)' 
+
+  if (!SAFARICOM_REGEX.test(normalized)) {
+    return {
+      valid: false,
+      normalized,
+      isComplete: true,
+      error: 'Only Safaricom numbers are allowed'
     }
   }
-  
-  return { valid: true }
+
+  return { valid: true, normalized, isComplete: true }
 }
 
 // Generate auto username from phone: User_XXXXX or anonymized number
@@ -50,17 +54,6 @@ function generateUsername(phone: string): string {
     suffix += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return `User_${suffix}`
-}
-
-// Normalize phone to 07XXXXXXXX format
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/\s+/g, '')
-  if (cleaned.startsWith('+254')) {
-    cleaned = '0' + cleaned.slice(4)
-  } else if (cleaned.startsWith('254')) {
-    cleaned = '0' + cleaned.slice(3)
-  }
-  return cleaned
 }
 
 export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: AuthModalProps) {
@@ -75,13 +68,18 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
     e.preventDefault()
     setError('')
 
-    // Validate Safaricom number
+    if (!validation.isComplete) {
+      setError('Enter your 9-digit phone number')
+      return
+    }
+
+    // Validate Safaricom number (checked only after full input)
     if (!validation.valid) {
       setError(validation.error || 'Invalid phone number')
       return
     }
 
-    const normalizedPhone = normalizePhone(phone)
+    const normalizedPhone = validation.normalized
 
     if (mode === 'register') {
       if (password !== confirmPassword) {
@@ -150,17 +148,23 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
             <label className="block text-white/60 text-[10px] font-medium mb-1">
               Phone Number
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-xs">🇰🇪</span>
-              <input
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="Phone number"
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
-                required
-              />
-            </div>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={e => {
+                setPhone(normalizePhoneInput(e.target.value))
+              }}
+              placeholder="712345678"
+              maxLength={9}
+              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
+              required
+            />
+            {mode === 'register' && validation.isComplete && !validation.valid && (
+              <p className="text-[#00E65A] text-[10px] mt-1 font-medium">
+                Only Safaricom numbers are supported
+              </p>
+            )}
           </div>
 
           {/* Password input */}

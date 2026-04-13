@@ -73,7 +73,7 @@ export default function AviatorGame() {
         <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto lg:overflow-hidden w-full">
 
           {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
-          <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] min-h-0">
+          <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] min-h-0 h-full">
             <LiveBetsSidebar 
               phase={game.phase} 
               multiplier={game.multiplier}
