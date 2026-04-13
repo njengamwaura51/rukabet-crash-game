@@ -263,7 +263,8 @@ function drawFlightPathToPoint(
   ctx: CanvasRenderingContext2D, w: number, h: number, elMs: number,
   globalOffsetY: number = 0,
   endX: number,  // Actual plane tail X (after clamping)
-  endY: number   // Actual plane tail Y (after clamping)
+  endY: number,  // Actual plane tail Y (after clamping)
+  globalOffsetX: number = 0
 ) {
   if (elMs < 8) return
 
@@ -277,8 +278,9 @@ function drawFlightPathToPoint(
     const t = (i / CURVE_STEPS) * elMs
     const { px, py } = flightPos(t, gw, gh)
     const progress = i / CURVE_STEPS
+    const scaledOffsetX = globalOffsetX * progress
     const scaledOffset = globalOffsetY * progress
-    pts.push({ x: px, y: py + scaledOffset })
+    pts.push({ x: px + scaledOffsetX, y: py + scaledOffset })
   }
 
   // Replace last point with actual plane tail position
@@ -759,9 +761,12 @@ export function GameCanvas({
         const noseX = tailX + PLANE_LEN * Math.cos(sm.angle)
         const noseY = tailY - PLANE_LEN * Math.sin(sm.angle)
 
-        // NOW re-draw the flight path UP TO the actual plane tail position
-        // This ensures the curve is ALWAYS connected to the tail
-        drawFlightPathToPoint(ctx, CW, CH, elapsedMs, -turbulenceY, tailX, tailY)
+        // Re-anchor the full curve to the true tail point (with clamp/turbulence),
+        // so mobile and desktop both keep the tip perfectly wired to the plane.
+        const { px: baseTipX, py: baseTipY } = flightPos(elapsedMs, gw, gh)
+        const followOffsetX = tailX - baseTipX
+        const followOffsetY = tailY - baseTipY
+        drawFlightPathToPoint(ctx, CW, CH, elapsedMs, followOffsetY, tailX, tailY, followOffsetX)
 
         drawExhaust(ctx, tailX, tailY, sm.angle, time)
         drawPlane(ctx, noseX, noseY, sm.angle, false, PLANE_SCALE)

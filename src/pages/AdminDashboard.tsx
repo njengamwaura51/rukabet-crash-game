@@ -94,6 +94,7 @@ export default function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState('')
   const [usernameInput, setUsernameInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authError, setAuthError] = useState('')
   const [whatsapp, setWhatsapp] = useState(config.whatsappSupportNumber)
@@ -118,11 +119,13 @@ export default function AdminDashboard() {
         setIsAuthenticated(false)
         setPaymentLoading(false)
         setOverviewLoading(false)
+        setIsAuthenticating(false)
         return
       }
 
       setPaymentLoading(true)
       setOverviewLoading(true)
+      setIsAuthenticating(true)
       try {
         const adminAuthHeader = buildAdminAuthHeader(adminUsername, adminPassword)
         const [settingsResponse, overviewResponse] = await Promise.all([
@@ -147,7 +150,11 @@ export default function AdminDashboard() {
         }
 
         if (!settingsResponse.ok) {
-          setPaymentError('Failed to load settings')
+          const errorData = await settingsResponse.json().catch(() => null)
+          const message = errorData?.error || 'Failed to load settings'
+          setIsAuthenticated(false)
+          setAuthError(message)
+          setPaymentError(message)
           return
         }
 
@@ -176,17 +183,21 @@ export default function AdminDashboard() {
         }
       } catch (error) {
         console.error('Failed to load settings:', error)
+        setIsAuthenticated(false)
+        setAuthError('Network error. Is the backend running?')
         setPaymentError('Network error. Is the backend running?')
         setOverviewError('Network error while loading analytics')
       } finally {
         setPaymentLoading(false)
         setOverviewLoading(false)
+        setIsAuthenticating(false)
       }
     }
     fetchSettings()
   }, [config.apiBaseUrl, adminUsername, adminPassword, refreshKey, updateConfig])
 
-  const handleAdminLogin = () => {
+  const handleAdminLogin = (event?: React.FormEvent) => {
+    event?.preventDefault()
     const username = usernameInput.trim()
     const password = passwordInput
 
@@ -197,7 +208,10 @@ export default function AdminDashboard() {
 
     setAdminUsername(username)
     setAdminPassword(password)
+    setIsAuthenticated(false)
+    setIsAuthenticating(true)
     setAuthError('')
+    setRefreshKey(prev => prev + 1)
   }
 
   const handleAdminLogout = () => {
@@ -320,26 +334,29 @@ export default function AdminDashboard() {
                 {authError}
               </div>
             )}
-            <input
-              type="text"
-              value={usernameInput}
-              onChange={e => setUsernameInput(e.target.value)}
-              placeholder="Username"
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
-            />
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
-              placeholder="Password"
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
-            />
-            <button
-              onClick={handleAdminLogin}
-              className="w-full py-3 rounded-lg font-bold bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30 transition-all"
-            >
-              Login to Admin Dashboard
-            </button>
+            <form onSubmit={handleAdminLogin}>
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={e => setUsernameInput(e.target.value)}
+                placeholder="Username"
+                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
+              />
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={e => setPasswordInput(e.target.value)}
+                placeholder="Password"
+                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
+              />
+              <button
+                type="submit"
+                disabled={isAuthenticating}
+                className="w-full py-3 rounded-lg font-bold bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isAuthenticating ? 'Signing in...' : 'Login to Admin Dashboard'}
+              </button>
+            </form>
           </div>
         </div>
       </div>

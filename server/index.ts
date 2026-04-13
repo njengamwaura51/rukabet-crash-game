@@ -44,10 +44,12 @@ const INTASEND_PUBLIC_DOMAIN = process.env.PUBLIC_APP_URL || 'https://rukabet.li
 const INTASEND_WEBHOOK_URL = `${INTASEND_PUBLIC_DOMAIN}${INTASEND_WEBHOOK_PATH}`
 
 const distPath = path.join(__dirname, '../dist')
+const isProduction = process.env.NODE_ENV === 'production'
 console.log(`📁 Static files: ${distPath}`)
 
 const app = express()
 const httpServer = createServer(app)
+app.enable('trust proxy')
 
 // CORS - allow all origins in production (we serve everything from same domain)
 // In production, static files and API are on same origin, so CORS is permissive
@@ -57,6 +59,17 @@ app.use(cors({
 }))
 
 app.use(express.json())
+
+if (isProduction) {
+  app.use((req, res, next) => {
+    const forwardedProto = req.headers['x-forwarded-proto']
+    const protocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
+    if (protocol && protocol !== 'https') {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`)
+    }
+    next()
+  })
+}
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }))
@@ -82,7 +95,6 @@ app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings)
 app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview)
 
 // Production: Serve static files from Vite build
-const isProduction = process.env.NODE_ENV === 'production'
 if (isProduction) {
   console.log(`📂 Serving static files from: ${distPath}`)
   app.use(express.static(distPath))
