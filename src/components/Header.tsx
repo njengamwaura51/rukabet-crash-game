@@ -8,8 +8,8 @@ import type { User } from '@/hooks/useAuth'
 
 interface HeaderProps {
   user: User | null
-  onLogin: (phone: string, password: string) => { success: boolean; error?: string }
-  onRegister: (phone: string, password: string) => { success: boolean; error?: string }
+  onLogin: (phone: string, password: string) => Promise<{ success: boolean; error?: string }>
+  onRegister: (phone: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>
   onLogout: () => void
   onDeposit: (amount: number) => void
   activeWallet?: 'main' | 'bonus'

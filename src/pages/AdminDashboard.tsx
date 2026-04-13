@@ -9,6 +9,8 @@ type SettingsPayload = {
   intasend_secret_key?: string
   companyName?: string
   company_name?: string
+  whatsappSupport?: string
+  whatsapp_support?: string
 }
 
 type AdminOverviewPayload = {
@@ -64,6 +66,7 @@ function normalizeSettings(settings: SettingsPayload) {
     intasendPublicKey: settings.intasendPublicKey || settings.intasend_public_key || '',
     intasendSecretKey: settings.intasendSecretKey || settings.intasend_secret_key || '',
     companyName: settings.companyName || settings.company_name || 'RUKA TECH SOLUTIONS',
+    whatsappSupportNumber: settings.whatsappSupport || settings.whatsapp_support || '',
   }
 }
 
@@ -150,7 +153,16 @@ export default function AdminDashboard() {
 
         const data = await settingsResponse.json()
         const settings = data.settings || data
-        setPaymentConfig(normalizeSettings(settings))
+        const normalizedSettings = normalizeSettings(settings)
+        setPaymentConfig({
+          intasendPublicKey: normalizedSettings.intasendPublicKey,
+          intasendSecretKey: normalizedSettings.intasendSecretKey,
+          companyName: normalizedSettings.companyName,
+        })
+        if (normalizedSettings.whatsappSupportNumber) {
+          setWhatsapp(normalizedSettings.whatsappSupportNumber)
+          updateConfig({ whatsappSupportNumber: normalizedSettings.whatsappSupportNumber })
+        }
         setIsAuthenticated(true)
         setAuthError('')
         setPaymentError('')
@@ -172,7 +184,7 @@ export default function AdminDashboard() {
       }
     }
     fetchSettings()
-  }, [config.apiBaseUrl, adminUsername, adminPassword, refreshKey])
+  }, [config.apiBaseUrl, adminUsername, adminPassword, refreshKey, updateConfig])
 
   const handleAdminLogin = () => {
     const username = usernameInput.trim()
@@ -197,11 +209,47 @@ export default function AdminDashboard() {
     setOverview(null)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!adminUsername || !adminPassword) {
+      setIsAuthenticated(false)
+      setAuthError('Username and password are required')
+      return
+    }
+
     const cleaned = whatsapp.replace(/\s+/g, '').replace(/^\+/, '')
-    updateConfig({ whatsappSupportNumber: cleaned })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setPaymentError('')
+    try {
+      const response = await fetch(`${config.apiBaseUrl}/api/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
+        },
+        body: JSON.stringify({
+          whatsapp_support: cleaned,
+        }),
+      })
+
+      if (response.ok) {
+        updateConfig({ whatsappSupportNumber: cleaned })
+        setWhatsapp(cleaned)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+        setAuthError('')
+      } else {
+        if (response.status === 403) {
+          setAdminUsername('')
+          setAdminPassword('')
+          setIsAuthenticated(false)
+          setAuthError('Invalid admin credentials')
+          return
+        }
+        const data = await response.json().catch(() => null)
+        setPaymentError(data?.error || 'Failed to save WhatsApp support number')
+      }
+    } catch {
+      setPaymentError('Network error. Is the backend running?')
+    }
   }
 
   const handlePaymentSave = async () => {
