@@ -70,10 +70,10 @@ export default function AviatorGame() {
         />
 
         {/* Body: sidebar + main game - responsive layout */}
-        <div className="flex flex-col lg:flex-row w-full gap-2 p-2 lg:px-2 lg:py-3">
+        <div className="flex flex-col lg:flex-row lg:items-stretch w-full gap-2 p-2 lg:px-2 lg:py-3">
 
           {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
-          <aside className="hidden lg:flex w-[320px] xl:w-[350px] flex-shrink-0 flex-col self-start lg:sticky lg:top-20 lg:h-[calc(100vh-90px)] lg:max-h-[calc(100vh-90px)]">
+          <aside className="hidden lg:flex w-[320px] xl:w-[350px] flex-shrink-0 flex-col lg:self-stretch">
             <LiveBetsSidebar 
               phase={game.phase} 
               multiplier={game.multiplier}
