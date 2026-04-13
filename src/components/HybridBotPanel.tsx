@@ -16,11 +16,47 @@ interface HybridBotPanelProps {
 const LOW_CRASH_THRESHOLD = 1.85
 const VERY_LOW_CRASH_THRESHOLD = 1.5
 const HISTORY_WINDOW_SIZE = 15
+const MIN_SAMPLE_SIZE_FOR_AVERAGE_GATE = 3
 const MIN_LOW_CRASHES_FOR_SIGNAL = 5
 const MIN_VERY_LOW_CRASHES_FOR_SIGNAL = 2
 const FORCED_ENTRY_SKIP_LIMIT = 2
 const WARMUP_MIN_SAMPLE_SIZE = 5
 const WARMUP_SKIP_BEFORE_ENTRY = 1
+
+type StrategyPreset = 'conservative' | 'moderate' | 'aggressive'
+
+const STRATEGY_PRESETS: Record<StrategyPreset, {
+  baseTarget: number
+  recoveryFactor: number
+  maxRecoverySteps: number
+  averageMultiplierThreshold: number
+  takeProfit: number
+}> = {
+  conservative: {
+    baseTarget: 1.2,
+    recoveryFactor: 1.5,
+    maxRecoverySteps: 4,
+    averageMultiplierThreshold: 1.6,
+    takeProfit: 120
+  },
+  moderate: {
+    baseTarget: 1.5,
+    recoveryFactor: 1.85,
+    maxRecoverySteps: 5,
+    averageMultiplierThreshold: 2.0,
+    takeProfit: 250
+  },
+  aggressive: {
+    baseTarget: 2.0,
+    recoveryFactor: 2.5,
+    maxRecoverySteps: 6,
+    averageMultiplierThreshold: 3.0,
+    takeProfit: 400
+  }
+}
+const DEFAULT_STRATEGY_PRESET: StrategyPreset = 'moderate'
+const DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD = STRATEGY_PRESETS[DEFAULT_STRATEGY_PRESET].averageMultiplierThreshold
+const DEFAULT_TAKE_PROFIT = STRATEGY_PRESETS[DEFAULT_STRATEGY_PRESET].takeProfit
 
 export default function HybridBotPanel({
   panelId,
@@ -68,6 +104,11 @@ export default function HybridBotPanel({
   const [baseTarget, setBaseTarget] = useState(1.65)
   const [maxTarget, setMaxTarget] = useState(5.0)
   const [sessionStopLoss, setSessionStopLoss] = useState(-500)
+  const [sessionTakeProfit, setSessionTakeProfit] = useState(DEFAULT_TAKE_PROFIT)
+  const [averageMultiplierThreshold, setAverageMultiplierThreshold] = useState(DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD)
+  const [strategyPreset, setStrategyPreset] = useState<StrategyPreset>(DEFAULT_STRATEGY_PRESET)
+  const takeProfitRef = useRef(DEFAULT_TAKE_PROFIT)
+  const averageMultiplierThresholdRef = useRef(DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD)
   
   // Sync refs with state
   useEffect(() => {
@@ -76,7 +117,20 @@ export default function HybridBotPanel({
     baseTargetRef.current = baseTarget
     maxTargetRef.current = maxTarget
     sessionStopLossRef.current = sessionStopLoss
-  }, [maxRecoverySteps, recoveryFactor, baseTarget, maxTarget, sessionStopLoss])
+    takeProfitRef.current = sessionTakeProfit
+    averageMultiplierThresholdRef.current = averageMultiplierThreshold
+  }, [maxRecoverySteps, recoveryFactor, baseTarget, maxTarget, sessionStopLoss, sessionTakeProfit, averageMultiplierThreshold])
+
+  // Apply external-style preset defaults when idle
+  useEffect(() => {
+    if (isActive) return
+    const preset = STRATEGY_PRESETS[strategyPreset]
+    setBaseTarget(preset.baseTarget)
+    setRecoveryFactor(preset.recoveryFactor)
+    setMaxRecoverySteps(preset.maxRecoverySteps)
+    setAverageMultiplierThreshold(preset.averageMultiplierThreshold)
+    setSessionTakeProfit(preset.takeProfit)
+  }, [strategyPreset, isActive])
   
   // Track if we've placed a bet this round
   const [betPlacedThisRound, setBetPlacedThisRound] = useState(false)
@@ -135,6 +189,13 @@ export default function HybridBotPanel({
     }
   }, [])
 
+  const getRecentAverageMultiplier = useCallback(() => {
+    const recent = crashHistoryRef.current.slice(-HISTORY_WINDOW_SIZE)
+    if (recent.length === 0) return 0
+    const sum = recent.reduce((acc, value) => acc + value, 0)
+    return sum / recent.length
+  }, [])
+
   // Continuously sync latest server round history so entry logic is never starved
   useEffect(() => {
     if (!Array.isArray(roundHistory) || roundHistory.length === 0) return
@@ -176,8 +237,17 @@ export default function HybridBotPanel({
       setIsActive(false)
       return
     }
+
+    // Gate 4: Session take-profit hit
+    if (sessionProfit >= takeProfitRef.current) {
+      console.log(`Bot ${panelId}: TARGET HIT - Session take-profit (${takeProfitRef.current}) reached`)
+      setEmergencyStop(true)
+      setEmergencyReason('Session take-profit reached')
+      setIsActive(false)
+      return
+    }
     
-    // Gate 4: Insufficient balance
+    // Gate 5: Insufficient balance
     if (currentBet > maxBalance) {
       console.log(`Bot ${panelId}: EMERGENCY STOP - Insufficient balance`)
       setEmergencyStop(true)
@@ -196,25 +266,30 @@ export default function HybridBotPanel({
       const lowCrashStreak = getLowCrashStreak()
       const lastWasVeryLow = wasLastCrashVeryLow()
       const recentSignals = getRecentWindowSignals()
+      const recentAverage = getRecentAverageMultiplier()
+      const hasBasicEntrySignal = lowCrashStreak >= 2 || lastWasVeryLow || recentSignals.hasSignal
+      const averageGateOpen =
+        recentSignals.sampleSize < MIN_SAMPLE_SIZE_FOR_AVERAGE_GATE ||
+        recentAverage <= averageMultiplierThresholdRef.current
       const skipLimitReached = skippedRounds >= FORCED_ENTRY_SKIP_LIMIT
       const warmupBypass = recentSignals.sampleSize < WARMUP_MIN_SAMPLE_SIZE && skippedRounds >= WARMUP_SKIP_BEFORE_ENTRY
       const shouldEnterNow =
-        lowCrashStreak >= 2 ||
-        lastWasVeryLow ||
-        recentSignals.hasSignal ||
+        (hasBasicEntrySignal && averageGateOpen) ||
         warmupBypass ||
         skipLimitReached
       
       // Only bet if conditions are favorable
       if (!shouldEnterNow) {
         // Skip this round - conditions not favorable
-        console.log(`Bot ${panelId}: Skipping round (streak: ${lowCrashStreak}, last very low: ${lastWasVeryLow}, sample: ${recentSignals.sampleSize})`)
+        console.log(
+          `Bot ${panelId}: Skipping round (streak: ${lowCrashStreak}, avg: ${recentAverage.toFixed(2)}x, threshold: ${averageMultiplierThresholdRef.current.toFixed(2)}x, sample: ${recentSignals.sampleSize})`
+        )
         setRoundSkipped(true)
         setSkippedRounds(prev => prev + 1)
         return
       }
       
-      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, lowCrashes: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
+      console.log(`Bot ${panelId}: Entry conditions met (streak: ${lowCrashStreak}, avg: ${recentAverage.toFixed(2)}x, lowCrashes: ${recentSignals.lowCrashes}, skipped: ${skippedRounds}) - placing bet`)
     }
     
     // Place bet
@@ -227,7 +302,7 @@ export default function HybridBotPanel({
     }
   }, [isActive, isLoggedIn, emergencyStop, gamePhase, currentBet, maxBalance, maxBetLimit, 
       panelId, betting, isFreebet, activeBet, queuedBet, betPlacedThisRound, dynamicTarget,
-      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals])
+      consecutiveLosses, sessionProfit, accumulatedLoss, roundSkipped, skippedRounds, getLowCrashStreak, wasLastCrashVeryLow, getRecentWindowSignals, getRecentAverageMultiplier])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PHASE 2: MULTIPLIER_UPDATE - AUTO CASHOUT
@@ -398,6 +473,21 @@ export default function HybridBotPanel({
       )}
 
       {/* Settings Grid - Compact */}
+      <div className="flex items-center gap-2">
+        <label className="text-[8px] text-gray-200 font-semibold uppercase min-w-fit">Strategy</label>
+        <select
+          value={strategyPreset}
+          onChange={(e) => setStrategyPreset(e.target.value as StrategyPreset)}
+          disabled={isActive || !isLoggedIn}
+          className="flex-1 bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50"
+        >
+          <option value="conservative">Conservative</option>
+          <option value="moderate">Moderate</option>
+          <option value="aggressive">Aggressive</option>
+        </select>
+      </div>
+
+      {/* Settings Grid - Compact */}
       <div className="grid grid-cols-4 gap-1.5">
         <div className="flex flex-col gap-0.5">
           <label className="text-[8px] text-gray-200 font-semibold uppercase">Base Bet</label>
@@ -444,7 +534,7 @@ export default function HybridBotPanel({
       </div>
 
       {/* Advanced Settings - Second Row */}
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         <div className="flex flex-col gap-0.5">
           <label className="text-[8px] text-gray-200 font-semibold uppercase">Recovery ×</label>
           <input
@@ -467,11 +557,32 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Avg Threshold</label>
+          <input
+            type="number"
+            step="0.05"
+            value={averageMultiplierThreshold}
+            onChange={(e) => setAverageMultiplierThreshold(Math.max(1.1, parseFloat(e.target.value) || DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD))}
+            disabled={isActive || !isLoggedIn}
+            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
+          />
+        </div>
+        <div className="flex flex-col gap-0.5">
           <label className="text-[8px] text-gray-200 font-semibold uppercase">Stop Loss</label>
           <input
             type="number"
             value={sessionStopLoss}
             onChange={(e) => setSessionStopLoss(parseInt(e.target.value) || -500)}
+            disabled={isActive || !isLoggedIn}
+            className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
+          />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Take Profit</label>
+          <input
+            type="number"
+            value={sessionTakeProfit}
+            onChange={(e) => setSessionTakeProfit(Math.max(0, parseInt(e.target.value) || DEFAULT_TAKE_PROFIT))}
             disabled={isActive || !isLoggedIn}
             className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
           />
