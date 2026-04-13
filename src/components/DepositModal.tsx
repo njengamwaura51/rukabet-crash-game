@@ -63,7 +63,6 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
       const token = TOKEN_STORAGE_KEYS
         .map(key => localStorage.getItem(key))
         .find((value): value is string => !!value)
-
       if (!token) {
         setStatus({ type: 'error', message: 'Please login to deposit' })
         setIsProcessing(false)
