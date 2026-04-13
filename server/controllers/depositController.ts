@@ -6,6 +6,7 @@ import { Settings } from '../models/Settings.js'
 
 const INTASEND_SANDBOX_URL = 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
 const INTASEND_LIVE_URL = 'https://payment.intasend.com/api/v1/payment/mpesa-stk-push/'
+// IntaSend challenge required for payload validation in this integration.
 const INTASEND_CHALLENGE = 117402
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
