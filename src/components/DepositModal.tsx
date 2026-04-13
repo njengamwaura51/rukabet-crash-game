@@ -13,6 +13,7 @@ type WalletTab = 'deposit' | 'withdraw' | 'transactions'
 
 // Phone validation regex: 9 digits starting with 7 or 1 (no leading 0)
 const PHONE_REGEX = /^[17][0-9]{8}$/
+const TOKEN_STORAGE_KEYS = ['rukabet_token', 'token', 'aspirebet_token'] as const
 
 export function DepositModal({ balance, freebet, freebetLocked, onClose, onDeposit }: DepositModalProps) {
   const { config } = useConfig()
@@ -58,8 +59,11 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
     setStatus({ type: 'info', message: 'Initiating M-Pesa payment...' })
 
     try {
-      // Get JWT token from localStorage
-      const token = localStorage.getItem('rukabet_token')
+      // Get JWT token from localStorage (support legacy/current key names)
+      const token = TOKEN_STORAGE_KEYS
+        .map(key => localStorage.getItem(key))
+        .find((value): value is string => !!value)
+
       if (!token) {
         setStatus({ type: 'error', message: 'Please login to deposit' })
         setIsProcessing(false)
@@ -80,6 +84,10 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
       })
 
       const data = await response.json()
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please login again.')
+      }
 
       if (response.ok && data.success) {
         setStatus({ type: 'success', message: 'STK Push sent! Check your phone and enter M-Pesa PIN' })
