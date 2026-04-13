@@ -44,16 +44,6 @@ const BOT_NAMES = [
   'jd**60', 're**13', 'st**96', 'az**49', 'bx**72', 'cw**25', 'dm**58', 'eq**81',
 ]
 
-// Top wins data
-interface TopWin {
-  id: string
-  user: string
-  multiplier: number
-  betAmount: number
-  winAmount: number
-  timestamp: number
-}
-
 // Generate top wins data
 function generateTopWins(): TopWin[] {
   const wins: TopWin[] = [
@@ -158,7 +148,7 @@ export function LiveBetsSidebar({
   
   useEffect(() => {
     if (sharedBets.length > 0) {
-      setBets(sharedBets.slice(0, 10))
+      setBets(sharedBets)
     }
   }, [sharedBets])
 
@@ -256,7 +246,7 @@ export function LiveBetsSidebar({
 
     return (
       <div className="py-2">
-        {userBetHistory.slice(0, 20).map((bet, index) => {
+        {userBetHistory.map((bet, index) => {
           const hasWon = bet.cashoutMultiplier !== null
           const badgeColor = hasWon ? getOddsBadgeColor(bet.cashoutMultiplier!) : '#ef4444'
           
@@ -348,10 +338,10 @@ export function LiveBetsSidebar({
   }
 
   return (
-    <div className={`flex flex-col h-full w-full ${variant === 'sidebar' ? 'p-3' : 'p-2 border-t border-white/5'}`}
+    <div className={`flex flex-col h-full min-h-0 w-full ${variant === 'sidebar' ? 'p-2' : 'p-2 border-t border-white/5'}`}
       style={{ background: '#0b0e11' }}
     >
-      <div className="flex flex-col flex-1 min-h-0 bg-[#1a1d24] rounded-2xl overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0 h-full bg-[#1a1d24] rounded-2xl overflow-hidden">
         
         {/* Pill-shaped tabs */}
         <div className="flex-shrink-0 p-3 pb-2">

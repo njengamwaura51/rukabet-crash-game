@@ -367,12 +367,14 @@ function drawPlane(
   ctx.save()
   ctx.translate(noseX, noseY)
   ctx.rotate(-angleRad)
-  ctx.scale(scale, scale)  // Apply scaling for mobile
+  const scaleX = scale
+  const scaleY = scale * 1.25  // Increase vertical height by 25% without extending length
+  ctx.scale(scaleX, scaleY)
 
   // No shadows - flat design
   ctx.shadowColor = 'transparent'
   ctx.shadowBlur = 0
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1 / scale  // Adjust line width for scale
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1 / scaleX
 
   // Wing (underneath)
   const w = new Path2D()

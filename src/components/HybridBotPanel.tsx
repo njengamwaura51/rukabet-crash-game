@@ -88,6 +88,7 @@ export default function HybridBotPanel({
   const [skippedRounds, setSkippedRounds] = useState(0)
   const [emergencyStop, setEmergencyStop] = useState(false)
   const [emergencyReason, setEmergencyReason] = useState('')
+  const lastProcessedHistoryIdRef = useRef<string | null>(null)
   
   // Advanced algorithm parameters (useRef for speed)
   const crashHistoryRef = useRef<number[]>([])
@@ -327,19 +328,18 @@ export default function HybridBotPanel({
     if (gamePhase !== 'crashed') return
     if (!betPlacedThisRound) return
 
+    const latestHistory = betting.betHistory.find(entry => entry.panelId === panelId)
+    if (!latestHistory) return
+    if (latestHistory.id === lastProcessedHistoryIdRef.current) return
+
+    lastProcessedHistoryIdRef.current = latestHistory.id
+
     // Get crash multiplier from the current game (use currentMultiplier as it holds the crash point)
     const crashMultiplier = currentMultiplier
-    
-    // Check if we won or lost
-    const bet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
-    
-    if (bet) {
+
+    if (latestHistory.cashoutMultiplier !== null && latestHistory.won !== null) {
       // ═══ WON ═══
-      if (bet.wonAmount == null) {
-        console.warn(`Bot ${panelId}: CASHED_OUT bet missing wonAmount, skipping profit calculation`)
-        return
-      }
-      const profit = bet.wonAmount - bet.amount
+      const profit = latestHistory.won - latestHistory.amount
       console.log(`Bot ${panelId}: WON ${profit.toFixed(2)} KSH`)
       
       // Reset loss tracking
@@ -365,7 +365,7 @@ export default function HybridBotPanel({
       
     } else {
       // ═══ LOST ═══
-      const lossAmount = currentBet
+      const lossAmount = latestHistory.amount
       console.log(`Bot ${panelId}: LOST ${lossAmount.toFixed(2)} KSH at crash ${crashMultiplier.toFixed(2)}x`)
       
       // Update loss tracking
@@ -393,7 +393,7 @@ export default function HybridBotPanel({
       
       console.log(`Bot ${panelId}: Soft progression - New bet: ${newCurrentBet} KSH, Target: ${newTarget.toFixed(2)}x`)
     }
-  }, [gamePhase, isActive, betPlacedThisRound, panelId, betting.bets, currentBet, 
+  }, [gamePhase, isActive, betPlacedThisRound, panelId, betting.betHistory, currentBet, 
       accumulatedLoss, baseBet, currentMultiplier, maxBetLimit])
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -413,8 +413,9 @@ export default function HybridBotPanel({
     setRoundSkipped(false)
     setEmergencyStop(false)
     setEmergencyReason('')
+    lastProcessedHistoryIdRef.current = betting.betHistory[0]?.id ?? null
     crashHistoryRef.current = []
-  }, [baseBet])
+  }, [baseBet, betting.betHistory])
 
   const handleToggleActive = useCallback(() => {
     if (isActive) {

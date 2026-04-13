@@ -16,6 +16,7 @@ export interface PlayerBet {
 
 export interface BetHistory {
   id: string
+  panelId: number
   roundId: number
   amount: number
   cashoutMultiplier: number | null
@@ -180,6 +181,7 @@ export function BettingProvider({
     // Add to history
     const historyEntry: BetHistory = {
       id: `bet_${Date.now()}_${panelId}`,
+      panelId,
       roundId: roundIdRef.current,
       amount: activeBet.amount,
       cashoutMultiplier,
@@ -210,6 +212,7 @@ export function BettingProvider({
         if (bet.status === 'ACTIVE') {
           const historyEntry: BetHistory = {
             id: `bet_${Date.now()}_${bet.panelId}`,
+            panelId: bet.panelId,
             roundId: roundIdRef.current,
             amount: bet.amount,
             cashoutMultiplier: null,

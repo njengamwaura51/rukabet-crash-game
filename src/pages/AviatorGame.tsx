@@ -70,10 +70,10 @@ export default function AviatorGame() {
         />
 
         {/* Body: sidebar + main game - responsive layout */}
-        <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden w-full">
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto lg:overflow-hidden w-full">
 
           {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
-          <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] h-full">
+          <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] min-h-0">
             <LiveBetsSidebar 
               phase={game.phase} 
               multiplier={game.multiplier}
@@ -83,7 +83,7 @@ export default function AviatorGame() {
           </aside>
 
           {/* Main column: history + canvas + bet panels */}
-          <main className="flex flex-col flex-1 min-w-0 w-full p-2 lg:pl-0 gap-2 max-w-full">
+          <main className="flex flex-col flex-1 min-w-0 min-h-0 w-full p-2 lg:pl-0 gap-2 max-w-full lg:overflow-y-auto">
 
             {/* Multiplier history bar */}
             <RoundHistory history={game.roundHistory} />
