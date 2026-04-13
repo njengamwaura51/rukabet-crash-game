@@ -287,7 +287,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
             <div className="mt-4 pt-4 border-t border-white/10">
               <p className="text-white/40 text-[11px] leading-relaxed text-center">
                 Need help? WhatsApp us at{' '}
-                <span className="text-[#00C74D] font-bold">0713934411</span>
+                <span className="text-[#00C74D] font-bold">+{config.whatsappSupportNumber}</span>
               </p>
             </div>
           </div>

@@ -45,6 +45,24 @@ export function useConfigState() {
     })
   }, [])
 
+  useEffect(() => {
+    const syncPublicConfig = async () => {
+      try {
+        const response = await fetch(`${config.apiBaseUrl}/api/public-config`)
+        if (!response.ok) return
+        const data = await response.json()
+        const whatsappSupportNumber = data?.config?.whatsappSupportNumber
+        if (typeof whatsappSupportNumber === 'string' && whatsappSupportNumber.trim()) {
+          updateConfig({ whatsappSupportNumber: whatsappSupportNumber.trim() })
+        }
+      } catch {
+        // keep local config if public config is unavailable
+      }
+    }
+
+    syncPublicConfig()
+  }, [config.apiBaseUrl, updateConfig])
+
   return { config, updateConfig }
 }
 

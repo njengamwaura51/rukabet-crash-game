@@ -15,7 +15,53 @@ export interface User {
 }
 
 const STORAGE_KEY = 'aspirebet_user'
+const TOKEN_STORAGE_KEYS = ['rukabet_token', 'token', 'aspirebet_token'] as const
+const PRIMARY_TOKEN_KEY = TOKEN_STORAGE_KEYS[0]
 const INITIAL_FREEBET = 150
+const LOCAL_API_BASE_URL = 'http://localhost:3001'
+
+function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') return LOCAL_API_BASE_URL
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  return isLocal ? LOCAL_API_BASE_URL : ''
+}
+
+function getStoredToken() {
+  return TOKEN_STORAGE_KEYS
+    .map(key => localStorage.getItem(key))
+    .find((value): value is string => !!value)
+}
+
+function setStoredToken(token: string) {
+  for (const key of TOKEN_STORAGE_KEYS) {
+    localStorage.removeItem(key)
+  }
+  localStorage.setItem(PRIMARY_TOKEN_KEY, token)
+}
+
+function clearStoredToken() {
+  for (const key of TOKEN_STORAGE_KEYS) {
+    localStorage.removeItem(key)
+  }
+}
+
+function normalizeUser(apiUser: any): User {
+  const rawPhone = String(apiUser?.phone || '')
+  const phone = rawPhone.length === 9 ? `0${rawPhone}` : rawPhone
+
+  return {
+    id: apiUser?._id || apiUser?.id || `user_${Date.now()}`,
+    phone,
+    username: apiUser?.username || `User${phone.slice(-4)}`,
+    balance: Number(apiUser?.balance || 0),
+    freebet: Number(apiUser?.freebet ?? INITIAL_FREEBET),
+    freebetLocked: Boolean(apiUser?.freebetLocked ?? true),
+    hasDeposited: Number(apiUser?.balance || 0) >= 20,
+    hasPlayedWithMoney: Boolean(apiUser?.hasPlayedWithMoney ?? false),
+    createdAt: apiUser?.createdAt ? Date.parse(apiUser.createdAt) || Date.now() : Date.now(),
+  }
+}
 
 // Referral system constants
 export const MIN_DEPOSIT = 10
@@ -46,16 +92,48 @@ export function useAuth() {
 
   // Load user from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
+    const loadAuth = async () => {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          setUser(parsed)
+        } catch {
+          localStorage.removeItem(STORAGE_KEY)
+        }
+      }
+
+      const token = getStoredToken()
+      if (!token) {
+        setIsLoading(false)
+        return
+      }
+
       try {
-        const parsed = JSON.parse(stored)
-        setUser(parsed)
+        const response = await fetch(`${getApiBaseUrl()}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (!response.ok) {
+          clearStoredToken()
+          setIsLoading(false)
+          return
+        }
+
+        const data = await response.json()
+        if (data?.user) {
+          const normalized = normalizeUser(data.user)
+          setUser(normalized)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+        }
       } catch {
-        localStorage.removeItem(STORAGE_KEY)
+        // Keep local state for offline/local fallback mode
+      } finally {
+        setIsLoading(false)
       }
     }
-    setIsLoading(false)
+
+    loadAuth()
   }, [])
 
   // Persist user to localStorage
@@ -69,7 +147,7 @@ export function useAuth() {
   }, [])
 
   // Register new user (now accepts auto-generated username)
-  const register = useCallback((phone: string, password: string, autoUsername?: string): { success: boolean; error?: string } => {
+  const register = useCallback(async (phone: string, password: string, autoUsername?: string): Promise<{ success: boolean; error?: string }> => {
     // Phone should already be validated and normalized by AuthModal
     const cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+254|254)/, '0')
 
@@ -78,29 +156,47 @@ export function useAuth() {
       return { success: false, error: 'Password must be at least 4 characters' }
     }
 
-    // Check if user already exists
+    // Use auto-generated username or fallback to phone-based
+    const username = autoUsername || `User${cleanPhone.slice(-4)}`
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, password, username }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        return { success: false, error: data?.error || 'Registration failed' }
+      }
+
+      if (data?.token && data?.user) {
+        setStoredToken(data.token)
+        persistUser(normalizeUser(data.user))
+        return { success: true }
+      }
+    } catch {
+      // Fall back to local-only auth mode if backend is unavailable
+    }
+
     const existingUsers = JSON.parse(localStorage.getItem('aspirebet_users') || '[]')
     if (existingUsers.some((u: any) => u.phone === cleanPhone)) {
       return { success: false, error: 'This phone number is already registered' }
     }
 
-    // Use auto-generated username or fallback to phone-based
-    const username = autoUsername || `User${cleanPhone.slice(-4)}`
-
-    // Create new user
     const newUser: User = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       phone: cleanPhone,
       username,
       balance: 0,
       freebet: INITIAL_FREEBET,
-      freebetLocked: true, // Locked until deposit 20 and play
+      freebetLocked: true,
       hasDeposited: false,
       hasPlayedWithMoney: false,
       createdAt: Date.now(),
     }
 
-    // Store user credentials (in real app, this would be server-side)
     existingUsers.push({ phone: cleanPhone, password, userId: newUser.id, username })
     localStorage.setItem('aspirebet_users', JSON.stringify(existingUsers))
 
@@ -109,21 +205,39 @@ export function useAuth() {
   }, [persistUser])
 
   // Login existing user
-  const login = useCallback((phone: string, password: string): { success: boolean; error?: string } => {
+  const login = useCallback(async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+254|254)/, '0')
-    
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, password }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        return { success: false, error: data?.error || 'Login failed' }
+      }
+
+      if (data?.token && data?.user) {
+        setStoredToken(data.token)
+        persistUser(normalizeUser(data.user))
+        return { success: true }
+      }
+    } catch {
+      // Fall back to local-only auth mode if backend is unavailable
+    }
+
     const existingUsers = JSON.parse(localStorage.getItem('aspirebet_users') || '[]')
     const userCreds = existingUsers.find((u: any) => u.phone === cleanPhone)
-    
     if (!userCreds) {
       return { success: false, error: 'Phone number not registered' }
     }
-    
     if (userCreds.password !== password) {
       return { success: false, error: 'Incorrect password' }
     }
 
-    // Load user data
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const userData = JSON.parse(stored)
@@ -151,6 +265,7 @@ export function useAuth() {
 
   // Logout
   const logout = useCallback(() => {
+    clearStoredToken()
     persistUser(null)
   }, [persistUser])
 

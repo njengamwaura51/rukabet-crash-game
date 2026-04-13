@@ -3,8 +3,8 @@ import { useState } from 'react'
 interface AuthModalProps {
   mode: 'login' | 'register'
   onClose: () => void
-  onLogin: (phone: string, password: string) => { success: boolean; error?: string }
-  onRegister: (phone: string, password: string, username: string) => { success: boolean; error?: string }
+  onLogin: (phone: string, password: string) => Promise<{ success: boolean; error?: string }>
+  onRegister: (phone: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>
   onSwitchMode: () => void
 }
 
@@ -71,7 +71,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
   const [isLoading, setIsLoading] = useState(false)
   const validation = validateSafaricomNumber(phone)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
@@ -95,24 +95,23 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
     }
 
     setIsLoading(true)
-    
-    setTimeout(() => {
+    try {
       let result
       if (mode === 'login') {
-        result = onLogin(normalizedPhone, password)
+        result = await onLogin(normalizedPhone, password)
       } else {
-        // Auto-generate username for new registrations
         const autoUsername = generateUsername(normalizedPhone)
-        result = onRegister(normalizedPhone, password, autoUsername)
+        result = await onRegister(normalizedPhone, password, autoUsername)
       }
-      
+
       if (result.success) {
         onClose()
       } else {
         setError(result.error || 'An error occurred')
       }
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   return (
