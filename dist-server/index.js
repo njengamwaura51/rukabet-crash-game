@@ -32,6 +32,9 @@ import { authMiddleware, adminMiddleware } from './middleware/auth.js';
 import { adminRateLimit } from './middleware/rateLimit.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const INTASEND_WEBHOOK_PATH = '/api/webhooks/intasend';
+const INTASEND_PUBLIC_DOMAIN = process.env.PUBLIC_APP_URL || 'https://rukabet.live';
+const INTASEND_WEBHOOK_URL = `${INTASEND_PUBLIC_DOMAIN}${INTASEND_WEBHOOK_PATH}`;
 const distPath = path.join(__dirname, '../dist');
 console.log(`📁 Static files: ${distPath}`);
 const app = express();
@@ -52,7 +55,8 @@ app.get('/api/auth/me', authMiddleware, getMe);
 // Deposit routes
 app.post('/api/deposit', authMiddleware, initiateDeposit);
 // Webhook (no auth - called by IntaSend)
-app.post('/api/webhooks/intasend', intasendWebhook);
+app.post(INTASEND_WEBHOOK_PATH, intasendWebhook);
+console.log(`🔔 IntaSend webhook URL: ${INTASEND_WEBHOOK_URL}`);
 // Admin routes
 app.get('/api/settings', adminRateLimit, adminMiddleware, getSettings);
 app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings);
