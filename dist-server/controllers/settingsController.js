@@ -1,4 +1,18 @@
 import { Settings } from '../models/Settings.js';
+export async function getPublicConfig(req, res) {
+    try {
+        const settings = await Settings.findOne();
+        return res.json({
+            success: true,
+            config: {
+                whatsappSupportNumber: settings?.whatsappSupport || '254712345678',
+            },
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+}
 export async function getSettings(req, res) {
     try {
         let settings = await Settings.findOne();
