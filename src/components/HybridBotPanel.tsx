@@ -16,6 +16,7 @@ interface HybridBotPanelProps {
 const LOW_CRASH_THRESHOLD = 1.85
 const VERY_LOW_CRASH_THRESHOLD = 1.5
 const HISTORY_WINDOW_SIZE = 15
+const MIN_SAMPLE_SIZE_FOR_AVERAGE_GATE = 3
 const MIN_LOW_CRASHES_FOR_SIGNAL = 5
 const MIN_VERY_LOW_CRASHES_FOR_SIGNAL = 2
 const FORCED_ENTRY_SKIP_LIMIT = 2
@@ -53,6 +54,9 @@ const STRATEGY_PRESETS: Record<StrategyPreset, {
     takeProfit: 400
   }
 }
+const DEFAULT_STRATEGY_PRESET: StrategyPreset = 'moderate'
+const DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD = STRATEGY_PRESETS[DEFAULT_STRATEGY_PRESET].averageMultiplierThreshold
+const DEFAULT_TAKE_PROFIT = STRATEGY_PRESETS[DEFAULT_STRATEGY_PRESET].takeProfit
 
 export default function HybridBotPanel({
   panelId,
@@ -100,11 +104,11 @@ export default function HybridBotPanel({
   const [baseTarget, setBaseTarget] = useState(1.65)
   const [maxTarget, setMaxTarget] = useState(5.0)
   const [sessionStopLoss, setSessionStopLoss] = useState(-500)
-  const [sessionTakeProfit, setSessionTakeProfit] = useState(250)
-  const [averageMultiplierThreshold, setAverageMultiplierThreshold] = useState(2.0)
-  const [strategyPreset, setStrategyPreset] = useState<StrategyPreset>('moderate')
-  const takeProfitRef = useRef(250)
-  const averageMultiplierThresholdRef = useRef(2.0)
+  const [sessionTakeProfit, setSessionTakeProfit] = useState(DEFAULT_TAKE_PROFIT)
+  const [averageMultiplierThreshold, setAverageMultiplierThreshold] = useState(DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD)
+  const [strategyPreset, setStrategyPreset] = useState<StrategyPreset>(DEFAULT_STRATEGY_PRESET)
+  const takeProfitRef = useRef(DEFAULT_TAKE_PROFIT)
+  const averageMultiplierThresholdRef = useRef(DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD)
   
   // Sync refs with state
   useEffect(() => {
@@ -263,15 +267,14 @@ export default function HybridBotPanel({
       const lastWasVeryLow = wasLastCrashVeryLow()
       const recentSignals = getRecentWindowSignals()
       const recentAverage = getRecentAverageMultiplier()
+      const hasBasicEntrySignal = lowCrashStreak >= 2 || lastWasVeryLow || recentSignals.hasSignal
       const averageGateOpen =
-        recentSignals.sampleSize < 3 ||
+        recentSignals.sampleSize < MIN_SAMPLE_SIZE_FOR_AVERAGE_GATE ||
         recentAverage <= averageMultiplierThresholdRef.current
       const skipLimitReached = skippedRounds >= FORCED_ENTRY_SKIP_LIMIT
       const warmupBypass = recentSignals.sampleSize < WARMUP_MIN_SAMPLE_SIZE && skippedRounds >= WARMUP_SKIP_BEFORE_ENTRY
       const shouldEnterNow =
-        ((lowCrashStreak >= 2 ||
-          lastWasVeryLow ||
-          recentSignals.hasSignal) && averageGateOpen) ||
+        (hasBasicEntrySignal && averageGateOpen) ||
         warmupBypass ||
         skipLimitReached
       
@@ -554,12 +557,12 @@ export default function HybridBotPanel({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[8px] text-gray-200 font-semibold uppercase">Avg ≤</label>
+          <label className="text-[8px] text-gray-200 font-semibold uppercase">Avg Threshold</label>
           <input
             type="number"
             step="0.05"
             value={averageMultiplierThreshold}
-            onChange={(e) => setAverageMultiplierThreshold(Math.max(1.1, parseFloat(e.target.value) || 2.0))}
+            onChange={(e) => setAverageMultiplierThreshold(Math.max(1.1, parseFloat(e.target.value) || DEFAULT_AVERAGE_MULTIPLIER_THRESHOLD))}
             disabled={isActive || !isLoggedIn}
             className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
           />
@@ -579,7 +582,7 @@ export default function HybridBotPanel({
           <input
             type="number"
             value={sessionTakeProfit}
-            onChange={(e) => setSessionTakeProfit(Math.max(0, parseInt(e.target.value) || 250))}
+            onChange={(e) => setSessionTakeProfit(Math.max(0, parseInt(e.target.value) || DEFAULT_TAKE_PROFIT))}
             disabled={isActive || !isLoggedIn}
             className="bg-[#0f1318] rounded px-2 py-1 text-[10px] font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#00C74D] disabled:opacity-50 w-full"
           />
