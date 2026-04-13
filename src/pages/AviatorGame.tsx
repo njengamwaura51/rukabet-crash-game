@@ -58,7 +58,7 @@ export default function AviatorGame() {
       onBalanceChange={handleBalanceChange}
       onCashoutSuccess={handleCashoutSuccess}
     >
-      <div className="h-screen bg-[#0b0e11] flex flex-col overflow-hidden">
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col overflow-x-hidden">
         {/* Header with dynamic wallet display */}
         <Header 
           user={auth.user}
@@ -70,10 +70,10 @@ export default function AviatorGame() {
         />
 
         {/* Body: sidebar + main game - responsive layout */}
-        <div className="h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)] flex flex-col lg:flex-row min-h-0 overflow-hidden w-full">
+        <div className="flex flex-col lg:flex-row w-full gap-2 p-2 lg:px-2 lg:py-3">
 
           {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
-          <aside className="hidden lg:flex flex-shrink-0 w-[320px] xl:w-[350px] min-h-0 h-full overflow-hidden">
+          <aside className="hidden lg:flex w-[320px] xl:w-[350px] flex-shrink-0 flex-col self-start lg:sticky lg:top-20 lg:h-[calc(100vh-90px)] lg:max-h-[calc(100vh-90px)]">
             <LiveBetsSidebar 
               phase={game.phase} 
               multiplier={game.multiplier}
@@ -83,7 +83,7 @@ export default function AviatorGame() {
           </aside>
 
           {/* Main column: history + canvas + bet panels */}
-          <main className="flex flex-col flex-1 min-w-0 min-h-0 h-full w-full p-2 lg:pl-0 gap-2 max-w-full overflow-hidden">
+          <main className="flex flex-col flex-1 min-w-0 w-full gap-2 max-w-full">
 
             {/* Multiplier history bar */}
             <RoundHistory history={game.roundHistory} />
@@ -163,7 +163,7 @@ export default function AviatorGame() {
             </div>
 
             {/* Live bets — mobile/tablet only (below lg), at bottom */}
-            <div className="flex-shrink-0 min-h-[180px] max-h-[400px] lg:max-h-full lg:hidden w-full max-w-full">
+            <div className="lg:hidden w-full max-w-full max-h-[500px] flex flex-col">
               <LiveBetsSidebar 
                 phase={game.phase} 
                 variant="bottom" 

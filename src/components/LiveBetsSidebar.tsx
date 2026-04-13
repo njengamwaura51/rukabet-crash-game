@@ -334,7 +334,7 @@ export function LiveBetsSidebar({
   }
 
   return (
-    <div className={`flex flex-col h-full max-h-[400px] lg:max-h-full min-h-0 w-full overflow-hidden ${variant === 'sidebar' ? 'p-2' : 'p-2 border-t border-white/5'}`}
+    <div className={`flex flex-col h-full max-h-[500px] lg:max-h-full min-h-0 w-full overflow-hidden ${variant === 'sidebar' ? 'p-2' : 'p-2 border-t border-white/5'}`}
       style={{ background: '#0b0e11' }}
     >
       <div className="flex flex-col flex-1 h-full max-h-full min-h-0 bg-[#1a1d24] rounded-2xl overflow-hidden">

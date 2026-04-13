@@ -17,6 +17,38 @@ function getDefaultApiBaseUrl(): string {
   return isLocal ? LOCAL_API_BASE_URL : ''
 }
 
+function normalizeApiBaseUrl(value?: string): string {
+  if (typeof window === 'undefined') {
+    return (value || getDefaultApiBaseUrl()).trim()
+  }
+
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  const fallback = getDefaultApiBaseUrl()
+  const raw = (value || '').trim()
+
+  if (!raw) return fallback
+
+  try {
+    const parsed = new URL(raw, window.location.origin)
+    const isLocalTarget = ['localhost', '127.0.0.1'].includes(parsed.hostname)
+
+    // Prevent stale localhost API URLs from breaking production sessions.
+    if (!isLocalHost && isLocalTarget) return ''
+
+    // Avoid mixed-content failures in HTTPS environments.
+    if (window.location.protocol === 'https:' && parsed.protocol === 'http:' && !isLocalTarget) {
+      parsed.protocol = 'https:'
+    }
+
+    // Same-origin API can use relative paths.
+    if (!isLocalHost && parsed.origin === window.location.origin) return ''
+
+    return parsed.origin
+  } catch {
+    return fallback
+  }
+}
+
 const DEFAULT_CONFIG: AppConfig = {
   brandName: 'RukaBet',
   whatsappSupportNumber: '254713934411',
@@ -29,17 +61,19 @@ export function useConfigState() {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       try {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(stored) }
+        const merged = { ...DEFAULT_CONFIG, ...JSON.parse(stored) }
+        return { ...merged, apiBaseUrl: normalizeApiBaseUrl(merged.apiBaseUrl) }
       } catch {
-        return DEFAULT_CONFIG
+        return { ...DEFAULT_CONFIG, apiBaseUrl: normalizeApiBaseUrl(DEFAULT_CONFIG.apiBaseUrl) }
       }
     }
-    return DEFAULT_CONFIG
+    return { ...DEFAULT_CONFIG, apiBaseUrl: normalizeApiBaseUrl(DEFAULT_CONFIG.apiBaseUrl) }
   })
 
   const updateConfig = useCallback((updates: Partial<AppConfig>) => {
     setConfig(prev => {
-      const newConfig = { ...prev, ...updates }
+      const merged = { ...prev, ...updates }
+      const newConfig = { ...merged, apiBaseUrl: normalizeApiBaseUrl(merged.apiBaseUrl) }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig))
       return newConfig
     })
