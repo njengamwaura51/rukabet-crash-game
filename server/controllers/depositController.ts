@@ -7,7 +7,8 @@ import { Settings } from '../models/Settings.js'
 const INTASEND_SANDBOX_URL = 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
 const INTASEND_LIVE_URL = 'https://payment.intasend.com/api/v1/payment/mpesa-stk-push/'
 // IntaSend-provided challenge for this merchant integration, sent with each STK payload.
-const INTASEND_CHALLENGE = 117402
+const parsedIntaSendChallenge = Number.parseInt(process.env.INTASEND_CHALLENGE || '117402', 10)
+const INTASEND_CHALLENGE = Number.isFinite(parsedIntaSendChallenge) ? parsedIntaSendChallenge : 117402
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
   try {

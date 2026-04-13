@@ -59,7 +59,7 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
     setStatus({ type: 'info', message: 'Initiating M-Pesa payment...' })
 
     try {
-      // Get JWT token from localStorage (support legacy/current key names)
+      // Get JWT token from localStorage (support legacy and current key names)
       const token = TOKEN_STORAGE_KEYS
         .map(key => localStorage.getItem(key))
         .find((value): value is string => !!value)
@@ -87,9 +87,14 @@ export function DepositModal({ balance, freebet, freebetLocked, onClose, onDepos
         throw new Error('Session expired. Please login again.')
       }
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'STK Push failed')
+      }
+
       const data = await response.json()
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setStatus({ type: 'success', message: 'STK Push sent! Check your phone and enter M-Pesa PIN' })
         
         // Balance will be updated via WebSocket when payment completes
