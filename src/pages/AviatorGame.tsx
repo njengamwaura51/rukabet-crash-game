@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useGameState } from '@/hooks/useGameState'
 import { useAuth } from '@/hooks/useAuth'
+import { useBotBets } from '@/hooks/useBotBets'
 import { BettingProvider } from '@/contexts/BettingContext'
 import { GameCanvas } from '@/components/GameCanvas'
 import { Header } from '@/components/Header'
@@ -13,6 +14,13 @@ import { CashoutPopup } from '@/components/CashoutPopup'
 export default function AviatorGame() {
   const game = useGameState()
   const auth = useAuth()
+  const botBets = useBotBets(game.phase, game.multiplier)
+
+  // Merge real shared bets with bot bets — real bets take priority
+  const allLiveBets = useMemo(() => {
+    const real = game.liveBets ?? []
+    return [...real, ...botBets].sort((a, b) => b.bet - a.bet)
+  }, [game.liveBets, botBets])
   const [activeWallet, setActiveWallet] = useState<'main' | 'bonus'>('main')
   const [cashoutPopup, setCashoutPopup] = useState<{ multiplier: number; amount: number } | null>(null)
   const [autoBetPanel1, setAutoBetPanel1] = useState(false)
@@ -78,7 +86,7 @@ export default function AviatorGame() {
               phase={game.phase} 
               multiplier={game.multiplier}
               username={auth.user?.username}
-              sharedBets={game.liveBets}
+              sharedBets={allLiveBets}
             />
           </aside>
 
@@ -154,7 +162,7 @@ export default function AviatorGame() {
                 variant="bottom" 
                 multiplier={game.multiplier}
                 username={auth.user?.username}
-                sharedBets={game.liveBets}
+                sharedBets={allLiveBets}
               />
             </div>
           </main>
