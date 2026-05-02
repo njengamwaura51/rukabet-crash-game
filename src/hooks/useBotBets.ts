@@ -119,40 +119,38 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
     }
   }, [generateBots])
 
-  // Generate new bots when transitioning to waiting
+  // Handle all phase transitions and cashout processing in a single effect
   useEffect(() => {
-    if (phase === 'waiting' && prevPhaseRef.current !== 'waiting') {
+    const prevPhase = prevPhaseRef.current
+
+    // Generate new bots when transitioning to waiting
+    if (phase === 'waiting' && prevPhase !== 'waiting') {
       generateBots()
     }
-    prevPhaseRef.current = phase
-  }, [phase, generateBots])
 
-  // Process cashouts during flying phase
-  useEffect(() => {
-    if (phase !== 'flying') return
-
-    setBots(prev => {
-      let changed = false
-      const updated = prev.map(bot => {
-        if (bot.cashout !== null) return bot
-        if (multiplier >= bot.cashoutTarget) {
-          changed = true
-          return {
-            ...bot,
-            cashout: bot.cashoutTarget,
-            won: parseFloat((bot.bet * bot.cashoutTarget).toFixed(2)),
-            updatedAt: Date.now(),
+    // Process cashouts during flying phase
+    if (phase === 'flying') {
+      setBots(prev => {
+        let changed = false
+        const updated = prev.map(bot => {
+          if (bot.cashout !== null) return bot
+          if (multiplier >= bot.cashoutTarget) {
+            changed = true
+            return {
+              ...bot,
+              cashout: bot.cashoutTarget,
+              won: parseFloat((bot.bet * bot.cashoutTarget).toFixed(2)),
+              updatedAt: Date.now(),
+            }
           }
-        }
-        return bot
+          return bot
+        })
+        return changed ? updated : prev
       })
-      return changed ? updated : prev
-    })
-  }, [phase, multiplier])
+    }
 
-  // Mark remaining bots as lost on crash
-  useEffect(() => {
-    if (phase === 'crashed' && prevPhaseRef.current !== 'crashed') {
+    // Mark remaining bots as lost on crash
+    if (phase === 'crashed' && prevPhase !== 'crashed') {
       setBots(prev => {
         const hasUncashedOut = prev.some(b => b.cashout === null)
         if (!hasUncashedOut) return prev
@@ -163,7 +161,10 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
         )
       })
     }
-  }, [phase])
+
+    // Update prevPhaseRef last so all checks above see the previous phase
+    prevPhaseRef.current = phase
+  }, [phase, multiplier, generateBots])
 
   return bots
 }
