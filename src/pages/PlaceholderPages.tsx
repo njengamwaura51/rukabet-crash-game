@@ -377,44 +377,4 @@ export function SupportPage() {
   )
 }
 
-export function BotHelpPage() {
-  return (
-    <div className="min-h-screen bg-[#0b0e11] text-white p-4 sm:p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-black text-white">How to use Smart Bot</h1>
-            <p className="text-white/50 text-xs mt-0.5">Simple guide for safer automated betting</p>
-          </div>
-          <Link to="/">
-            <button className="px-3 py-1.5 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-xs font-bold focus:outline-none">
-              ← Back
-            </button>
-          </Link>
-        </div>
 
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5 space-y-4">
-          <div>
-            <h2 className="text-[#00C74D] font-black text-sm mb-1">1. Choose your setup</h2>
-            <p className="text-white/70 text-xs">Pick a strategy, set Base Bet, Stop Loss, and Take Profit before pressing START.</p>
-          </div>
-
-          <div>
-            <h2 className="text-[#00C74D] font-black text-sm mb-1">2. Start and monitor</h2>
-            <p className="text-white/70 text-xs">The bot places one bet per round and keeps running automatically until it hits take profit, stop loss, or you press STOP.</p>
-          </div>
-
-          <div>
-            <h2 className="text-[#00C74D] font-black text-sm mb-1">3. Understand live stats</h2>
-            <p className="text-white/70 text-xs">Bet = current stake, Target = current auto cashout, Profit = session net result, At Risk = current unrecovered losses.</p>
-          </div>
-
-          <div>
-            <h2 className="text-[#00C74D] font-black text-sm mb-1">4. Safety tips</h2>
-            <p className="text-white/70 text-xs">Use smaller base bets, keep stop loss realistic, and avoid running the bot when your balance is too low.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}

@@ -7,7 +7,7 @@ import { Header } from '@/components/Header'
 import { RoundHistory } from '@/components/RoundHistory'
 import { LiveBetsSidebar } from '@/components/LiveBetsSidebar'
 import BetPanel from '@/components/BetPanel'
-import HybridBotPanel from '@/components/HybridBotPanel'
+
 import { CashoutPopup } from '@/components/CashoutPopup'
 
 export default function AviatorGame() {
@@ -145,21 +145,6 @@ export default function AviatorGame() {
                   onAutoBetToggle={setAutoBetPanel2}
                 />
               </div>
-            </div>
-
-            {/* Hybrid Bot Panel */}
-            <div className="flex-shrink-0 w-full max-w-full">
-              <HybridBotPanel
-                panelId={3}
-                gamePhase={game.phase}
-                currentMultiplier={game.multiplier}
-                roundHistory={game.roundHistory}
-                isLoggedIn={auth.isLoggedIn}
-                isFreebet={isFreebet}
-                freebetLocked={freebetLocked}
-                maxBalance={maxBalance}
-                currency="KSH"
-              />
             </div>
 
             {/* Live bets — mobile/tablet only (below lg), at bottom */}

@@ -20,12 +20,10 @@ const QUICK_AMOUNTS = [10, 100, 1000, 10000] as const
 const STEP = 5
 const MIN_AMOUNT = 10
 
-// Clean number formatting - no ugly trailing zeros
 function formatNumber(num: number): string {
   if (num === 0) return '0'
   if (Number.isInteger(num)) return num.toString()
   const fixed = num.toFixed(2)
-  // Remove trailing zeros after decimal
   return fixed.replace(/\.?0+$/, '') || '0'
 }
 
@@ -43,12 +41,12 @@ function ToggleSwitch({
       type="button"
       onClick={onToggle}
       disabled={disabled}
-      className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
-        enabled ? 'bg-[#00C74D]' : 'bg-[#374151]'
+      className={`relative w-10 h-5 rounded-full transition-all duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+        enabled ? 'bg-[#00C74D] shadow-sm shadow-[#00C74D]/30' : 'bg-white/10'
       }`}
     >
       <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
           enabled ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
@@ -76,16 +74,10 @@ export default function BetPanelRefactored({
   const [lastBetAmount, setLastBetAmount] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  // Query the centralized state
   const activeBet = betting.getActiveBet(panelId)
   const queuedBet = betting.getQueuedBet(panelId)
   const cashedOutBet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PHASE 4: ZERO LOCAL LOGIC - PURELY REFLECTIVE UI
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // Handle amount changes
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/[^0-9]/g, '')
     const numVal = parseInt(val, 10)
@@ -99,7 +91,6 @@ export default function BetPanelRefactored({
   const decrease = () => setAmount((prev) => Math.max(MIN_AMOUNT, prev - STEP))
   const increase = () => setAmount((prev) => Math.min(maxBalance || 999999, prev + STEP))
 
-  // Auto-cashout logic
   useEffect(() => {
     if (autoCashoutEnabled && activeBet && gamePhase === 'flying' && autoCashout) {
       const target = parseFloat(autoCashout)
@@ -109,7 +100,6 @@ export default function BetPanelRefactored({
     }
   }, [currentMultiplier, gamePhase, activeBet, autoCashout, autoCashoutEnabled, panelId, betting])
 
-  // Auto-bet logic: place bet automatically when new round starts
   useEffect(() => {
     if (autoBetEnabled && gamePhase === 'waiting' && lastBetAmount >= MIN_AMOUNT && isLoggedIn && !activeBet && !queuedBet) {
       if (lastBetAmount <= maxBalance) {
@@ -118,7 +108,6 @@ export default function BetPanelRefactored({
     }
   }, [gamePhase, autoBetEnabled, lastBetAmount, isLoggedIn, panelId, betting, isFreebet, activeBet, queuedBet, maxBalance, freebetLocked])
 
-  // Clear error after 3 seconds
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setError(null), 3000)
@@ -126,34 +115,28 @@ export default function BetPanelRefactored({
     }
   }, [error])
 
-  // Main button click handler
   const handleClick = () => {
     if (!isLoggedIn) return
     setError(null)
 
-    // CASH OUT (during flying with active bet)
     if (activeBet && gamePhase === 'flying') {
       betting.cashOut(panelId, currentMultiplier)
       return
     }
 
-    // CANCEL QUEUED BET
     if (queuedBet) {
       betting.cancelQueuedBet(panelId)
       return
     }
 
-    // PLACE BET (during waiting)
     if (gamePhase === 'waiting' && !activeBet && !queuedBet) {
       const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
       
-      // VALIDATION: Check balance
       if (betAmount > maxBalance) {
         setError('Insufficient funds')
         return
       }
       
-      // VALIDATION: Check freebet lock
       if (isFreebet && freebetLocked) {
         setError('Deposit at least 20 to unlock')
         return
@@ -168,11 +151,9 @@ export default function BetPanelRefactored({
       return
     }
 
-    // QUEUE BET (during flying/crashed)
     if ((gamePhase === 'flying' || gamePhase === 'crashed' || gamePhase === 'crashing') && !activeBet && !queuedBet) {
       const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
       
-      // VALIDATION: Check balance
       if (betAmount > maxBalance) {
         setError('Insufficient funds')
         return
@@ -188,63 +169,66 @@ export default function BetPanelRefactored({
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUTTON STATE MAPPING (ZERO LOGIC - PURELY REFLECTIVE)
-  // ─────────────────────────────────────────────────────────────────────────
-
   let buttonText = 'BET'
   let buttonSubtext = `${formatNumber(amount)} ${currency}`
-  let buttonBg = '#00C74D'
+  let buttonBg = 'from-[#00D455] to-[#00A83D]'
   let isDisabled = false
+  let buttonShadow = 'shadow-[#00C74D]/25'
 
   if (!isLoggedIn) {
     buttonText = 'BET'
     buttonSubtext = `${formatNumber(amount)} ${currency}`
-    buttonBg = '#00C74D'
+    buttonBg = 'from-[#00D455] to-[#00A83D]'
+    buttonShadow = 'shadow-[#00C74D]/25'
   } else if (cashedOutBet && gamePhase !== 'waiting') {
     buttonText = 'WAIT'
     buttonSubtext = 'Next Round'
-    buttonBg = '#374151'
+    buttonBg = 'from-[#374151] to-[#1F2937]'
+    buttonShadow = 'shadow-black/20'
     isDisabled = true
   } else if (queuedBet) {
     buttonText = 'CANCEL'
     buttonSubtext = `Next Round`
-    buttonBg = '#ef4444'
+    buttonBg = 'from-[#EF4444] to-[#DC2626]'
+    buttonShadow = 'shadow-red-500/25'
   } else if (activeBet && gamePhase === 'flying') {
     const potentialWin = formatNumber(activeBet.amount * currentMultiplier)
     buttonText = 'CASH OUT'
     buttonSubtext = `${potentialWin} ${currency}`
-    buttonBg = '#f59e0b'
+    buttonBg = 'from-[#F59E0B] to-[#D97706]'
+    buttonShadow = 'shadow-amber-500/25'
   } else if (activeBet && gamePhase === 'waiting') {
     buttonText = 'ACTIVE'
     buttonSubtext = `${formatNumber(activeBet.amount)} ${currency}`
-    buttonBg = '#374151'
+    buttonBg = 'from-[#374151] to-[#1F2937]'
+    buttonShadow = 'shadow-black/20'
     isDisabled = true
   } else if (gamePhase === 'crashed' || gamePhase === 'crashing') {
     buttonText = 'BET NEXT'
     buttonSubtext = `${formatNumber(amount)} ${currency}`
-    buttonBg = '#00C74D'
+    buttonBg = 'from-[#00D455] to-[#00A83D]'
+    buttonShadow = 'shadow-[#00C74D]/25'
   }
 
   return (
-    <div className="bg-[#1a1d24] rounded-xl p-2 border border-white/5 w-full max-w-full overflow-hidden">
+    <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl p-2.5 border border-white/[0.06] w-full max-w-full overflow-hidden">
       {/* Error Toast */}
       {error && (
-        <div className="mb-2 px-2 py-1.5 bg-[#00C74D]/15 border border-[#00C74D]/40 rounded-lg text-center">
-          <span className="text-[#00E65A] text-[10px] font-bold">{error}</span>
+        <div className="mb-2 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-xl text-center animate-fade-in">
+          <span className="text-red-400 text-[10px] font-bold">{error}</span>
         </div>
       )}
       {/* Compact 50/50 Layout */}
-      <div className="flex flex-row w-full gap-2 items-stretch">
+      <div className="flex flex-row w-full gap-2.5 items-stretch">
         {/* Left Block: All Controls (50%) */}
-        <div className="w-1/2 flex flex-col gap-1">
-          {/* Row 1: Amount stepper - reduced height */}
-          <div className="flex items-center bg-[#0f1318] rounded-full p-0.5 w-full">
+        <div className="w-1/2 flex flex-col gap-1.5">
+          {/* Amount stepper */}
+          <div className="flex items-center bg-white/[0.04] rounded-xl p-0.5 w-full border border-white/[0.06]">
             <button
               type="button"
               onClick={decrease}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-6 h-6 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-white/[0.10] active:scale-90 transition-all duration-150 flex-shrink-0 disabled:opacity-35 disabled:cursor-not-allowed focus:outline-none"
             >
               −
             </button>
@@ -255,19 +239,19 @@ export default function BetPanelRefactored({
               value={amount.toLocaleString()}
               onChange={handleAmountChange}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="flex-1 bg-transparent text-center font-mono text-xs font-black text-white truncate focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+              className="flex-1 bg-transparent text-center font-mono text-xs font-black text-white truncate focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
             />
             <button
               type="button"
               onClick={increase}
               disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-6 h-6 rounded-full bg-[#252a33] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-[#374151] active:scale-95 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+              className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-white/[0.10] active:scale-90 transition-all duration-150 flex-shrink-0 disabled:opacity-35 disabled:cursor-not-allowed focus:outline-none"
             >
               +
             </button>
           </div>
 
-          {/* Row 2: Quick bet buttons - reduced height */}
+          {/* Quick bet buttons */}
           <div className="grid grid-cols-4 gap-0.5 w-full">
             {QUICK_AMOUNTS.map((v) => (
               <button
@@ -275,18 +259,17 @@ export default function BetPanelRefactored({
                 type="button"
                 onClick={() => setAmount(Math.min(v, maxBalance || v))}
                 disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-5 rounded bg-[#0f1318] text-[8px] font-mono font-bold text-gray-100 hover:bg-[#252a33] hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none truncate"
+                className="h-6 rounded-lg bg-white/[0.04] text-[8px] font-mono font-bold text-white/70 hover:bg-white/[0.08] hover:text-white transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed focus:outline-none border border-white/[0.04] truncate"
               >
                 {v >= 1000 ? `${v / 1000}k` : v}
               </button>
             ))}
           </div>
 
-          {/* Row 3: Auto toggles - EXTENDED to full width with better spacing */}
-          <div className="flex flex-row items-center w-full bg-[#0f1318] rounded px-1 py-0.5 text-[8px]">
-            {/* Auto Bet */}
-            <div className="flex items-center gap-0.5">
-              <span className="text-gray-200 font-semibold">Auto</span>
+          {/* Auto toggles */}
+          <div className="flex flex-row items-center w-full bg-white/[0.03] rounded-xl px-1.5 py-1 text-[8px] border border-white/[0.04]">
+            <div className="flex items-center gap-1">
+              <span className="text-white/50 font-semibold">Auto</span>
               <ToggleSwitch
                 enabled={autoBetEnabled}
                 onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
@@ -294,18 +277,16 @@ export default function BetPanelRefactored({
               />
             </div>
 
-            {/* Spacer to push Auto Cash Out to the right */}
             <div className="flex-1" />
 
-            {/* Auto Cash Out - extended to right edge */}
             <div className="flex items-center gap-0.5">
-              <span className="text-gray-200 font-semibold">@</span>
+              <span className="text-white/50 font-semibold">@</span>
               <ToggleSwitch
                 enabled={autoCashoutEnabled}
                 onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
                 disabled={!isLoggedIn}
               />
-              <div className="flex items-center bg-[#1a1d24] rounded border border-white/10 overflow-hidden">
+              <div className="flex items-center bg-white/[0.04] rounded-lg border border-white/[0.06] overflow-hidden">
                 <input
                   type="text"
                   value={autoCashout}
@@ -314,25 +295,24 @@ export default function BetPanelRefactored({
                     setAutoCashout(val)
                   }}
                   disabled={!autoCashoutEnabled || !isLoggedIn}
-                  className="w-7 h-4 bg-transparent text-white text-[9px] font-mono font-bold text-center focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-7 h-4 bg-transparent text-white text-[9px] font-mono font-bold text-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                 />
-                <span className="text-[9px] text-gray-200 font-bold pr-0.5">x</span>
+                <span className="text-[9px] text-white/40 font-bold pr-1">x</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Block: Giant BET Button (50%) */}
+        {/* Right Block: BET Button (50%) */}
         <div className="w-1/2">
           <button
             type="button"
             onClick={handleClick}
             disabled={isDisabled}
-            style={{ backgroundColor: buttonBg }}
-            className="h-full w-full rounded-xl flex flex-col justify-center items-center text-lg font-bold hover:brightness-110 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
+            className={`h-full w-full rounded-2xl flex flex-col justify-center items-center text-lg font-bold bg-gradient-to-b ${buttonBg} hover:brightness-110 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none shadow-lg ${buttonShadow}`}
           >
-            <span className="text-base sm:text-lg font-black text-white tracking-wide">{buttonText}</span>
-            <span className="text-[10px] sm:text-xs font-bold text-white/90 font-mono mt-0.5 truncate max-w-full px-2">
+            <span className="text-base sm:text-lg font-black text-white tracking-wide drop-shadow-sm">{buttonText}</span>
+            <span className="text-[10px] sm:text-xs font-bold text-white/85 font-mono mt-0.5 truncate max-w-full px-2">
               {buttonSubtext}
             </span>
           </button>

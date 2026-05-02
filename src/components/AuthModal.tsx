@@ -113,13 +113,13 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md" onClick={onClose}>
       <div
-        className="bg-[#1a1d24] rounded-2xl border border-white/10 w-full max-w-xs mx-4 overflow-hidden"
+        className="bg-[#151920]/95 backdrop-blur-xl rounded-2xl border border-white/[0.08] w-full max-w-xs mx-4 overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header - compact */}
-        <div className="relative px-4 py-3 border-b border-white/10 text-center">
+        {/* Header */}
+        <div className="relative px-4 py-3 border-b border-white/[0.06] text-center">
           {/* Logo */}
           <div className="flex justify-center mb-2">
             <img src="/logo.png" alt="RukaBet" className="h-10 w-auto" />
@@ -157,11 +157,11 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
               }}
               placeholder="712345678"
               maxLength={9}
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
               required
             />
             {mode === 'register' && validation.isComplete && !validation.valid && (
-              <p className="text-[#00E65A] text-[10px] mt-1 font-medium">
+              <p className="text-red-400 text-[10px] mt-1 font-medium">
                 Only Safaricom numbers are supported
               </p>
             )}
@@ -169,13 +169,13 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
           {/* Password input */}
           <div>
-            <label className="block text-white/60 text-[10px] font-medium mb-1">Password</label>
+            <label className="block text-white/50 text-[10px] font-medium mb-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Enter password"
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
               required
               minLength={4}
             />
@@ -190,7 +190,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter password"
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-all placeholder-white/30"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
                 required
                 minLength={4}
               />
@@ -199,16 +199,16 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
           {/* Error message */}
           {error && (
-            <div className="bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg px-3 py-2 text-[#00E65A] text-[11px] text-center">
+            <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2 text-red-400 text-[11px] text-center">
               {error}
             </div>
           )}
 
-          {/* Submit button - brand green */}
+          {/* Submit button */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-[#00C74D] rounded-lg text-black font-bold text-sm tracking-wide hover:bg-[#00a83d] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-gradient-to-b from-[#00D455] to-[#00A83D] rounded-xl text-black font-bold text-sm tracking-wide hover:brightness-110 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-[#00C74D]/20"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -225,9 +225,9 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
           {/* Register bonus info */}
           {mode === 'register' && (
-            <div className="bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg px-3 py-2 text-center">
-              <span className="text-[#00C74D] text-[11px] font-bold">🎁 KSH 150 Freebet Bonus!</span>
-              <p className="text-white/50 text-[10px] mt-0.5">Deposit KSH 20 & bet to unlock</p>
+            <div className="bg-[#00C74D]/8 border border-[#00C74D]/20 rounded-xl px-3 py-2 text-center">
+              <span className="text-[#00C74D] text-[11px] font-bold">KSH 150 Freebet Bonus</span>
+              <p className="text-white/40 text-[10px] mt-0.5">Deposit KSH 20 & bet to unlock</p>
             </div>
           )}
 
