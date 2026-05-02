@@ -189,9 +189,9 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
 
         {/* Status message */}
         {status && (
-          <div className={`mx-5 mb-4 px-4 py-3 rounded-lg text-xs text-center font-bold ${
+          <div className={`mx-5 mb-4 px-4 py-3 rounded-xl text-xs text-center font-bold ${
             status.type === 'success' ? 'bg-[#00C74D]/10 border border-[#00C74D]/30 text-[#00C74D]' :
-            status.type === 'error' ? 'bg-[#00C74D]/10 border border-[#00C74D]/30 text-[#00E65A]' :
+            status.type === 'error' ? 'bg-red-500/10 border border-red-500/30 text-red-400' :
             'bg-blue-500/10 border border-blue-500/30 text-blue-400'
           }`}>
             {status.message}

@@ -31,7 +31,7 @@ export function MenuDropdown({ username, isLoggedIn, onClose, onLogout }: MenuDr
   return (
     <div
       ref={ref}
-      className="fixed right-3 top-14 z-50 bg-[#141414]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 w-56 overflow-hidden animate-fade-in"
+      className="fixed right-2 sm:right-3 top-12 sm:top-14 z-50 bg-[#141414]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 w-56 overflow-hidden animate-fade-in"
     >
       {/* Username header */}
       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">

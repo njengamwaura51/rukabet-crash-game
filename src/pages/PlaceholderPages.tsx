@@ -40,16 +40,16 @@ export function ProfilePage() {
             <p className="text-white/50 text-xs mt-0.5">Manage your account</p>
           </div>
           <Link to="/">
-            <button className="px-3 py-1.5 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-xs font-bold focus:outline-none">
+            <button className="px-3.5 py-1.5 bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] rounded-xl text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold focus:outline-none">
               ← Back
             </button>
           </Link>
         </div>
 
         {/* Account Info Card */}
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5 mb-4">
+        <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5 mb-4">
           <div className="flex items-center gap-4 mb-5">
-            <div className="w-14 h-14 rounded-full bg-[#00C74D] flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#00D455] to-[#00A83D] flex items-center justify-center shadow-sm shadow-[#00C74D]/20">
               <span className="text-black font-black text-xl">
                 {user?.username?.charAt(0).toUpperCase() || 'U'}
               </span>
@@ -61,15 +61,15 @@ export function ProfilePage() {
           </div>
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center py-2 border-b border-white/5">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.06]">
               <span className="text-white/50 text-sm">Username</span>
               <span className="text-white font-bold text-sm">{user?.username || '—'}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-white/5">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.06]">
               <span className="text-white/50 text-sm">Phone Number</span>
               <span className="text-white font-bold text-sm font-mono">{user?.phone || '—'}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-white/5">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.06]">
               <span className="text-white/50 text-sm">Balance</span>
               <span className="text-[#00C74D] font-black text-sm font-mono">
                 KSH {(user?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -85,16 +85,16 @@ export function ProfilePage() {
         </div>
 
         {/* Change Password Card */}
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5">
+        <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5">
           <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
             <span>🔐</span> Change Password
           </h3>
 
           {message && (
-            <div className={`mb-4 p-3 rounded-lg text-xs font-bold ${
+            <div className={`mb-4 p-3 rounded-xl text-xs font-bold ${
               message.type === 'success' 
                 ? 'bg-[#00C74D]/20 text-[#00C74D] border border-[#00C74D]/30' 
-                : 'bg-[#00C74D]/20 text-[#00E65A] border border-[#00C74D]/30'
+                : 'bg-red-500/10 text-red-400 border border-red-500/30'
             }`}>
               {message.text}
             </div>
@@ -107,7 +107,7 @@ export function ProfilePage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-colors"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
                 placeholder="••••••••"
               />
             </div>
@@ -117,7 +117,7 @@ export function ProfilePage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-colors"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
                 placeholder="••••••••"
               />
             </div>
@@ -127,13 +127,13 @@ export function ProfilePage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D] transition-colors"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
                 placeholder="••••••••"
               />
             </div>
             <button
               type="submit"
-              className="w-full mt-2 py-2.5 bg-[#00C74D] text-black font-black text-sm rounded-lg hover:brightness-110 transition-all active:scale-[0.98] focus:outline-none"
+              className="w-full mt-2 py-2.5 bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black font-black text-sm rounded-xl hover:brightness-110 transition-all duration-200 active:scale-[0.98] focus:outline-none shadow-sm shadow-[#00C74D]/20"
             >
               Update Password
             </button>
@@ -177,14 +177,14 @@ export function ReferralsPage() {
             <p className="text-white/50 text-xs mt-0.5">Invite friends, earn rewards</p>
           </div>
           <Link to="/">
-            <button className="px-3 py-1.5 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-xs font-bold focus:outline-none">
+            <button className="px-3.5 py-1.5 bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] rounded-xl text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold focus:outline-none">
               ← Back
             </button>
           </Link>
         </div>
 
         {/* Hero Card */}
-        <div className="bg-gradient-to-br from-[#00C74D]/20 to-[#00C74D]/5 rounded-xl border border-[#00C74D]/30 p-5 mb-4 text-center">
+        <div className="bg-gradient-to-br from-[#00C74D]/20 to-[#00C74D]/5 rounded-2xl border border-[#00C74D]/25 p-5 mb-4 text-center backdrop-blur-sm">
           <div className="text-4xl mb-2">💰</div>
           <h2 className="text-[#00C74D] font-black text-2xl">KSH 20</h2>
           <p className="text-white/70 text-sm mt-1">Per successful referral</p>
@@ -193,18 +193,18 @@ export function ReferralsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-4 text-center">
+          <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-4 text-center">
             <div className="text-white/50 text-xs font-bold mb-1">Total Referrals</div>
             <div className="text-white font-black text-2xl">{totalReferrals}</div>
           </div>
-          <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-4 text-center">
+          <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-4 text-center">
             <div className="text-white/50 text-xs font-bold mb-1">Total Earned</div>
             <div className="text-[#00C74D] font-black text-2xl">KSH {totalEarned}</div>
           </div>
         </div>
 
         {/* Referral Link Card */}
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5">
+        <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5">
           <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
             <span>🔗</span> Your Referral Link
           </h3>
@@ -214,13 +214,13 @@ export function ReferralsPage() {
               type="text"
               value={referralLink}
               readOnly
-              className="flex-1 bg-[#0f1318] border border-white/10 rounded-lg px-3 py-2.5 text-white/70 text-xs font-mono focus:outline-none"
+              className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white/70 text-xs font-mono focus:outline-none"
             />
             <button
               onClick={handleCopy}
-              className={`px-4 py-2.5 rounded-lg font-bold text-xs transition-all focus:outline-none ${
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 focus:outline-none ${
                 copied 
-                  ? 'bg-[#00C74D] text-black' 
+                  ? 'bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black shadow-sm shadow-[#00C74D]/20' 
                   : 'bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30'
               }`}
             >
@@ -228,7 +228,7 @@ export function ReferralsPage() {
             </button>
           </div>
 
-          <div className="mt-4 p-3 bg-[#0f1318] rounded-lg border border-white/5">
+          <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
             <p className="text-white/50 text-xs">
               <strong className="text-white">How it works:</strong> Share your link with friends. 
               When they register and make their first deposit of KSH 10 or more, 
@@ -265,17 +265,17 @@ export function BonusesPage() {
             <p className="text-white/50 text-xs mt-0.5">Your rewards & promotions</p>
           </div>
           <Link to="/">
-            <button className="px-3 py-1.5 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-xs font-bold focus:outline-none">
+            <button className="px-3.5 py-1.5 bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] rounded-xl text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold focus:outline-none">
               ← Back
             </button>
           </Link>
         </div>
 
         {/* Freebet Card */}
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5 mb-4">
+        <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5 mb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-[#FBBF24]/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-[#FBBF24]/15 flex items-center justify-center border border-[#FBBF24]/20">
                 <span className="text-2xl">🎟️</span>
               </div>
               <div>
@@ -291,7 +291,7 @@ export function BonusesPage() {
             </div>
           </div>
           
-          <div className="p-3 bg-[#0f1318] rounded-lg border border-white/5">
+          <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
             <p className="text-white/60 text-xs">
               Freebet winnings are credited as real cash minus the original stake. 
               Use them on the main game to win real money!
@@ -300,7 +300,7 @@ export function BonusesPage() {
         </div>
 
         {/* Deposit Bonus Card */}
-        <div className="bg-gradient-to-br from-[#00C74D]/10 to-transparent rounded-xl border border-[#00C74D]/20 p-5 mb-4">
+        <div className="bg-gradient-to-br from-[#00C74D]/10 to-transparent rounded-2xl border border-[#00C74D]/20 p-5 mb-4 backdrop-blur-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-[#00C74D]/20 flex items-center justify-center">
               <span className="text-2xl">💎</span>
@@ -311,14 +311,14 @@ export function BonusesPage() {
             </div>
           </div>
 
-          <div className="bg-[#0f1318] rounded-lg p-4 border border-white/5">
+          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
             <div className="flex justify-between items-center mb-2">
               <span className="text-white/50 text-xs">Wager Progress (2x requirement)</span>
               <span className="text-white font-bold text-xs">{wagerProgress} / {wagerRequired} KSH</span>
             </div>
             
             {/* Progress bar */}
-            <div className="h-2 bg-[#1a1d24] rounded-full overflow-hidden">
+            <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-[#00C74D] to-[#00C74D]/70 rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
@@ -330,7 +330,7 @@ export function BonusesPage() {
             </p>
           </div>
 
-          <div className="mt-4 p-3 bg-[#00C74D]/10 rounded-lg border border-[#00C74D]/20">
+          <div className="mt-4 p-3 bg-[#00C74D]/[0.08] rounded-xl border border-[#00C74D]/20">
             <p className="text-[#00C74D] text-xs font-bold mb-1">How it works:</p>
             <p className="text-white/60 text-xs">
               Deposit KSH 99 or more to receive a 50% bonus. Wager 2x the bonus amount 
@@ -340,7 +340,7 @@ export function BonusesPage() {
         </div>
 
         {/* Welcome Bonus Info */}
-        <div className="bg-[#1a1d24] rounded-xl border border-white/10 p-5">
+        <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5">
           <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
             <span>🎁</span> Welcome Bonus
           </h3>

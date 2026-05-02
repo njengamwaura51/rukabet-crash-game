@@ -225,7 +225,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
           {/* Register bonus info */}
           {mode === 'register' && (
-            <div className="bg-[#00C74D]/8 border border-[#00C74D]/20 rounded-xl px-3 py-2 text-center">
+            <div className="bg-[#00C74D]/[0.08] border border-[#00C74D]/20 rounded-xl px-3 py-2 text-center">
               <span className="text-[#00C74D] text-[11px] font-bold">KSH 150 Freebet Bonus</span>
               <p className="text-white/40 text-[10px] mt-0.5">Deposit KSH 20 & bet to unlock</p>
             </div>

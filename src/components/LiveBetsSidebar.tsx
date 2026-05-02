@@ -85,10 +85,10 @@ export function LiveBetsSidebar({
     return (
       <div
         key={`${row.id}-${index}`}
-        className={`mx-2 mb-1.5 rounded-full px-3 py-1 flex items-center justify-between transition-all ${
+        className={`mx-2 mb-1.5 rounded-full px-3 py-1 flex items-center transition-all ${
           hasWon 
             ? 'bg-gradient-to-r from-[#00C74D]/20 to-[#00C74D]/10 border border-[#00C74D]/40' 
-            : 'bg-[#0f1318] border border-white/5 hover:border-white/10'
+            : 'bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.10]'
         } ${row.isUser ? 'border-[#00C74D]/60 shadow-lg shadow-[#00C74D]/10' : ''}`}
       >
         {/* Left: Avatar + Name */}
@@ -249,10 +249,10 @@ export function LiveBetsSidebar({
         </div>
 
         {/* Column headers */}
-        <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 text-[9px] font-black uppercase tracking-wider text-white/30 border-b border-white/[0.06]">
-          <span>Player</span>
-          <span>Bet</span>
-          <span>Multiplier / Win</span>
+        <div className="flex-shrink-0 flex items-center px-5 py-2 text-[9px] font-black uppercase tracking-wider text-white/30 border-b border-white/[0.06]">
+          <span className="flex-1">Player</span>
+          <span className="px-2">Bet</span>
+          <span className="min-w-[80px] text-right">Multiplier / Win</span>
         </div>
 
         {/* Bet pills list */}

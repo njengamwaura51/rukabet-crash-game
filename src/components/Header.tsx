@@ -32,7 +32,7 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
 
   return (
     <>
-      <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+      <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
         {/* Left: logo + whatsapp */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           <Link to="/">
@@ -60,7 +60,7 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
         </div>
 
         {/* Right: auth or balance */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           {isLoggedIn ? (
             <>
               {/* Balance pill */}
