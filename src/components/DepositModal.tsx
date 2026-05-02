@@ -116,18 +116,18 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4" onClick={onClose}>
       <div
-        className="bg-gradient-to-b from-[#1a1a1a] to-[#111] rounded-2xl border border-white/10 shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto"
+        className="bg-[#151920]/95 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/60 w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto animate-fade-in"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#1a1a1a] z-10">
-          <span className="text-white font-black text-sm tracking-wide">💰 My Wallet</span>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] sticky top-0 bg-[#151920]/95 backdrop-blur-xl z-10">
+          <span className="text-white font-black text-sm tracking-wide">My Wallet</span>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/40 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/5"
+            className="text-white/40 hover:text-white transition-colors duration-200 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/[0.06]"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -138,15 +138,15 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
         {/* Wallet cards */}
         <div className="flex gap-3 px-5 py-4">
           {/* Balance card */}
-          <div className="flex-1 bg-gradient-to-br from-[#252525] to-[#1a1a1a] rounded-xl p-4 border border-white/10 shadow-inner">
-            <div className="text-white/50 text-[10px] font-black text-center mb-1.5 tracking-wider">BALANCE</div>
+          <div className="flex-1 bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+            <div className="text-white/40 text-[10px] font-black text-center mb-1.5 tracking-wider">BALANCE</div>
             <div className="text-center">
               <span className="text-white/50 text-xs mr-1">KSH</span>
               <span className="text-white font-black text-lg">{balance.toFixed(2)}</span>
             </div>
           </div>
           {/* Freebet card */}
-          <div className="flex-1 bg-gradient-to-br from-[#252525] to-[#1a1a1a] rounded-xl p-4 border border-[#00C74D]/20 relative overflow-hidden shadow-inner">
+          <div className="flex-1 bg-white/[0.03] rounded-xl p-4 border border-[#00C74D]/15 relative overflow-hidden">
             <div className={`absolute top-1.5 right-1.5 text-[8px] px-2 py-0.5 rounded-full font-black ${
               freebetLocked 
                 ? 'bg-[#00C74D]/20 text-[#00E65A] border border-[#00C74D]/30' 
@@ -176,10 +176,10 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-lg text-xs font-black transition-all capitalize ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all duration-200 capitalize ${
                 tab === t
-                  ? 'bg-[#00C74D] text-black shadow-lg shadow-[#00C74D]/20'
-                  : 'bg-[#252525] text-white/50 hover:text-white/80 hover:bg-[#303030]'
+                  ? 'bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black shadow-md shadow-[#00C74D]/20'
+                  : 'bg-white/[0.04] text-white/45 hover:text-white/70 hover:bg-white/[0.07]'
               }`}
             >
               {t}
@@ -201,7 +201,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
         {/* Content */}
         {tab === 'deposit' && (
           <div className="px-5 pb-5">
-            <div className="mb-4 rounded-lg border border-white/10 bg-[#252525] px-4 py-3">
+            <div className="mb-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
               <div className="text-white/60 text-[10px] font-bold">
                 STK push will be sent to your registered M-Pesa number.
               </div>
@@ -216,7 +216,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
                 onChange={e => setAmount(e.target.value)}
                 placeholder="Enter amount"
                 min={10}
-                className="flex-1 bg-[#252525] border border-white/10 rounded-lg px-4 py-3.5 text-white text-lg font-bold focus:outline-none focus:border-[#00C74D] transition-colors placeholder-white/30"
+                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white text-lg font-bold focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
                 disabled={isProcessing}
               />
             </div>
@@ -229,7 +229,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
                   type="button"
                   onClick={() => setAmount(String(v))}
                   disabled={isProcessing}
-                  className="bg-[#252525] border border-white/10 text-white/80 text-sm font-bold py-2.5 rounded-lg hover:border-[#00C74D]/50 hover:text-white transition-all disabled:opacity-50"
+                  className="bg-white/[0.04] border border-white/[0.06] text-white/70 text-sm font-bold py-2.5 rounded-xl hover:border-[#00C74D]/40 hover:text-white transition-all duration-200 disabled:opacity-50"
                 >
                   {v}
                 </button>
@@ -241,7 +241,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
               type="button"
               onClick={handleDeposit}
               disabled={isProcessing || !amount || !registeredPhone}
-              className="w-full py-4 bg-[#00C74D] hover:brightness-110 rounded-lg text-black font-black text-sm tracking-wider transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#00C74D]/20"
+              className="w-full py-4 bg-gradient-to-b from-[#00D455] to-[#00A83D] hover:brightness-110 rounded-xl text-black font-black text-sm tracking-wider transition-all duration-200 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#00C74D]/20"
             >
               {isProcessing ? (
                 <span className="flex items-center justify-center gap-2">
@@ -267,7 +267,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
                 type="tel"
                 placeholder="712345678"
                 maxLength={9}
-                className="w-full bg-[#252525] border border-white/10 rounded-lg pl-20 pr-4 py-3.5 text-white text-base font-bold focus:outline-none focus:border-[#00C74D] transition-colors placeholder-white/30"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-20 pr-4 py-3.5 text-white text-base font-bold focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
               />
             </div>
             <div className="text-white/70 text-xs font-bold mb-1.5">Amount to Withdraw</div>
@@ -275,12 +275,12 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
               type="number"
               placeholder="Enter amount"
               min={50}
-              className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3.5 text-white text-lg font-bold focus:outline-none focus:border-[#00C74D] transition-colors placeholder-white/30 mb-2"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white text-lg font-bold focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25 mb-2"
             />
             <p className="text-white/40 text-[11px] mb-4 font-bold">Minimum withdrawal: KSH 50</p>
             <button
               type="button"
-              className="w-full py-4 bg-[#00C74D] hover:brightness-110 rounded-lg text-black font-black text-sm tracking-wider transition-all active:scale-[0.99] shadow-lg shadow-[#00C74D]/20"
+              className="w-full py-4 bg-gradient-to-b from-[#00D455] to-[#00A83D] hover:brightness-110 rounded-xl text-black font-black text-sm tracking-wider transition-all duration-200 active:scale-[0.99] shadow-lg shadow-[#00C74D]/20"
             >
               WITHDRAW
             </button>
@@ -299,7 +299,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
             ) : (
               <div className="space-y-2">
                 {transactions.map(tx => (
-                  <div key={tx.id} className="bg-[#252525] rounded-lg p-3 flex items-center justify-between">
+                  <div key={tx.id} className="bg-white/[0.04] rounded-xl p-3 flex items-center justify-between border border-white/[0.04]">
                     <div>
                       <div className="text-white text-xs font-bold">{tx.type}</div>
                       <div className="text-white/40 text-[10px]">{tx.date}</div>
