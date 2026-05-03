@@ -267,7 +267,7 @@ export default function BetPanelRefactored({
           </div>
 
           {/* Auto toggles */}
-          <div className="flex flex-row items-center w-full bg-white/[0.03] rounded-xl px-1.5 py-1 text-[8px] border border-white/[0.04]">
+          <div className="flex flex-row items-center w-full bg-white/[0.03] rounded-xl px-2 py-1.5 text-[9px] border border-white/[0.04]">
             <div className="flex items-center gap-1">
               <span className="text-white/50 font-semibold">Auto</span>
               <ToggleSwitch
@@ -295,9 +295,9 @@ export default function BetPanelRefactored({
                     setAutoCashout(val)
                   }}
                   disabled={!autoCashoutEnabled || !isLoggedIn}
-                  className="w-7 h-4 bg-transparent text-white text-[9px] font-mono font-bold text-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-8 h-5 bg-transparent text-white text-[10px] font-mono font-bold text-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                 />
-                <span className="text-[9px] text-white/40 font-bold pr-1">x</span>
+                <span className="text-[10px] text-white/40 font-bold pr-1">x</span>
               </div>
             </div>
           </div>

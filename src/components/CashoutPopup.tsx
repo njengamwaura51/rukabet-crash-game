@@ -42,7 +42,7 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
           flex flex-col items-center gap-1
           border border-[#00C74D]/25
           shadow-xl shadow-[#00C74D]/15
-          transform transition-all duration-220 ease-out
+          transform transition-all duration-[220ms] ease-out
           ${animClasses[animState]}
         `}
       >
