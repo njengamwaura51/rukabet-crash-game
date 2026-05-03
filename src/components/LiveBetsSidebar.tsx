@@ -39,7 +39,7 @@ function getOddsBadgeColor(v: number): string {
 function UserAvatar({ name, isUser, color }: { name: string; isUser?: boolean; color?: string }) {
   const bgStyle = isUser
     ? 'bg-gradient-to-br from-[#00D455] to-[#00A83D] shadow-sm shadow-[#00C74D]/20'
-    : ''
+    : (!color ? 'bg-white/[0.08]' : '')
 
   return (
     <div
