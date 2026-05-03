@@ -78,10 +78,10 @@ export default function AviatorGame() {
         />
 
         {/* Body: sidebar + main game - responsive layout */}
-        <div className="flex flex-col lg:flex-row lg:items-stretch w-full gap-1.5 sm:gap-2 p-1.5 sm:p-2 lg:px-2 lg:py-3">
+        <div className="flex flex-col lg:flex-row lg:items-start w-full gap-1.5 sm:gap-2 p-1.5 sm:p-2 lg:px-2 lg:py-3">
 
-          {/* Left sidebar: live bets — desktop only (lg+) - fixed width */}
-          <aside className="hidden lg:flex w-[320px] xl:w-[350px] flex-shrink-0 flex-col lg:self-stretch">
+          {/* Left sidebar: live bets — desktop only (lg+) - constrained to main content height */}
+          <aside className="hidden lg:flex w-[300px] xl:w-[320px] flex-shrink-0 flex-col sticky top-0 max-h-[calc(100vh-60px)] overflow-hidden">
             <LiveBetsSidebar 
               phase={game.phase} 
               multiplier={game.multiplier}
@@ -156,7 +156,7 @@ export default function AviatorGame() {
             </div>
 
             {/* Live bets — mobile/tablet only (below lg), at bottom */}
-            <div className="lg:hidden w-full max-w-full max-h-[500px] flex flex-col">
+            <div className="lg:hidden w-full max-w-full max-h-[400px] flex flex-col">
               <LiveBetsSidebar 
                 phase={game.phase} 
                 variant="bottom" 

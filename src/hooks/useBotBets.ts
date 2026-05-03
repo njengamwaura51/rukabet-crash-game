@@ -12,20 +12,13 @@ export interface BotBet {
   isUser: false
   roundId: string
   updatedAt: number
+  avatar: string
 }
 
-// Kenyan-flavored names mixed with generic gamertags
-const BOT_FIRST_NAMES = [
-  'Brian', 'Kevin', 'Dennis', 'Peter', 'James', 'John', 'Eric', 'Martin',
-  'David', 'Chris', 'Paul', 'Felix', 'Moses', 'Alex', 'Mike', 'Dan',
-  'Grace', 'Faith', 'Joy', 'Mercy', 'Ann', 'Lucy', 'Mary', 'Rose',
-  'Victor', 'Oscar', 'Tony', 'Mark', 'Steve', 'Ken', 'Sam', 'Ray',
-  'Otieno', 'Kamau', 'Njoroge', 'Wanjiku', 'Akinyi', 'Kipchoge', 'Mwangi', 'Odhiambo',
-]
-
-const BOT_SUFFIXES = [
-  '_254', '_ke', '001', '99', '_pro', 'X', '_vip', '23', '_bet', '77',
-  '_fn', '100', '_ace', '45', '_gg', '21', '', '_kr', '88', '_og',
+// Masked phone-style usernames like k2****76, m7****23, etc.
+const USERNAME_PREFIXES = [
+  'k', 'm', 'j', 'b', 'd', 'p', 's', 'a', 'r', 'f',
+  'c', 'n', 'e', 'v', 'g', 'w', 'h', 't', 'l', 'o',
 ]
 
 function seededRandom(seed: number): () => number {
@@ -36,35 +29,53 @@ function seededRandom(seed: number): () => number {
   }
 }
 
-function generateBotName(rng: () => number): string {
-  const first = BOT_FIRST_NAMES[Math.floor(rng() * BOT_FIRST_NAMES.length)]
-  const suffix = BOT_SUFFIXES[Math.floor(rng() * BOT_SUFFIXES.length)]
-  return `${first}${suffix}`
+function generateMaskedUsername(rng: () => number): string {
+  const prefix = USERNAME_PREFIXES[Math.floor(rng() * USERNAME_PREFIXES.length)]
+  const firstDigit = Math.floor(rng() * 9) + 1
+  const lastTwo = String(Math.floor(rng() * 100)).padStart(2, '0')
+  return `${prefix}${firstDigit}****${lastTwo}`
 }
 
-// Common Kenyan bet amounts in KSH
-const BET_AMOUNTS = [10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 250, 300, 500, 1000]
+// Avatar colors for profile icons
+const AVATAR_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+  '#F1948A', '#82E0AA', '#F8C471', '#AED6F1', '#D7BDE2',
+  '#A3E4D7', '#FAD7A0', '#D5F5E3', '#FADBD8', '#D6EAF8',
+]
+
+function pickAvatarColor(rng: () => number): string {
+  return AVATAR_COLORS[Math.floor(rng() * AVATAR_COLORS.length)]
+}
+
+// Bet amounts ranging from 10 to 10,000 KSH
+const BET_AMOUNTS = [
+  10, 15, 20, 25, 30, 50, 75, 100, 150, 200,
+  250, 300, 500, 750, 1000, 1500, 2000, 2500,
+  3000, 5000, 7500, 10000,
+]
 
 function pickBetAmount(rng: () => number): number {
-  // Weight toward smaller bets (more realistic)
   const r = rng()
-  if (r < 0.35) return BET_AMOUNTS[Math.floor(rng() * 4)]        // 10-25
-  if (r < 0.65) return BET_AMOUNTS[4 + Math.floor(rng() * 3)]    // 30-75
-  if (r < 0.85) return BET_AMOUNTS[7 + Math.floor(rng() * 3)]    // 100-250
-  return BET_AMOUNTS[10 + Math.floor(rng() * 4)]                  // 300-1000
+  if (r < 0.25) return BET_AMOUNTS[Math.floor(rng() * 5)]          // 10-30 (common small bets)
+  if (r < 0.45) return BET_AMOUNTS[5 + Math.floor(rng() * 4)]      // 50-200
+  if (r < 0.65) return BET_AMOUNTS[9 + Math.floor(rng() * 4)]      // 200-500
+  if (r < 0.80) return BET_AMOUNTS[13 + Math.floor(rng() * 4)]     // 750-2500
+  if (r < 0.92) return BET_AMOUNTS[17 + Math.floor(rng() * 3)]     // 2500-5000
+  return BET_AMOUNTS[20 + Math.floor(rng() * 2)]                    // 7500-10000 (high rollers)
 }
 
 function pickCashoutTarget(rng: () => number): number {
   const r = rng()
-  if (r < 0.15) return 1.1 + rng() * 0.2                         // 1.10-1.30 (early cashout)
-  if (r < 0.40) return 1.3 + rng() * 0.5                         // 1.30-1.80
-  if (r < 0.65) return 1.8 + rng() * 1.2                         // 1.80-3.00
-  if (r < 0.85) return 3.0 + rng() * 4.0                         // 3.00-7.00
-  return 7.0 + rng() * 13.0                                      // 7.00-20.00 (diamond hands)
+  if (r < 0.15) return 1.1 + rng() * 0.2                           // 1.10-1.30 (early cashout)
+  if (r < 0.40) return 1.3 + rng() * 0.5                           // 1.30-1.80
+  if (r < 0.65) return 1.8 + rng() * 1.2                           // 1.80-3.00
+  if (r < 0.85) return 3.0 + rng() * 4.0                           // 3.00-7.00
+  return 7.0 + rng() * 13.0                                        // 7.00-20.00 (diamond hands)
 }
 
-const MIN_BOTS = 5
-const MAX_BOTS = 12
+const MIN_BOTS = 15
+const MAX_BOTS = 25
 
 export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
   const [bots, setBots] = useState<BotBet[]>([])
@@ -72,7 +83,6 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
   const prevPhaseRef = useRef<Phase>(phase)
   const botsInitializedRef = useRef(false)
 
-  // Generate fresh bots when entering the waiting phase
   const generateBots = useCallback(() => {
     const seed = Date.now()
     const rng = seededRandom(seed)
@@ -85,12 +95,13 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
     for (let i = 0; i < count; i++) {
       let name: string
       do {
-        name = generateBotName(rng)
+        name = generateMaskedUsername(rng)
       } while (usedNames.has(name))
       usedNames.add(name)
 
       const bet = pickBetAmount(rng)
       const cashoutTarget = pickCashoutTarget(rng)
+      const avatar = pickAvatarColor(rng)
 
       newBots.push({
         id: `bot_${seed}_${i}`,
@@ -103,16 +114,16 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
         isUser: false,
         roundId,
         updatedAt: Date.now(),
+        avatar,
       })
     }
 
-    // Sort by bet amount descending
     newBots.sort((a, b) => b.bet - a.bet)
     setBots(newBots)
     botsInitializedRef.current = true
   }, [])
 
-  // Initialize bots on mount (for the first waiting phase)
+  // Initialize bots on mount
   useEffect(() => {
     if (!botsInitializedRef.current) {
       generateBots()
@@ -123,12 +134,10 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
   useEffect(() => {
     const prevPhase = prevPhaseRef.current
 
-    // Generate new bots when transitioning to waiting
     if (phase === 'waiting' && prevPhase !== 'waiting') {
       generateBots()
     }
 
-    // Process cashouts during flying phase
     if (phase === 'flying') {
       setBots(prev => {
         let changed = false
@@ -149,7 +158,6 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
       })
     }
 
-    // Mark remaining bots as lost on crash
     if (phase === 'crashed' && prevPhase !== 'crashed') {
       setBots(prev => {
         const hasUncashedOut = prev.some(b => b.cashout === null)
@@ -162,7 +170,6 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
       })
     }
 
-    // Update prevPhaseRef last so all checks above see the previous phase
     prevPhaseRef.current = phase
   }, [phase, multiplier, generateBots])
 
