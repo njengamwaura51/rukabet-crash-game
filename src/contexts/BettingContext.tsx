@@ -99,15 +99,15 @@ export function BettingProvider({
     // Check if panel already has a bet
     if (bets.some(b => b.panelId === panelId)) return false
     
-    // BALANCE VALIDATION - prevent negative balances
-    if (currentBalance !== undefined && amount > currentBalance) {
-      console.warn('Insufficient funds: bet amount exceeds balance')
+    // FREEBET LOCK VALIDATION - special error for locked bonus (check before balance)
+    if (isFreebet && freebetLocked) {
+      console.warn('Freebet locked: Deposit at least 20 to unlock')
       return false
     }
     
-    // FREEBET LOCK VALIDATION - special error for locked bonus
-    if (isFreebet && freebetLocked) {
-      console.warn('Freebet locked: Deposit at least 20 to unlock')
+    // BALANCE VALIDATION - prevent negative balances
+    if (currentBalance !== undefined && amount > currentBalance) {
+      console.warn('Insufficient funds: bet amount exceeds balance')
       return false
     }
     
@@ -132,15 +132,15 @@ export function BettingProvider({
     // Check if panel already has a queued bet
     if (bets.some(b => b.panelId === panelId && b.status === 'QUEUED')) return false
     
-    // BALANCE VALIDATION
-    if (currentBalance !== undefined && amount > currentBalance) {
-      console.warn('Insufficient funds: bet amount exceeds balance')
+    // FREEBET LOCK VALIDATION - check before balance
+    if (isFreebet && freebetLocked) {
+      console.warn('Freebet locked: Deposit at least 20 to unlock')
       return false
     }
 
-    // FREEBET LOCK VALIDATION
-    if (isFreebet && freebetLocked) {
-      console.warn('Freebet locked: Deposit at least 20 to unlock')
+    // BALANCE VALIDATION
+    if (currentBalance !== undefined && amount > currentBalance) {
+      console.warn('Insufficient funds: bet amount exceeds balance')
       return false
     }
     
