@@ -1,6 +1,12 @@
 import mongoose, { HydratedDocument } from 'mongoose'
 import bcrypt from 'bcryptjs'
 
+function generateReferralCode() {
+  const random = Math.random().toString(36).slice(2, 10).toUpperCase()
+  const timestamp = Date.now().toString(36).slice(-4).toUpperCase()
+  return `RB${timestamp}${random}`.slice(0, 12)
+}
+
 // Define the schema
 const UserSchema = new mongoose.Schema({
   phone: {
@@ -37,7 +43,47 @@ const UserSchema = new mongoose.Schema({
   hasPlayedWithMoney: {
     type: Boolean,
     default: false
-  }
+  },
+  referralCode: {
+    type: String,
+    unique: true,
+    index: true,
+    default: generateReferralCode
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  hasReceivedReferralReward: {
+    type: Boolean,
+    default: false
+  },
+  referredUsers: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    },
+    depositAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    rewardEarned: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    referredAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true,
   methods: {

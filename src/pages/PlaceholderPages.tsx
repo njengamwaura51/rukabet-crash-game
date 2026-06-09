@@ -152,14 +152,13 @@ export function ProfilePage() {
 export function ReferralsPage() {
   const { user } = useAuth()
   const [copied, setCopied] = useState(false)
+  const referredUsers = user?.referredUsers ?? []
   
-  // Generate referral link (use username or a hash)
-  const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || 'guest'
-  const referralLink = `https://rukabet.live/ref/${referralCode}`
-  
-  // Mock stats
-  const totalReferrals = 3
-  const totalEarned = 60
+  const referralCode = user?.referralCode || 'N/A'
+  const appOrigin = typeof window === 'undefined' ? 'https://rukabet.live' : window.location.origin
+  const referralLink = referralCode === 'N/A' ? `${appOrigin}/` : `${appOrigin}/?ref=${referralCode}`
+  const totalReferrals = referredUsers.length
+  const totalEarned = referredUsers.reduce((sum, referral) => sum + (referral.rewardEarned || 0), 0)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink)
@@ -205,6 +204,11 @@ export function ReferralsPage() {
 
         {/* Referral Link Card */}
         <div className="bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5">
+          <div className="mb-3">
+            <span className="text-white/40 text-[10px] font-bold tracking-wide">YOUR CODE</span>
+            <p className="text-[#00C74D] font-black font-mono text-base mt-0.5">{referralCode}</p>
+          </div>
+
           <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
             <span>🔗</span> Your Referral Link
           </h3>
@@ -235,6 +239,30 @@ export function ReferralsPage() {
               you'll receive KSH 20 credited to your main balance instantly!
             </p>
           </div>
+        </div>
+
+        {/* Referred Users */}
+        <div className="mt-4 bg-[#151920]/90 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-5">
+          <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+            <span>👥</span> Referred Users
+          </h3>
+          {referredUsers.length === 0 ? (
+            <p className="text-white/40 text-xs">No referrals yet. Share your link to start earning.</p>
+          ) : (
+            <div className="space-y-2">
+              {referredUsers.map((referral) => (
+                <div key={referral.userId} className="bg-white/[0.03] rounded-xl border border-white/[0.06] px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white text-xs font-bold">{referral.username}</p>
+                    <p className="text-[#00C74D] text-xs font-black">+KSH {referral.rewardEarned.toFixed(2)}</p>
+                  </div>
+                  <p className="text-white/40 text-[11px] mt-1">
+                    First Deposit: KSH {referral.depositAmount.toFixed(2)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -376,5 +404,4 @@ export function SupportPage() {
     </div>
   )
 }
-
 

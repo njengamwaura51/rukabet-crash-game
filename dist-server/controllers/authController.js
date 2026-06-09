@@ -4,7 +4,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 const JWT_EXPIRES_IN = '30d';
 export async function register(req, res) {
     try {
-        const { phone, password, username } = req.body;
+        const { phone, password, username, referredByCode } = req.body;
         if (!phone || !password || !username) {
             return res.status(400).json({ error: 'Phone, password, and username are required' });
         }
@@ -15,12 +15,34 @@ export async function register(req, res) {
         if (existingUser) {
             return res.status(400).json({ error: 'Phone number already registered' });
         }
+        const normalizedReferralCode = String(referredByCode || '').trim().toUpperCase();
+        let referrerId;
+        if (normalizedReferralCode) {
+            const referrer = await User.findOne({ referralCode: normalizedReferralCode }).select('_id');
+            if (referrer) {
+                referrerId = String(referrer._id);
+            }
+        }
         // Create user
         const user = await User.create({
             phone: normalizedPhone,
             password,
-            username: username.slice(0, 20)
+            username: username.slice(0, 20),
+            referredBy: referrerId
         });
+        if (referrerId) {
+            await User.findByIdAndUpdate(referrerId, {
+                $push: {
+                    referredUsers: {
+                        userId: user._id,
+                        username: user.username,
+                        depositAmount: 0,
+                        rewardEarned: 0,
+                        referredAt: new Date(),
+                    },
+                },
+            });
+        }
         // Generate token
         const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
         // Return user without password
