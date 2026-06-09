@@ -155,7 +155,7 @@ export function ReferralsPage() {
   
   // Generate referral link (use username or a hash)
   const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || 'guest'
-  const referralLink = `https://rukabet.com/ref/${referralCode}`
+  const referralLink = `https://rukabet.live/ref/${referralCode}`
   
   // Mock stats
   const totalReferrals = 3

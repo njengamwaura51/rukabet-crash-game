@@ -132,13 +132,13 @@ export default function BetPanelRefactored({
     if (gamePhase === 'waiting' && !activeBet && !queuedBet) {
       const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
       
-      if (betAmount > maxBalance) {
-        setError('Insufficient funds')
+      if (isFreebet && freebetLocked) {
+        setError('Deposit at least 20 to activate account')
         return
       }
       
-      if (isFreebet && freebetLocked) {
-        setError('Deposit at least 20 to unlock')
+      if (betAmount > maxBalance) {
+        setError('Insufficient funds')
         return
       }
       
