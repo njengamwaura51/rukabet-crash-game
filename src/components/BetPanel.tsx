@@ -138,7 +138,7 @@ export default function BetPanelRefactored({
       }
       
       if (isFreebet && freebetLocked) {
-        setError('Deposit at least 20 to unlock')
+        setError('Deposit at least 20 to activate account')
         return
       }
       
