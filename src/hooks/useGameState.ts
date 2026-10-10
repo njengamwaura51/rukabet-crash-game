@@ -21,6 +21,7 @@ export interface SharedLiveBet {
   won: number | null
   cashoutTarget: number
   isUser?: boolean
+  avatar?: string
   roundId: string
   updatedAt: number
 }

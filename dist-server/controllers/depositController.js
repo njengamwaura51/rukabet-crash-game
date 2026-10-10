@@ -1,10 +1,17 @@
 import axios from 'axios';
 import { Deposit } from '../models/Deposit.js';
 import { Settings } from '../models/Settings.js';
-const INTASEND_STK_PUSH_URL = 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/';
 const MIN_DEPOSIT = 10;
+function getIntaSendUrl(secretKey) {
+    if (secretKey.includes('_test_')) {
+        return 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/';
+    }
+    return 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/';
+}
 function sanitizeKey(value) {
-    return typeof value === 'string' ? value.trim() : '';
+    if (typeof value !== 'string')
+        return '';
+    return value.trim().replace(/^["']|["']$/g, '');
 }
 export async function initiateDeposit(req, res) {
     let depositId = null;
@@ -40,11 +47,11 @@ export async function initiateDeposit(req, res) {
         });
         depositId = deposit._id.toString();
         // Call IntaSend STK Push API
-        const response = await axios.post(INTASEND_STK_PUSH_URL, {
+        const intasendUrl = getIntaSendUrl(intasendSecretKey);
+        const response = await axios.post(intasendUrl, {
             amount: depositAmount,
             phone_number: normalizedPhone,
-            api_ref: apiRef,
-            narrative: `Deposit to ${settings?.companyName || 'RukaBet'}`
+            api_ref: apiRef
         }, {
             headers: {
                 'Content-Type': 'application/json',

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from './models/User.js';
 import { Bet } from './models/Bet.js';
+import { Round } from './models/Round.js';
 let io = null;
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 const WAIT_MS = 5000;
@@ -239,6 +240,15 @@ function startCrashing() {
         gameState.elapsedMs = Date.now() - crashingStartedAt;
         gameState.roundHistory = [...gameState.roundHistory, gameState.crashPoint].slice(-MAX_HISTORY);
         await markRoundLostBets(gameState.roundId, gameState.crashPoint);
+        try {
+            await Round.create({
+                roundId: gameState.roundId,
+                crashPoint: gameState.crashPoint
+            });
+        }
+        catch (error) {
+            console.error('Failed to save round to history:', error);
+        }
         emitGameSnapshot();
         crashedTimer = setTimeout(() => {
             gameState.nonce += 1;
@@ -246,9 +256,26 @@ function startCrashing() {
         }, CRASH_DISPLAY_MS);
     }, CRASHING_MS);
 }
-function initializeGameLoop() {
+async function initializeGameLoop() {
     stopTimers();
-    gameState.nonce = INITIAL_NONCE;
+    try {
+        const recentRounds = await Round.find().sort({ createdAt: -1 }).limit(MAX_HISTORY);
+        if (recentRounds.length > 0) {
+            gameState.roundHistory = recentRounds.map(r => r.crashPoint).reverse();
+            const highestRound = recentRounds[0];
+            const match = highestRound.roundId.match(/^round-(\d+)$/);
+            if (match) {
+                gameState.nonce = parseInt(match[1], 10) + 1;
+            }
+        }
+        else {
+            gameState.nonce = INITIAL_NONCE;
+        }
+    }
+    catch (error) {
+        console.error('Error loading initial round history:', error);
+        gameState.nonce = INITIAL_NONCE;
+    }
     startWaiting();
 }
 export function initializeSocket(httpServer) {

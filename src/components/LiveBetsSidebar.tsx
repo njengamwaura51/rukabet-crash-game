@@ -35,8 +35,14 @@ function getOddsBadgeColor(v: number): string {
   return '#ec4899'
 }
 
-// User avatar with initial and custom color
+// User avatar with initial, custom color, or image URL
 function UserAvatar({ name, isUser, color }: { name: string; isUser?: boolean; color?: string }) {
+  if (color && (color.startsWith('http') || color.startsWith('/'))) {
+    return (
+      <img src={color} alt={name} className="w-6 h-6 rounded-full flex-shrink-0 bg-white/10" />
+    )
+  }
+
   const bgStyle = isUser
     ? 'bg-gradient-to-br from-[#00D455] to-[#00A83D] shadow-sm shadow-[#00C74D]/20'
     : (!color ? 'bg-white/[0.08]' : '')
