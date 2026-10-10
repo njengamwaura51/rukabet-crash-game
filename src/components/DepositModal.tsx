@@ -85,23 +85,11 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
       const data = await response.json()
 
       if (data.success) {
-        setStatus({ type: 'success', message: 'STK Push sent! Check your phone and enter M-Pesa PIN' })
-        
-        // Balance will be updated via WebSocket when payment completes
-        // For now, we wait and then show success
-        setTimeout(() => {
-          setStatus({ type: 'info', message: 'Waiting for payment confirmation...' })
-        }, 3000)
-        
-        // After 10 seconds, assume success if WebSocket hasn't updated
-        setTimeout(() => {
-          if (isProcessing) {
-            onDeposit(depositAmount)
-            setStatus({ type: 'success', message: `KSH ${depositAmount.toFixed(2)} deposited successfully!` })
-            setAmount('')
-            setIsProcessing(false)
-          }
-        }, 10000)
+        setStatus({
+          type: 'info',
+          message: 'STK Push sent. Complete payment on your phone. Balance updates only after confirmed payment.'
+        })
+        setIsProcessing(false)
       } else {
         throw new Error(data.error || 'STK Push failed')
       }

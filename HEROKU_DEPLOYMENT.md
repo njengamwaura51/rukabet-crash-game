@@ -37,6 +37,8 @@ heroku config:set FRONTEND_URL="https://rukabet-game.herokuapp.com"
 # Optional (can be set via Admin Dashboard instead)
 heroku config:set INTASEND_PUBLIC_KEY="ISPubKey_live_xxx"
 heroku config:set INTASEND_SECRET_KEY="ISSecretKey_live_xxx"
+heroku config:set INTASEND_CHALLENGE="117402"
+heroku config:set PUBLIC_APP_URL="https://rukabet-game.herokuapp.com"
 ```
 
 ### Deploy
@@ -59,6 +61,8 @@ After deployment, configure your IntaSend webhook:
 2. Go to Settings → Webhooks
 3. Add webhook URL: `https://rukabet-game.herokuapp.com/api/webhooks/intasend`
 4. Enable "Payment Completed" events
+
+> The backend credits balances only when a pending deposit reference and matching amount are verified on webhook completion. Ensure IntaSend points to the exact HTTPS webhook URL above.
 
 ## Phase 4: Verify Deployment
 
