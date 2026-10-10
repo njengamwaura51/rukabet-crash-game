@@ -4,8 +4,14 @@ import { AuthRequest } from '../middleware/auth.js'
 import { Deposit } from '../models/Deposit.js'
 import { Settings } from '../models/Settings.js'
 
-const INTASEND_STK_PUSH_URL = 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/'
 const MIN_DEPOSIT = 10
+
+function getIntaSendUrl(secretKey: string): string {
+  if (secretKey.includes('_test_')) {
+    return 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
+  }
+  return 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/'
+}
 
 function sanitizeKey(value?: string): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -53,7 +59,8 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     depositId = deposit._id.toString()
 
     // Call IntaSend STK Push API
-    const response = await axios.post(INTASEND_STK_PUSH_URL, {
+    const intasendUrl = getIntaSendUrl(intasendSecretKey)
+    const response = await axios.post(intasendUrl, {
       amount: depositAmount,
       phone_number: normalizedPhone,
       api_ref: apiRef,
