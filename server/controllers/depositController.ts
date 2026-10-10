@@ -4,21 +4,11 @@ import { AuthRequest } from '../middleware/auth.js'
 import { Deposit } from '../models/Deposit.js'
 import { Settings } from '../models/Settings.js'
 
-const INTASEND_SANDBOX_URL = 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
-const INTASEND_LIVE_URL = 'https://payment.intasend.com/api/v1/payment/mpesa-stk-push/'
+const INTASEND_STK_PUSH_URL = 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/'
 const MIN_DEPOSIT = 10
-// IntaSend-provided challenge for this merchant integration, sent with each STK payload.
-const parsedIntaSendChallenge = Number.parseInt(process.env.INTASEND_CHALLENGE || '117402', 10)
-const INTASEND_CHALLENGE = Number.isFinite(parsedIntaSendChallenge) ? parsedIntaSendChallenge : 117402
 
 function sanitizeKey(value?: string): string {
   return typeof value === 'string' ? value.trim() : ''
-}
-
-function isLiveKey(publicKey: string, secretKey: string): boolean {
-  const normalizedPublicKey = publicKey.toLowerCase()
-  const normalizedSecretKey = secretKey.toLowerCase()
-  return normalizedPublicKey.includes('_live_') || normalizedSecretKey.includes('_live_')
 }
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
@@ -62,14 +52,8 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     })
     depositId = deposit._id.toString()
 
-    // Determine API URL based on key prefix
-    const isLive = isLiveKey(intasendPublicKey, intasendSecretKey)
-    const apiUrl = isLive ? INTASEND_LIVE_URL : INTASEND_SANDBOX_URL
-
     // Call IntaSend STK Push API
-    const response = await axios.post(apiUrl, {
-      public_key: intasendPublicKey,
-      challenge: INTASEND_CHALLENGE,
+    const response = await axios.post(INTASEND_STK_PUSH_URL, {
       amount: depositAmount,
       phone_number: normalizedPhone,
       api_ref: apiRef,
@@ -106,9 +90,24 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       })
     }
 
-    console.error('❌ Deposit error:', error.response?.data || error.message)
-    return res.status(500).json({
-      error: error.response?.data?.message || error.message || 'Deposit failed'
+    const intasendStatus = error?.response?.status
+    const intasendCode = error?.response?.data?.code || error?.code
+    const intasendMessage = error?.response?.data?.message || error?.message || 'Deposit failed'
+    const intasendDetails = error?.response?.data?.detail || error?.response?.data?.errors
+    const responseStatus = Number.isInteger(intasendStatus) && intasendStatus >= 400 && intasendStatus < 600
+      ? intasendStatus
+      : 500
+
+    console.error('❌ IntaSend STK push failed:', {
+      status: intasendStatus ?? 'unknown',
+      code: intasendCode ?? 'unknown',
+      message: intasendMessage
+    })
+
+    return res.status(responseStatus).json({
+      error: intasendMessage,
+      code: intasendCode,
+      details: intasendDetails
     })
   }
 }
