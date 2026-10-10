@@ -64,13 +64,11 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     const response = await axios.post(intasendUrl, {
       amount: depositAmount,
       phone_number: normalizedPhone,
-      api_ref: apiRef,
-      narrative: `Deposit to ${settings?.companyName || 'RukaBet'}`
+      api_ref: apiRef
     }, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + intasendSecretKey,
-        'X-PubKey': intasendPublicKey
+        Authorization: 'Bearer ' + intasendSecretKey
       }
     })
 
