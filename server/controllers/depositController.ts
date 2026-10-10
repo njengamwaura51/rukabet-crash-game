@@ -14,7 +14,8 @@ function getIntaSendUrl(secretKey: string): string {
 }
 
 function sanitizeKey(value?: string): string {
-  return typeof value === 'string' ? value.trim() : ''
+  if (typeof value !== 'string') return ''
+  return value.trim().replace(/^["']|["']$/g, '')
 }
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
@@ -68,7 +69,8 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + intasendSecretKey
+        Authorization: 'Bearer ' + intasendSecretKey,
+        'X-PubKey': intasendPublicKey
       }
     })
 

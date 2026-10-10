@@ -250,11 +250,11 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
           <div className="px-5 pb-5">
             <div className="text-white/70 text-xs font-bold mb-1.5">Phone Number</div>
             <div className="relative mb-3">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">🇰🇪 +254</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">🇰🇪</span>
               <input
                 type="tel"
-                placeholder="712345678"
-                maxLength={9}
+                placeholder="0712345678"
+                maxLength={10}
                 className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-20 pr-4 py-3.5 text-white text-base font-bold focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
               />
             </div>

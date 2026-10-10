@@ -10,25 +10,22 @@ interface AuthModalProps {
 
 // Safaricom prefixes in 9-digit format (without country code or leading zero):
 // 7xx... (70,71,72,74,75,76,79) and 11x... (110-115)
-const SAFARICOM_REGEX = /^(7[01245679]\d{7}|11[0-5]\d{6})$/
+const SAFARICOM_REGEX = /^0(7[01245679]\d{7}|11[0-5]\d{6})$/
 
 function normalizePhoneInput(phone: string): string {
   let cleaned = phone.replace(/\D/g, '')
-
-  // Gracefully accept pasted 254... / 0... inputs, but store as 9 digits
-  if (cleaned.startsWith('254') && cleaned.length > 9) {
-    cleaned = cleaned.slice(3)
+  if (cleaned.startsWith('254')) {
+    cleaned = '0' + cleaned.slice(3)
   }
-  if (cleaned.startsWith('0') && cleaned.length > 9) {
-    cleaned = cleaned.slice(1)
+  if (cleaned.length > 0 && !cleaned.startsWith('0')) {
+    cleaned = '0' + cleaned
   }
-
-  return cleaned.slice(0, 9)
+  return cleaned.slice(0, 10)
 }
 
 function validateSafaricomNumber(phone: string): { valid: boolean; normalized: string; isComplete: boolean; error?: string } {
   const normalized = normalizePhoneInput(phone)
-  const isComplete = normalized.length === 9
+  const isComplete = normalized.length === 10
 
   if (!isComplete) {
     return { valid: false, normalized, isComplete: false }
@@ -69,7 +66,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
     setError('')
 
     if (!validation.isComplete) {
-      setError('Enter your 9-digit phone number')
+      setError('Enter your 10-digit phone number')
       return
     }
 
@@ -155,8 +152,8 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
               onChange={e => {
                 setPhone(normalizePhoneInput(e.target.value))
               }}
-              placeholder="712345678"
-              maxLength={9}
+              placeholder="0712345678"
+              maxLength={10}
               className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00C74D]/60 transition-all duration-200 placeholder-white/25"
               required
             />
