@@ -36,18 +36,6 @@ function generateMaskedUsername(rng: () => number): string {
   return `${prefix}${firstDigit}****${lastTwo}`
 }
 
-// Avatar colors for profile icons
-const AVATAR_COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-  '#F1948A', '#82E0AA', '#F8C471', '#AED6F1', '#D7BDE2',
-  '#A3E4D7', '#FAD7A0', '#D5F5E3', '#FADBD8', '#D6EAF8',
-]
-
-function pickAvatarColor(rng: () => number): string {
-  return AVATAR_COLORS[Math.floor(rng() * AVATAR_COLORS.length)]
-}
-
 // Bet amounts ranging from 10 to 10,000 KSH
 const BET_AMOUNTS = [
   10, 15, 20, 25, 30, 50, 75, 100, 150, 200,
@@ -101,7 +89,7 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
 
       const bet = pickBetAmount(rng)
       const cashoutTarget = pickCashoutTarget(rng)
-      const avatar = pickAvatarColor(rng)
+      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
 
       newBots.push({
         id: `bot_${seed}_${i}`,
