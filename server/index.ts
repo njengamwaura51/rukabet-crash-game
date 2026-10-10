@@ -35,7 +35,7 @@ import { intasendWebhook } from './controllers/webhookController.js'
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js'
 import { getAdminOverview } from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
-import { adminRateLimit } from './middleware/rateLimit.js'
+import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -80,13 +80,13 @@ app.post('/api/auth/login', login)
 app.get('/api/auth/me', authMiddleware, getMe)
 
 // Deposit routes
-app.post('/api/deposit', authMiddleware, initiateDeposit)
+app.post('/api/deposit', depositRateLimit, authMiddleware, initiateDeposit)
 
 // Public configuration
 app.get('/api/public-config', getPublicConfig)
 
 // Webhook (no auth - called by IntaSend)
-app.post(INTASEND_WEBHOOK_PATH, intasendWebhook)
+app.post(INTASEND_WEBHOOK_PATH, webhookRateLimit, intasendWebhook)
 console.log(`🔔 IntaSend webhook URL: ${INTASEND_WEBHOOK_URL}`)
 
 // Admin routes
