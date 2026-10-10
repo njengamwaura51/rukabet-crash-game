@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { User } from './models/User.js'
 import { Bet } from './models/Bet.js'
+import { Round } from './models/Round.js'
 
 let io: Server | null = null
 
@@ -303,6 +304,16 @@ function startCrashing(): void {
     gameState.roundHistory = [...gameState.roundHistory, gameState.crashPoint].slice(-MAX_HISTORY)
 
     await markRoundLostBets(gameState.roundId, gameState.crashPoint)
+
+    try {
+      await Round.create({
+        roundId: gameState.roundId,
+        crashPoint: gameState.crashPoint
+      })
+    } catch (error) {
+      console.error('Failed to save round to history:', error)
+    }
+
     emitGameSnapshot()
 
     crashedTimer = setTimeout(() => {
@@ -312,9 +323,27 @@ function startCrashing(): void {
   }, CRASHING_MS)
 }
 
-function initializeGameLoop(): void {
+async function initializeGameLoop(): Promise<void> {
   stopTimers()
-  gameState.nonce = INITIAL_NONCE
+  
+  try {
+    const recentRounds = await Round.find().sort({ createdAt: -1 }).limit(MAX_HISTORY)
+    if (recentRounds.length > 0) {
+      gameState.roundHistory = recentRounds.map(r => r.crashPoint).reverse()
+      
+      const highestRound = recentRounds[0]
+      const match = highestRound.roundId.match(/^round-(\d+)$/)
+      if (match) {
+        gameState.nonce = parseInt(match[1], 10) + 1
+      }
+    } else {
+      gameState.nonce = INITIAL_NONCE
+    }
+  } catch (error) {
+    console.error('Error loading initial round history:', error)
+    gameState.nonce = INITIAL_NONCE
+  }
+
   startWaiting()
 }
 
