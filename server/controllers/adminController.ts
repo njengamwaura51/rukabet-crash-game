@@ -5,6 +5,8 @@ import { User } from '../models/User.js'
 import { Bet } from '../models/Bet.js'
 import { Deposit } from '../models/Deposit.js'
 import { Withdrawal } from '../models/Withdrawal.js'
+import { OddsControl } from '../models/OddsControl.js'
+import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal } from '../socket.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
 
@@ -406,5 +408,93 @@ export async function updateWithdrawalStatus(req: Request, res: Response) {
     })
   } catch (error: any) {
     return res.status(500).json({ error: error.message })
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN ODDS ENGINE CONTROLS
+   Manage multiplier range rules, scheduled reward windows, and reset to normal
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export async function getOddsEngineConfig(req: Request, res: Response) {
+  try {
+    const liveState = getOddsEngineState()
+    const doc = await OddsControl.getOddsControl()
+    return res.json({
+      success: true,
+      state: liveState,
+      config: doc,
+      auditLogs: (doc.auditLogs || []).slice(-30).reverse()
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to fetch odds engine config' })
+  }
+}
+
+export async function setOddsEngineRule(req: Request, res: Response) {
+  try {
+    const {
+      mode = 'range',
+      minMultiplier = 2.0,
+      maxMultiplier = 5.0,
+      exactMultiplier,
+      durationType = 'minutes',
+      durationMinutes = 15,
+      roundsTotal = 10,
+      scheduledStartTime,
+      scheduledEndTime,
+      note
+    } = req.body
+
+    const parsedMin = Math.max(1.01, Number(minMultiplier) || 2.0)
+    const parsedMax = Math.min(200, Math.max(parsedMin, Number(maxMultiplier) || 5.0))
+
+    if (mode === 'exact' && (!exactMultiplier || Number(exactMultiplier) < 1.01)) {
+      return res.status(400).json({ error: 'Exact multiplier must be at least 1.01' })
+    }
+
+    if (parsedMin < 1.01) {
+      return res.status(400).json({ error: 'Minimum multiplier must be at least 1.01' })
+    }
+
+    if (mode === 'range' && parsedMax < parsedMin) {
+      return res.status(400).json({ error: 'Maximum multiplier must be greater than or equal to minimum' })
+    }
+
+    const updatedState = await applyOddsEngineRule({
+      mode,
+      minMultiplier: parsedMin,
+      maxMultiplier: parsedMax,
+      exactMultiplier: exactMultiplier ? Number(exactMultiplier) : undefined,
+      durationType,
+      durationMinutes: Math.max(1, Number(durationMinutes) || 15),
+      roundsTotal: Math.max(1, Number(roundsTotal) || 10),
+      scheduledStartTime: scheduledStartTime ? new Date(scheduledStartTime) : undefined,
+      scheduledEndTime: scheduledEndTime ? new Date(scheduledEndTime) : undefined,
+      activatedBy: (req as any).admin?.username || 'admin',
+      note: note || `Admin set ${mode} [${parsedMin}x - ${parsedMax}x]`
+    })
+
+    return res.json({
+      success: true,
+      message: `Odds Engine active: ${mode} [${parsedMin}x - ${parsedMax}x]`,
+      state: updatedState
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to set odds engine rule' })
+  }
+}
+
+export async function resetOddsEngine(req: Request, res: Response) {
+  try {
+    const { reason = 'Admin manual reset' } = req.body || {}
+    const updatedState = await resetOddsEngineToNormal(reason)
+    return res.json({
+      success: true,
+      message: 'Odds engine successfully reset to standard provably fair mode',
+      state: updatedState
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to reset odds engine' })
   }
 }

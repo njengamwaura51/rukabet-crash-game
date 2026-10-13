@@ -44,7 +44,10 @@ import {
   toggleUserFreeze,
   resetUserPassword,
   getAdminWithdrawals,
-  updateWithdrawalStatus
+  updateWithdrawalStatus,
+  getOddsEngineConfig,
+  setOddsEngineRule,
+  resetOddsEngine
 } from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
@@ -123,6 +126,11 @@ app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware,
 // Admin withdrawal management
 app.get('/api/admin/withdrawals', adminRateLimit, adminMiddleware, getAdminWithdrawals)
 app.post('/api/admin/withdrawals/:id/status', adminRateLimit, adminMiddleware, updateWithdrawalStatus)
+
+// Admin odds engine management
+app.get('/api/admin/odds-engine', adminRateLimit, adminMiddleware, getOddsEngineConfig)
+app.post('/api/admin/odds-engine', adminRateLimit, adminMiddleware, setOddsEngineRule)
+app.post('/api/admin/odds-engine/reset', adminRateLimit, adminMiddleware, resetOddsEngine)
 
 // Catch-all 404 for unhandled API requests
 app.all('/api/{*splat}', (req, res) => {

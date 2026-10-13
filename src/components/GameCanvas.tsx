@@ -827,8 +827,8 @@ export function GameCanvas({
     <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ display: 'block' }} />
 
-      {/* Top bar: wallet toggle + connection status moved right to avoid blocking Y-axis (at x=18px) */}
-      <div className="absolute left-12 top-2 z-10 flex items-center gap-2 sm:left-14 sm:top-2.5">
+      {/* Top bar: wallet toggle bordering vertical Y-axis (x=18px) edge-to-edge, with online status below */}
+      <div className="absolute left-[18px] top-2 z-10 flex flex-col items-start gap-1">
         <BetModeToggle
           betMode={betMode}
           onToggle={onToggleBetMode}

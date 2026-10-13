@@ -1,12 +1,45 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'wouter'
 import { 
   Users, DollarSign, Activity, TrendingUp, Key, Lock, Unlock, Shield, 
   Search, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff, 
   CreditCard, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, 
-  Copy, Check, LogOut, ChevronRight, UserCheck, UserX, AlertCircle, ArrowRight
+  Copy, Check, LogOut, ChevronRight, UserCheck, UserX, AlertCircle, ArrowRight,
+  Zap, Sparkles, Timer, Sliders, Flame, Clock
 } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
+
+type OddsEngineLiveState = {
+  enabled: boolean
+  mode: 'normal' | 'range' | 'min_multiplier' | 'exact'
+  minMultiplier: number
+  maxMultiplier: number
+  exactMultiplier?: number
+  durationType: 'minutes' | 'rounds' | 'scheduled_window' | 'indefinite'
+  durationMinutes: number
+  roundsTotal: number
+  roundsRemaining: number
+  scheduledStartTime?: number
+  scheduledEndTime?: number
+  startedAt?: number
+  expiresAt?: number
+  timeRemainingMs: number
+  timeRemainingSeconds: number
+  lastActivatedBy: string
+}
+
+type OddsAuditLog = {
+  activatedAt: string
+  expiredAt?: string
+  mode: string
+  minMultiplier: number
+  maxMultiplier?: number
+  durationType: string
+  durationMinutes?: number
+  roundsTotal?: number
+  activatedBy: string
+  reason?: string
+}
 
 type SettingsPayload = {
   intasendPublicKey?: string
@@ -146,7 +179,25 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState('')
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'withdrawals' | 'gateway' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
+
+  // Odds Engine State
+  const [oddsEngine, setOddsEngine] = useState<OddsEngineLiveState | null>(null)
+  const [oddsAuditLogs, setOddsAuditLogs] = useState<OddsAuditLog[]>([])
+  const [oddsSubmitting, setOddsSubmitting] = useState(false)
+  const [oddsToast, setOddsToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Odds Form State
+  const [oddsMode, setOddsMode] = useState<'range' | 'min_multiplier' | 'exact'>('range')
+  const [oddsMin, setOddsMin] = useState('2.0')
+  const [oddsMax, setOddsMax] = useState('5.0')
+  const [oddsExact, setOddsExact] = useState('3.5')
+  const [oddsDurationType, setOddsDurationType] = useState<'minutes' | 'rounds' | 'scheduled_window'>('minutes')
+  const [oddsDurationMinutes, setOddsDurationMinutes] = useState('15')
+  const [oddsRoundsTotal, setOddsRoundsTotal] = useState('10')
+  const [oddsScheduledStart, setOddsScheduledStart] = useState('')
+  const [oddsScheduledEnd, setOddsScheduledEnd] = useState('')
+  const [oddsNote, setOddsNote] = useState('Reward active users promotional multiplier boost')
 
   // Overview Data
   const [overview, setOverview] = useState<AdminOverviewPayload | null>(null)
@@ -313,6 +364,102 @@ export default function AdminDashboard() {
 
     fetchWithdrawals()
   }, [adminToken, activeTab, withdrawalFilter, config.apiBaseUrl, refreshKey])
+
+  // Fetch Odds Engine Status & Logs
+  const fetchOddsEngine = useCallback(async () => {
+    if (!adminToken) return
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/admin/odds-engine`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.success) {
+          setOddsEngine(data.state)
+          setOddsAuditLogs(data.auditLogs || [])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load odds engine status:', err)
+    }
+  }, [adminToken, config.apiBaseUrl])
+
+  useEffect(() => {
+    if (!adminToken) return
+    fetchOddsEngine()
+    const interval = setInterval(fetchOddsEngine, 3500)
+    return () => clearInterval(interval)
+  }, [adminToken, fetchOddsEngine])
+
+  const handleApplyOddsRule = async (customPayload?: any) => {
+    if (!adminToken) return
+    setOddsSubmitting(true)
+    setOddsToast(null)
+
+    const payload = customPayload || {
+      mode: oddsMode,
+      minMultiplier: parseFloat(oddsMin) || 2.0,
+      maxMultiplier: parseFloat(oddsMax) || 5.0,
+      exactMultiplier: oddsMode === 'exact' ? (parseFloat(oddsExact) || 2.0) : undefined,
+      durationType: oddsDurationType,
+      durationMinutes: parseInt(oddsDurationMinutes, 10) || 15,
+      roundsTotal: parseInt(oddsRoundsTotal, 10) || 10,
+      scheduledStartTime: oddsScheduledStart ? new Date(oddsScheduledStart).toISOString() : undefined,
+      scheduledEndTime: oddsScheduledEnd ? new Date(oddsScheduledEnd).toISOString() : undefined,
+      note: oddsNote
+    }
+
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/admin/odds-engine`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success) {
+        setOddsEngine(data.state)
+        setOddsToast({ type: 'success', message: data.message || 'Odds Engine rule activated successfully!' })
+        fetchOddsEngine()
+      } else {
+        setOddsToast({ type: 'error', message: data?.error || 'Failed to apply odds engine rule.' })
+      }
+    } catch {
+      setOddsToast({ type: 'error', message: 'Network error while configuring odds engine.' })
+    } finally {
+      setOddsSubmitting(false)
+    }
+  }
+
+  const handleResetOddsRule = async () => {
+    if (!adminToken) return
+    setOddsSubmitting(true)
+    setOddsToast(null)
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/admin/odds-engine/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ reason: 'Admin manual reset clicked' })
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success) {
+        setOddsEngine(data.state)
+        setOddsToast({ type: 'success', message: 'Odds Engine reset to standard normal provably fair mode.' })
+        fetchOddsEngine()
+      } else {
+        setOddsToast({ type: 'error', message: data?.error || 'Failed to reset odds engine.' })
+      }
+    } catch {
+      setOddsToast({ type: 'error', message: 'Network error while resetting odds engine.' })
+    } finally {
+      setOddsSubmitting(false)
+    }
+  }
 
   // Admin Login Handler
   const handleLogin = async (e: React.FormEvent) => {
@@ -771,6 +918,20 @@ export default function AdminDashboard() {
               )}
             </button>
             <button
+              onClick={() => setActiveTab('odds')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
+                activeTab === 'odds' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              }`}
+            >
+              <Zap className="size-3.5 text-brand" />
+              Odds Engine
+              {oddsEngine?.enabled && (
+                <span className="flex items-center gap-0.5 rounded bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold text-brand animate-pulse">
+                  ACTIVE
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('gateway')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
                 activeTab === 'gateway' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
@@ -1226,6 +1387,598 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            TAB: ODDS ENGINE & SCHEDULED MULTIPLIER CONTROLS
+            ══════════════════════════════════════════════════════════════ */}
+        {activeTab === 'odds' && (
+          <div className="mx-auto max-w-4xl space-y-5">
+            {/* Alert / Notification toast */}
+            {oddsToast && (
+              <div
+                className={`flex items-center justify-between rounded-lg p-3 text-xs font-medium ${
+                  oddsToast.type === 'success'
+                    ? 'border border-brand/40 bg-brand/10 text-brand'
+                    : 'border border-loss/40 bg-loss/10 text-loss'
+                }`}
+              >
+                <span>{oddsToast.message}</span>
+                <button onClick={() => setOddsToast(null)} className="text-ink-3 hover:text-ink">
+                  <XCircle className="size-4" />
+                </button>
+              </div>
+            )}
+
+            {/* 1. Live Engine Status & Emergency Reset Bar */}
+            <div
+              className={`rounded-xl border p-5 transition-all ${
+                oddsEngine?.enabled
+                  ? 'border-brand/50 bg-brand/5 shadow-lg shadow-brand/5'
+                  : 'border-line bg-panel'
+              }`}
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+                      oddsEngine?.enabled ? 'bg-brand text-brand-ink' : 'bg-field text-ink-3'
+                    }`}
+                  >
+                    <Zap className="size-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-ink">
+                        {oddsEngine?.enabled ? 'Active Promotion Override Running' : 'Normal Odds Engine Running'}
+                      </h2>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          oddsEngine?.enabled
+                            ? 'bg-brand text-brand-ink animate-pulse'
+                            : 'bg-field text-ink-3 border border-line'
+                        }`}
+                      >
+                        {oddsEngine?.enabled ? 'BOOST ACTIVE' : 'STANDARD FAIR'}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-xs text-ink-2">
+                      {oddsEngine?.enabled ? (
+                        <>
+                          Targeting{' '}
+                          <strong className="text-brand font-bold">
+                            {oddsEngine.mode === 'range'
+                              ? `${oddsEngine.minMultiplier.toFixed(2)}x – ${oddsEngine.maxMultiplier.toFixed(2)}x`
+                              : oddsEngine.mode === 'min_multiplier'
+                              ? `Over ${oddsEngine.minMultiplier.toFixed(2)}x`
+                              : `Exact ${oddsEngine.exactMultiplier?.toFixed(2)}x`}
+                          </strong>{' '}
+                          to reward active players. Mined server seeds guarantee 100% SHA-256 HMAC provably fair validation.
+                        </>
+                      ) : (
+                        'Standard provably fair odds generator. Multipliers calculated naturally from random server seeds & client seed nonces.'
+                      )}
+                    </p>
+
+                    {/* Progress / Timer when active */}
+                    {oddsEngine?.enabled && (
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink">
+                        {oddsEngine.durationType === 'minutes' && (
+                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
+                            <Clock className="size-3.5" />
+                            <span>
+                              Time Remaining:{' '}
+                              <strong className="tabular-nums">
+                                {Math.floor((oddsEngine.timeRemainingSeconds || 0) / 60)}m{' '}
+                                {((oddsEngine.timeRemainingSeconds || 0) % 60).toString().padStart(2, '0')}s
+                              </strong>
+                            </span>
+                          </div>
+                        )}
+                        {oddsEngine.durationType === 'rounds' && (
+                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
+                            <Flame className="size-3.5" />
+                            <span>
+                              Rounds Remaining:{' '}
+                              <strong className="tabular-nums">
+                                {oddsEngine.roundsRemaining} / {oddsEngine.roundsTotal}
+                              </strong>
+                            </span>
+                          </div>
+                        )}
+                        {oddsEngine.durationType === 'scheduled_window' && (
+                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
+                            <Timer className="size-3.5" />
+                            <span>Scheduled Window Active</span>
+                          </div>
+                        )}
+                        <span className="text-[11px] text-ink-3">
+                          (Automatically reverts back to normal odds generator once completed)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reset button */}
+                {oddsEngine?.enabled ? (
+                  <button
+                    type="button"
+                    onClick={handleResetOddsRule}
+                    disabled={oddsSubmitting}
+                    className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-loss px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-loss/90 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className={`size-3.5 ${oddsSubmitting ? 'animate-spin' : ''}`} />
+                    Reset to Normal Odds Now
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={fetchOddsEngine}
+                    disabled={oddsSubmitting}
+                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-line bg-field px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-raised hover:text-ink transition-colors"
+                  >
+                    <RefreshCw className="size-3" />
+                    Refresh Status
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Quick One-Click Reward Presets */}
+            <div className="rounded-xl border border-line bg-panel p-5">
+              <div className="mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                  1-Click Reward Presets for Active Users
+                </h3>
+                <p className="mt-0.5 text-xs text-ink-3">
+                  Instantly reward players currently online and active with guaranteed generous multiplier ranges.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Preset 1 */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyOddsRule({
+                      mode: 'range',
+                      minMultiplier: 2.0,
+                      maxMultiplier: 5.0,
+                      durationType: 'minutes',
+                      durationMinutes: 15,
+                      note: 'Active Users Reward: 2.00x - 5.00x for 15m'
+                    })
+                  }
+                  disabled={oddsSubmitting}
+                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-brand">
+                    <Sparkles className="size-3.5" />
+                    <span>Reward Active Users</span>
+                  </div>
+                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 5.00x</div>
+                  <div className="mt-1 text-[11px] text-ink-3">For 15 minutes • Auto-resets</div>
+                </button>
+
+                {/* Preset 2 */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyOddsRule({
+                      mode: 'range',
+                      minMultiplier: 2.0,
+                      maxMultiplier: 10.0,
+                      durationType: 'minutes',
+                      durationMinutes: 30,
+                      note: 'Happy Hour Boost: 2.00x - 10.00x for 30m'
+                    })
+                  }
+                  disabled={oddsSubmitting}
+                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
+                    <Flame className="size-3.5" />
+                    <span>Happy Hour Boost</span>
+                  </div>
+                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 10.00x</div>
+                  <div className="mt-1 text-[11px] text-ink-3">For 30 minutes • Auto-resets</div>
+                </button>
+
+                {/* Preset 3 */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyOddsRule({
+                      mode: 'range',
+                      minMultiplier: 2.0,
+                      maxMultiplier: 4.0,
+                      durationType: 'rounds',
+                      roundsTotal: 10,
+                      note: 'Active 10 Rounds Streak: 2.00x - 4.00x'
+                    })
+                  }
+                  disabled={oddsSubmitting}
+                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <Zap className="size-3.5" />
+                    <span>10 Rounds Streak</span>
+                  </div>
+                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 4.00x</div>
+                  <div className="mt-1 text-[11px] text-ink-3">Next 10 rounds • Auto-resets</div>
+                </button>
+
+                {/* Preset 4 */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyOddsRule({
+                      mode: 'min_multiplier',
+                      minMultiplier: 2.0,
+                      maxMultiplier: 50.0,
+                      durationType: 'minutes',
+                      durationMinutes: 10,
+                      note: 'Over 2.00x Guaranteed: 10m'
+                    })
+                  }
+                  disabled={oddsSubmitting}
+                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400">
+                    <TrendingUp className="size-3.5" />
+                    <span>Over 2.00x Guaranteed</span>
+                  </div>
+                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">&ge; 2.00x</div>
+                  <div className="mt-1 text-[11px] text-ink-3">For 10 minutes • Auto-resets</div>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Custom Range & Schedule Builder */}
+            <form onSubmit={(e) => { e.preventDefault(); handleApplyOddsRule(); }} className="rounded-xl border border-line bg-panel p-5 space-y-4">
+              <div className="border-b border-line pb-3">
+                <h3 className="text-sm font-bold text-ink">Custom Odds Engine Configuration</h3>
+                <p className="mt-0.5 text-xs text-ink-3">
+                  Tailor the exact multiplier range and scheduled active period. Automatically reverts to standard provably fair odds once the schedule concludes.
+                </p>
+              </div>
+
+              {/* Mode Selection */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-ink-2">Rule Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOddsMode('range')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsMode === 'range'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <Sliders className="size-3.5" />
+                    Range (Min – Max)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOddsMode('min_multiplier')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsMode === 'min_multiplier'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <TrendingUp className="size-3.5" />
+                    Minimum Odds (Over X)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOddsMode('exact')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsMode === 'exact'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <Sparkles className="size-3.5" />
+                    Exact Multiplier
+                  </button>
+                </div>
+              </div>
+
+              {/* Multiplier Inputs */}
+              {oddsMode === 'range' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Multiplier</label>
+                    <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="1.01"
+                        max="100"
+                        value={oddsMin}
+                        onChange={e => setOddsMin(e.target.value)}
+                        className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
+                      />
+                      <span className="text-xs text-ink-3">x</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-ink-2">Maximum Multiplier</label>
+                    <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="1.01"
+                        max="200"
+                        value={oddsMax}
+                        onChange={e => setOddsMax(e.target.value)}
+                        className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
+                      />
+                      <span className="text-xs text-ink-3">x</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {oddsMode === 'min_multiplier' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Guarantee Over Multiplier</label>
+                  <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1.01"
+                      max="100"
+                      value={oddsMin}
+                      onChange={e => setOddsMin(e.target.value)}
+                      className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
+                    />
+                    <span className="text-xs text-ink-3">x</span>
+                  </div>
+                  <span className="mt-1 block text-[11px] text-ink-3">Every round crash point will be generated at or above this value.</span>
+                </div>
+              )}
+
+              {oddsMode === 'exact' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Target Exact Multiplier</label>
+                  <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="1.01"
+                      max="100"
+                      value={oddsExact}
+                      onChange={e => setOddsExact(e.target.value)}
+                      className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
+                    />
+                    <span className="text-xs text-ink-3">x</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Duration / Schedule Type */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-ink-2">Duration & Schedule</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOddsDurationType('minutes')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsDurationType === 'minutes'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <Clock className="size-3.5" />
+                    Timer (Minutes)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOddsDurationType('rounds')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsDurationType === 'rounds'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <Flame className="size-3.5" />
+                    Round Counter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOddsDurationType('scheduled_window')}
+                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
+                      oddsDurationType === 'scheduled_window'
+                        ? 'border-brand bg-brand/10 text-brand font-semibold'
+                        : 'border-line bg-field text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    <Timer className="size-3.5" />
+                    Time Window
+                  </button>
+                </div>
+              </div>
+
+              {/* Duration inputs */}
+              {oddsDurationType === 'minutes' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-ink-2">Duration in Minutes</label>
+                    <div className="flex gap-1">
+                      {['5', '10', '15', '30', '60'].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setOddsDurationMinutes(m)}
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border ${
+                            oddsDurationMinutes === m ? 'border-brand bg-brand/20 text-brand' : 'border-line bg-field text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {m}m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    value={oddsDurationMinutes}
+                    onChange={e => setOddsDurationMinutes(e.target.value)}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm text-ink outline-none"
+                  />
+                  <span className="mt-1 block text-[11px] text-ink-3">
+                    Starts immediately upon activation and reverts automatically when the timer reaches 0.
+                  </span>
+                </div>
+              )}
+
+              {oddsDurationType === 'rounds' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-ink-2">Total Number of Rounds</label>
+                    <div className="flex gap-1">
+                      {['5', '10', '20', '50'].map(r => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setOddsRoundsTotal(r)}
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border ${
+                            oddsRoundsTotal === r ? 'border-brand bg-brand/20 text-brand' : 'border-line bg-field text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {r} rounds
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={oddsRoundsTotal}
+                    onChange={e => setOddsRoundsTotal(e.target.value)}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm text-ink outline-none"
+                  />
+                  <span className="mt-1 block text-[11px] text-ink-3">
+                    Applies to the next specified number of rounds and decrements automatically with each round.
+                  </span>
+                </div>
+              )}
+
+              {oddsDurationType === 'scheduled_window' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-ink-2">Start Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      value={oddsScheduledStart}
+                      onChange={e => setOddsScheduledStart(e.target.value)}
+                      className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-ink-2">End Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      value={oddsScheduledEnd}
+                      onChange={e => setOddsScheduledEnd(e.target.value)}
+                      className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Campaign Description / Audit Note</label>
+                <input
+                  type="text"
+                  value={oddsNote}
+                  onChange={e => setOddsNote(e.target.value)}
+                  placeholder="e.g. Happy hour boost to reward active players"
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={oddsSubmitting}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand font-bold text-brand-ink text-xs uppercase tracking-wider shadow-sm hover:brightness-110 disabled:opacity-50 transition-all"
+                >
+                  <Zap className={`size-4 ${oddsSubmitting ? 'animate-bounce' : ''}`} />
+                  Activate Odds Engine Schedule
+                </button>
+              </div>
+            </form>
+
+            {/* 4. Audit & Activation Logs */}
+            <div className="rounded-xl border border-line bg-panel p-5">
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink">
+                Recent Odds Engine Activity Logs
+              </h3>
+
+              {oddsAuditLogs.length === 0 ? (
+                <div className="py-6 text-center text-xs text-ink-3">No recent activation logs recorded.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-line text-[11px] font-semibold text-ink-3 uppercase">
+                        <th className="pb-2">Activated At</th>
+                        <th className="pb-2">Rule Mode</th>
+                        <th className="pb-2">Target Multipliers</th>
+                        <th className="pb-2">Duration</th>
+                        <th className="pb-2">Status / Result</th>
+                        <th className="pb-2">Activated By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line/60">
+                      {oddsAuditLogs.map((log, i) => (
+                        <tr key={i} className="hover:bg-field/50 transition-colors">
+                          <td className="py-2.5 text-ink-2 tabular-nums">
+                            {new Date(log.activatedAt).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 font-medium text-ink capitalize">{log.mode}</td>
+                          <td className="py-2.5 font-bold text-brand tabular-nums">
+                            {log.mode === 'range'
+                              ? `${log.minMultiplier}x – ${log.maxMultiplier || 5}x`
+                              : log.mode === 'min_multiplier'
+                              ? `Over ${log.minMultiplier}x`
+                              : `${log.minMultiplier}x`}
+                          </td>
+                          <td className="py-2.5 text-ink-2">
+                            {log.durationType === 'minutes'
+                              ? `${log.durationMinutes} mins`
+                              : log.durationType === 'rounds'
+                              ? `${log.roundsTotal} rounds`
+                              : 'Window'}
+                          </td>
+                          <td className="py-2.5">
+                            {log.expiredAt ? (
+                              <span className="rounded bg-field px-1.5 py-0.5 text-[10px] text-ink-3">
+                                Expired ({log.reason || 'Completed'})
+                              </span>
+                            ) : (
+                              <span className="rounded bg-brand/20 px-1.5 py-0.5 text-[10px] font-bold text-brand animate-pulse">
+                                Running
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-ink-3">{log.activatedBy || 'admin'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

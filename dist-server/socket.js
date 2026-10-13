@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { User } from './models/User.js';
 import { Bet } from './models/Bet.js';
 import { Round } from './models/Round.js';
+import { OddsControl } from './models/OddsControl.js';
 let io = null;
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 const WAIT_MS = 5000;
@@ -84,6 +85,116 @@ function computeCrashPoint(serverSeed, clientSeed, nonce) {
         return 1.0;
     const raw = Math.floor((100 * E - h) / (E - h)) / 100;
     return Math.min(200, Math.max(1.01, raw));
+}
+let activeOddsState = {
+    enabled: false,
+    mode: 'normal',
+    minMultiplier: 2.0,
+    maxMultiplier: 5.0,
+    durationType: 'minutes',
+    durationMinutes: 15,
+    roundsTotal: 10,
+    roundsRemaining: 10,
+    lastActivatedBy: 'system'
+};
+function mineServerSeedForCondition(condition, clientSeed, nonce) {
+    if (condition.mode === 'normal') {
+        const serverSeed = crypto.randomBytes(32).toString('hex');
+        const crashPoint = computeCrashPoint(serverSeed, clientSeed, nonce);
+        return { serverSeed, crashPoint };
+    }
+    const minMult = Math.max(1.01, condition.min);
+    const maxMult = Math.min(200, Math.max(minMult, condition.max));
+    if (condition.mode === 'exact' && condition.exact && condition.exact >= 1.01) {
+        const target = Math.min(200, Math.max(1.01, Math.round(condition.exact * 100) / 100));
+        for (let i = 0; i < 400; i++) {
+            const seed = crypto.randomBytes(32).toString('hex');
+            const cp = computeCrashPoint(seed, clientSeed, nonce);
+            if (Math.abs(cp - target) <= 0.05) {
+                return { serverSeed: seed, crashPoint: cp };
+            }
+        }
+    }
+    let bestSeed = crypto.randomBytes(32).toString('hex');
+    let bestCp = computeCrashPoint(bestSeed, clientSeed, nonce);
+    let bestDiff = Math.abs(bestCp - (minMult + maxMult) / 2);
+    // Mine seed matching range or min
+    for (let attempt = 0; attempt < 500; attempt++) {
+        const seed = crypto.randomBytes(32).toString('hex');
+        const cp = computeCrashPoint(seed, clientSeed, nonce);
+        if (condition.mode === 'min_multiplier') {
+            if (cp >= minMult) {
+                return { serverSeed: seed, crashPoint: cp };
+            }
+        }
+        else {
+            // range mode
+            if (cp >= minMult && cp <= maxMult) {
+                return { serverSeed: seed, crashPoint: cp };
+            }
+        }
+        const diff = cp < minMult ? (minMult - cp) : (cp > maxMult ? (cp - maxMult) : 0);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestSeed = seed;
+            bestCp = cp;
+        }
+    }
+    // Fallback within target bounds
+    if (bestCp < minMult || (condition.mode === 'range' && bestCp > maxMult)) {
+        const forced = Math.round((minMult + Math.random() * (maxMult - minMult)) * 100) / 100;
+        return { serverSeed: bestSeed, crashPoint: Math.min(200, Math.max(minMult, forced)) };
+    }
+    return { serverSeed: bestSeed, crashPoint: bestCp };
+}
+async function resetOddsEngineInternal(reason = 'Reset to normal') {
+    activeOddsState.enabled = false;
+    activeOddsState.mode = 'normal';
+    activeOddsState.expiresAt = undefined;
+    activeOddsState.roundsRemaining = 0;
+    try {
+        const doc = await OddsControl.getOddsControl();
+        doc.enabled = false;
+        doc.mode = 'normal';
+        doc.expiresAt = undefined;
+        doc.roundsRemaining = 0;
+        if (doc.auditLogs && doc.auditLogs.length > 0) {
+            const last = doc.auditLogs[doc.auditLogs.length - 1];
+            if (!last.expiredAt) {
+                last.expiredAt = new Date();
+                last.reason = reason;
+            }
+        }
+        await doc.save();
+    }
+    catch (error) {
+        console.error('Error resetting OddsControl in DB:', error);
+    }
+}
+async function checkAndApplyOddsExpiration() {
+    if (!activeOddsState.enabled)
+        return;
+    const now = Date.now();
+    // Duration in minutes expired
+    if (activeOddsState.durationType === 'minutes' && activeOddsState.expiresAt && now >= activeOddsState.expiresAt) {
+        console.log(`[OddsEngine] Scheduled duration (${activeOddsState.durationMinutes}m) expired at ${new Date().toISOString()}. Reverting to normal odds.`);
+        await resetOddsEngineInternal('Duration expired');
+        return;
+    }
+    // Scheduled window ended
+    if (activeOddsState.durationType === 'scheduled_window') {
+        if (activeOddsState.scheduledEndTime && now >= activeOddsState.scheduledEndTime) {
+            console.log(`[OddsEngine] Scheduled window ended. Reverting to normal odds.`);
+            await resetOddsEngineInternal('Scheduled window ended');
+            return;
+        }
+    }
+    // Rounds completed
+    if (activeOddsState.durationType === 'rounds' && activeOddsState.roundsRemaining <= 0) {
+        console.log(`[OddsEngine] Completed all ${activeOddsState.roundsTotal} scheduled rounds. Reverting to normal odds.`);
+        await resetOddsEngineInternal('Completed all scheduled rounds');
+        return;
+    }
 }
 function getRandomBotBetAmount(isHighRoller) {
     if (isHighRoller) {
@@ -178,9 +289,36 @@ function startWaiting() {
     gameState.revealedSeed = '';
     gameState.waitProgress = 0;
     waitingStartedAt = Date.now();
-    currentServerSeed = crypto.randomBytes(32).toString('hex');
-    gameState.serverSeedHash = crypto.createHash('sha256').update(currentServerSeed).digest('hex');
-    gameState.crashPoint = computeCrashPoint(currentServerSeed, SERVER_CLIENT_SEED, gameState.nonce);
+    // Check and apply expiration for active odds rules
+    checkAndApplyOddsExpiration().catch(() => { });
+    let isOverrideActive = false;
+    if (activeOddsState.enabled) {
+        const now = Date.now();
+        if (activeOddsState.durationType === 'scheduled_window') {
+            const inWindow = (!activeOddsState.scheduledStartTime || now >= activeOddsState.scheduledStartTime) &&
+                (!activeOddsState.scheduledEndTime || now <= activeOddsState.scheduledEndTime);
+            isOverrideActive = inWindow;
+        }
+        else {
+            isOverrideActive = true;
+        }
+    }
+    if (isOverrideActive) {
+        const mined = mineServerSeedForCondition({
+            mode: activeOddsState.mode,
+            min: activeOddsState.minMultiplier,
+            max: activeOddsState.maxMultiplier,
+            exact: activeOddsState.exactMultiplier
+        }, SERVER_CLIENT_SEED, gameState.nonce);
+        currentServerSeed = mined.serverSeed;
+        gameState.serverSeedHash = crypto.createHash('sha256').update(currentServerSeed).digest('hex');
+        gameState.crashPoint = mined.crashPoint;
+    }
+    else {
+        currentServerSeed = crypto.randomBytes(32).toString('hex');
+        gameState.serverSeedHash = crypto.createHash('sha256').update(currentServerSeed).digest('hex');
+        gameState.crashPoint = computeCrashPoint(currentServerSeed, SERVER_CLIENT_SEED, gameState.nonce);
+    }
     seedRoundBotBets();
     emitGameSnapshot();
     waitingTimer = setTimeout(() => {
@@ -251,6 +389,14 @@ function startCrashing() {
         catch (error) {
             console.error('Failed to save round to history:', error);
         }
+        // Decrement round counter if active round-based rule
+        if (activeOddsState.enabled && activeOddsState.durationType === 'rounds') {
+            activeOddsState.roundsRemaining = Math.max(0, activeOddsState.roundsRemaining - 1);
+            OddsControl.updateOne({}, { roundsRemaining: activeOddsState.roundsRemaining }).catch(() => { });
+            if (activeOddsState.roundsRemaining <= 0) {
+                resetOddsEngineInternal('Completed all scheduled rounds').catch(() => { });
+            }
+        }
         emitGameSnapshot();
         crashedTimer = setTimeout(() => {
             gameState.nonce += 1;
@@ -277,6 +423,43 @@ async function initializeGameLoop() {
     catch (error) {
         console.error('Error loading initial round history:', error);
         gameState.nonce = INITIAL_NONCE;
+    }
+    // Restore OddsControl rule from DB
+    try {
+        const oddsDoc = await OddsControl.getOddsControl();
+        if (oddsDoc && oddsDoc.enabled) {
+            const now = Date.now();
+            const isExpired = (oddsDoc.durationType === 'minutes' && oddsDoc.expiresAt && oddsDoc.expiresAt.getTime() <= now) ||
+                (oddsDoc.durationType === 'rounds' && oddsDoc.roundsRemaining <= 0) ||
+                (oddsDoc.durationType === 'scheduled_window' && oddsDoc.scheduledEndTime && oddsDoc.scheduledEndTime.getTime() <= now);
+            if (isExpired) {
+                oddsDoc.enabled = false;
+                oddsDoc.mode = 'normal';
+                await oddsDoc.save();
+            }
+            else {
+                activeOddsState = {
+                    enabled: oddsDoc.enabled,
+                    mode: oddsDoc.mode,
+                    minMultiplier: oddsDoc.minMultiplier,
+                    maxMultiplier: oddsDoc.maxMultiplier,
+                    exactMultiplier: oddsDoc.exactMultiplier,
+                    durationType: oddsDoc.durationType,
+                    durationMinutes: oddsDoc.durationMinutes,
+                    roundsTotal: oddsDoc.roundsTotal,
+                    roundsRemaining: oddsDoc.roundsRemaining,
+                    scheduledStartTime: oddsDoc.scheduledStartTime?.getTime(),
+                    scheduledEndTime: oddsDoc.scheduledEndTime?.getTime(),
+                    startedAt: oddsDoc.startedAt?.getTime(),
+                    expiresAt: oddsDoc.expiresAt?.getTime(),
+                    lastActivatedBy: oddsDoc.lastActivatedBy
+                };
+                console.log(`[OddsEngine] Restored active rule from DB: ${activeOddsState.mode} [${activeOddsState.minMultiplier}x - ${activeOddsState.maxMultiplier}x]`);
+            }
+        }
+    }
+    catch (e) {
+        console.error('Failed to load OddsControl on startup:', e);
     }
     startWaiting();
 }
@@ -440,4 +623,81 @@ export function initializeSocket(httpServer) {
 }
 export function getIO() {
     return io;
+}
+export function getOddsEngineState() {
+    const now = Date.now();
+    let timeRemainingMs = 0;
+    if (activeOddsState.enabled && activeOddsState.durationType === 'minutes' && activeOddsState.expiresAt) {
+        timeRemainingMs = Math.max(0, activeOddsState.expiresAt - now);
+    }
+    else if (activeOddsState.enabled && activeOddsState.durationType === 'scheduled_window' && activeOddsState.scheduledEndTime) {
+        timeRemainingMs = Math.max(0, activeOddsState.scheduledEndTime - now);
+    }
+    return {
+        ...activeOddsState,
+        timeRemainingMs,
+        timeRemainingSeconds: Math.ceil(timeRemainingMs / 1000)
+    };
+}
+export async function applyOddsEngineRule(params) {
+    const now = Date.now();
+    const durationMinutes = Math.max(1, Number(params.durationMinutes) || 15);
+    const roundsTotal = Math.max(1, Number(params.roundsTotal) || 10);
+    const expiresAt = params.durationType === 'minutes' ? new Date(now + durationMinutes * 60 * 1000) : undefined;
+    activeOddsState = {
+        enabled: params.mode !== 'normal',
+        mode: params.mode,
+        minMultiplier: Math.max(1.01, Number(params.minMultiplier) || 2.0),
+        maxMultiplier: Math.min(200, Math.max(Number(params.minMultiplier) || 2.0, Number(params.maxMultiplier) || 5.0)),
+        exactMultiplier: params.exactMultiplier ? Number(params.exactMultiplier) : undefined,
+        durationType: params.durationType,
+        durationMinutes,
+        roundsTotal,
+        roundsRemaining: roundsTotal,
+        scheduledStartTime: params.scheduledStartTime ? new Date(params.scheduledStartTime).getTime() : undefined,
+        scheduledEndTime: params.scheduledEndTime ? new Date(params.scheduledEndTime).getTime() : undefined,
+        startedAt: now,
+        expiresAt: expiresAt?.getTime(),
+        lastActivatedBy: params.activatedBy || 'admin'
+    };
+    try {
+        const doc = await OddsControl.getOddsControl();
+        doc.enabled = activeOddsState.enabled;
+        doc.mode = activeOddsState.mode;
+        doc.minMultiplier = activeOddsState.minMultiplier;
+        doc.maxMultiplier = activeOddsState.maxMultiplier;
+        doc.exactMultiplier = activeOddsState.exactMultiplier;
+        doc.durationType = activeOddsState.durationType;
+        doc.durationMinutes = activeOddsState.durationMinutes;
+        doc.roundsTotal = activeOddsState.roundsTotal;
+        doc.roundsRemaining = activeOddsState.roundsRemaining;
+        doc.scheduledStartTime = params.scheduledStartTime;
+        doc.scheduledEndTime = params.scheduledEndTime;
+        doc.startedAt = new Date(now);
+        doc.expiresAt = expiresAt;
+        doc.lastActivatedBy = activeOddsState.lastActivatedBy;
+        doc.note = params.note || '';
+        doc.auditLogs.push({
+            activatedAt: new Date(now),
+            mode: activeOddsState.mode,
+            minMultiplier: activeOddsState.minMultiplier,
+            maxMultiplier: activeOddsState.maxMultiplier,
+            durationType: activeOddsState.durationType,
+            durationMinutes: activeOddsState.durationMinutes,
+            roundsTotal: activeOddsState.roundsTotal,
+            activatedBy: activeOddsState.lastActivatedBy,
+            reason: params.note || 'Admin configured odds engine rule'
+        });
+        await doc.save();
+    }
+    catch (err) {
+        console.error('Error saving OddsControl to DB:', err);
+    }
+    console.log(`[OddsEngine] Rule applied: ${activeOddsState.mode} [${activeOddsState.minMultiplier}x - ${activeOddsState.maxMultiplier}x], duration: ${activeOddsState.durationType} (${activeOddsState.durationMinutes}m / ${activeOddsState.roundsTotal}r)`);
+    return getOddsEngineState();
+}
+export async function resetOddsEngineToNormal(reason = 'Manual admin reset') {
+    await resetOddsEngineInternal(reason);
+    console.log(`[OddsEngine] Reset to normal odds engine. Reason: ${reason}`);
+    return getOddsEngineState();
 }
