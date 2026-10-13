@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'wouter'
+import { Gift, LifeBuoy, LogOut, User, Users } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
 
 interface MenuDropdownProps {
@@ -9,95 +10,99 @@ interface MenuDropdownProps {
   onLogout: () => void
 }
 
+const ROW = 'flex h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium transition-colors hover:bg-field active:bg-field'
+
 export function MenuDropdown({ username, isLoggedIn, onClose, onLogout }: MenuDropdownProps) {
   const ref = useRef<HTMLDivElement>(null)
   const { config } = useConfig()
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Element
+      // The header's menu button toggles on its own; don't close and reopen.
+      if (target.closest('[data-menu-toggle]')) return
+      if (ref.current && !ref.current.contains(target)) onClose()
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [onClose])
 
   const handleSupportClick = () => {
-    window.open(`https://wa.me/${config.whatsappSupportNumber}`, '_blank')
+    window.open(`https://wa.me/${config.whatsappSupportNumber}`, '_blank', 'noopener,noreferrer')
     onClose()
   }
 
   return (
     <div
       ref={ref}
-      className="fixed right-2 sm:right-3 top-12 sm:top-14 z-50 bg-[#141414]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 w-56 overflow-hidden animate-fade-in"
+      role="menu"
+      className="animate-fade-in fixed right-3 top-[calc(env(safe-area-inset-top)_+_3.5rem)] z-50 w-64 overflow-hidden rounded-lg border border-line bg-panel shadow-lg"
     >
-      {/* Username header */}
-      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00D455] to-[#00A83D] flex items-center justify-center shadow-sm shadow-[#00C74D]/20">
-          <span className="text-black font-black text-sm">{username.charAt(0).toUpperCase()}</span>
+      <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-brand-ink">
+          {username.charAt(0).toUpperCase()}
         </div>
-        <div>
-          <span className="text-white font-bold text-sm block">{username}</span>
-          <span className="text-white/35 text-[10px]">Member</span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-ink">{username}</p>
+          {!isLoggedIn && <p className="text-xs text-ink-3">Not logged in</p>}
         </div>
       </div>
 
-      {/* Menu items */}
-      <div className="py-1.5">
-        <Link to="/profile" onClick={onClose}>
-          <MenuItem icon="👤" label="My Profile" />
-        </Link>
-        <Link to="/referrals" onClick={onClose}>
-          <MenuItem icon="👥" label="Refer & Earn" badge="KSH 20" />
-        </Link>
-        <Link to="/bonuses" onClick={onClose}>
-          <MenuItem icon="🎁" label="Bonuses" />
-        </Link>
-        <MenuItem icon="❓" label="Help & Support" onClick={handleSupportClick} />
-        
+      <nav className="py-1">
+        <MenuLink to="/profile" icon={<User className="size-[18px]" />} label="My profile" onClose={onClose} />
+        <MenuLink to="/referrals" icon={<Users className="size-[18px]" />} label="Refer and earn" badge="KSH 20" onClose={onClose} />
+        <MenuLink to="/bonuses" icon={<Gift className="size-[18px]" />} label="Bonuses" onClose={onClose} />
+        <button type="button" role="menuitem" onClick={handleSupportClick} className={`${ROW} text-ink-2 hover:text-ink`}>
+          <LifeBuoy className="size-[18px]" aria-hidden="true" />
+          <span>Help and support</span>
+        </button>
+
         {isLoggedIn && (
           <>
-            <div className="border-t border-white/[0.06] my-1.5 mx-3" />
-            <MenuItem icon="🚪" label="Logout" danger onClick={() => { onLogout(); onClose(); }} />
+            <div className="mx-4 my-1 border-t border-line" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { onLogout(); onClose() }}
+              className={`${ROW} text-loss`}
+            >
+              <LogOut className="size-[18px]" aria-hidden="true" />
+              <span>Log out</span>
+            </button>
           </>
         )}
-      </div>
+      </nav>
     </div>
   )
 }
 
-function MenuItem({
+function MenuLink({
+  to,
   icon,
   label,
   badge,
-  danger = false,
-  onClick,
+  onClose,
 }: {
-  icon: string
+  to: string
+  icon: ReactNode
   label: string
   badge?: string
-  danger?: boolean
-  onClick?: () => void
+  onClose: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold hover:bg-white/[0.04] transition-colors duration-150 ${
-        danger ? 'text-[#E91E63]' : 'text-white/65 hover:text-white/90'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <span className="text-sm">{icon}</span>
-        <span>{label}</span>
-      </div>
+    <Link to={to} onClick={onClose} role="menuitem" className={`${ROW} text-ink-2 hover:text-ink`}>
+      <span aria-hidden="true">{icon}</span>
+      <span className="flex-1">{label}</span>
       {badge && (
-        <span className="bg-[#00C74D]/15 text-[#00C74D] text-[10px] font-black px-2 py-0.5 rounded-full border border-[#00C74D]/20">
-          {badge}
-        </span>
+        <span className="rounded bg-brand/15 px-1.5 py-0.5 text-xs font-semibold text-brand">{badge}</span>
       )}
-    </button>
+    </Link>
   )
 }

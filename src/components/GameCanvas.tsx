@@ -55,7 +55,7 @@ function drawBackground(
   multiplier: number = 1
 ) {
   // Dark background
-  ctx.fillStyle = '#0d1117'
+  ctx.fillStyle = '#0e1115'
   ctx.fillRect(0, 0, w, h)
 
   const ox = PAD.left, oy = h - PAD.bottom
@@ -494,38 +494,38 @@ function drawExhaust(
    JSX OVERLAYS — bet toggle, network status, spinner
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function BetModeToggle({ 
-  betMode, 
-  onToggle, 
+function BetModeToggle({
+  betMode,
+  onToggle,
   freebetLocked = true,
-  freebetAmount = 0 
-}: { 
+  freebetAmount = 0
+}: {
   betMode: 'money' | 'freebet'
   onToggle: () => void
   freebetLocked?: boolean
   freebetAmount?: number
 }) {
+  const base = 'h-8 rounded px-3 text-xs font-semibold transition-colors'
   return (
-    <div className="flex items-center rounded-full bg-[#0f1318] p-0.5 border border-[#00C74D]/20 ml-2">
-      <button type="button" onClick={() => betMode !== 'money' && onToggle()}
-        className={cn('rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-bold tracking-wide transition-all duration-200',
-          betMode === 'money' 
-            ? 'bg-[#00C74D] text-black' 
-            : 'text-white/60 hover:text-white/90')}>
+    <div role="group" aria-label="Bet wallet" className="flex rounded-md border border-line bg-page p-0.5">
+      <button
+        type="button"
+        aria-pressed={betMode === 'money'}
+        onClick={() => betMode !== 'money' && onToggle()}
+        className={cn(base, betMode === 'money' ? 'bg-brand text-brand-ink' : 'text-ink-2 hover:text-ink')}
+      >
         Money
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
+        aria-pressed={betMode === 'freebet'}
         onClick={() => betMode !== 'freebet' && onToggle()}
-        className={cn('rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-bold tracking-wide transition-all duration-200 relative',
-          betMode === 'freebet' 
-            ? 'bg-[#00C74D] text-black' 
-            : 'text-white/60 hover:text-white/90')}
+        className={cn(base, betMode === 'freebet' ? 'bg-brand text-brand-ink' : 'text-ink-2 hover:text-ink')}
         title={freebetLocked ? 'Deposit KSH 20+ to unlock bonus' : `Freebet: KSH ${freebetAmount > 0 ? freebetAmount.toFixed(0) : '0'}`}
       >
         Freebet
         {!freebetLocked && freebetAmount > 0 && (
-          <span className="ml-1 text-[8px] opacity-80">({freebetAmount.toFixed(0)})</span>
+          <span className="ml-1 tabular-nums opacity-80">({freebetAmount.toFixed(0)})</span>
         )}
       </button>
     </div>
@@ -534,11 +534,8 @@ function BetModeToggle({
 
 function NetworkStatus() {
   return (
-    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/70 font-semibold">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00C74D] opacity-75" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00C74D]" />
-      </span>
+    <div className="flex items-center gap-1.5 text-xs text-ink-2">
+      <span className="size-1.5 rounded-full bg-brand" aria-hidden="true" />
       <span>Online</span>
     </div>
   )
@@ -547,8 +544,8 @@ function NetworkStatus() {
 function NautilusSpinner() {
   const blades = 9, cx = 32, cy = 32
   return (
-    <svg className="animate-spin" style={{ animationDuration: '1.6s', animationDirection: 'reverse' }}
-      width="80" height="80" viewBox="0 0 64 64" fill="none">
+    <svg style={{ animationDuration: '1.6s', animationDirection: 'reverse' }}
+      className="animate-spin size-14 sm:size-20" viewBox="0 0 64 64" fill="none" aria-hidden="true">
       {Array.from({ length: blades }, (_, i) => {
         const step = (Math.PI * 2) / blades
         const a0 = step * i, a1 = step * i + step * 0.88
@@ -569,7 +566,7 @@ function NautilusSpinner() {
         )
       })}
       <circle cx={cx} cy={cy} r="5.5" fill="#00C74D" />
-      <circle cx={cx} cy={cy} r="3" fill="#0b0e11" />
+      <circle cx={cx} cy={cy} r="3" fill="#0e1115" />
     </svg>
   )
 }
@@ -581,7 +578,7 @@ function NautilusSpinner() {
    FLYING   → curve draws, plane rides the tip following the tangent.
               Subtle turbulence bounce on the plane at high multipliers.
    CRASHING → curve freezes, plane shoots off along its last tangent.
-   CRASHED  → frozen curve + "FLEW AWAY!" overlay in pink.
+   CRASHED  → frozen curve + "Flew away" overlay in red.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function GameCanvas({
@@ -823,61 +820,57 @@ export function GameCanvas({
   const isCrashed = phase === 'crashed' || phase === 'crashing'
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-md sm:rounded-lg">
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ display: 'block' }} />
+    <div className="relative h-full w-full overflow-hidden">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ display: 'block' }} />
 
-      {/* Top-left: Money/Freebet toggle - moved slightly right with ml-2 */}
-      <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
-        <BetModeToggle 
-          betMode={betMode} 
-          onToggle={onToggleBetMode} 
+      {/* Top-left: wallet toggle + connection status */}
+      <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-2 sm:left-3 sm:top-3">
+        <BetModeToggle
+          betMode={betMode}
+          onToggle={onToggleBetMode}
           freebetLocked={freebetLocked}
           freebetAmount={freebetAmount}
         />
-      </div>
-      
-      {/* Top-left inside canvas: Online status indicator */}
-      <div className="absolute top-2 left-4 z-10" style={{ top: '44px' }}>
-        <NetworkStatus />
+        <div className="pl-1">
+          <NetworkStatus />
+        </div>
       </div>
 
-      {/* WAITING overlay */}
+      {/* Waiting for the next round */}
       {phase === 'waiting' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 z-10">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3" role="status">
           <NautilusSpinner />
           <div className="text-center">
-            <div className="text-white font-bold text-[10px] sm:text-sm tracking-widest uppercase">WAITING FOR NEXT ROUND</div>
-            <div className="mt-1.5 sm:mt-2 mx-auto w-28 sm:w-40 h-1.5 sm:h-2 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-[#00E676] rounded-full transition-all" style={{ width: `${waitProgress}%` }} />
+            <div className="text-sm font-medium text-ink">Waiting for next round</div>
+            <div className="mx-auto mt-2 h-1 w-36 overflow-hidden rounded-full bg-raised sm:w-44">
+              <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${waitProgress}%` }} />
             </div>
           </div>
         </div>
       )}
 
-      {/* FLYING multiplier - large centered display (crisp white, no glow) */}
+      {/* Live multiplier */}
       {phase === 'flying' && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="font-black text-white leading-none"
-            style={{ 
-              fontSize: 'clamp(2rem, 10vw, 6rem)', 
-              letterSpacing: '-0.02em'
-            }}>
-            {multiplier.toFixed(2)}<span className="text-[0.6em] ml-0.5 sm:ml-1">x</span>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <div
+            className="font-bold leading-none tabular-nums text-ink"
+            style={{ fontSize: 'clamp(3rem, 16vw, 6.5rem)', letterSpacing: '-0.02em' }}
+          >
+            {multiplier.toFixed(2)}<span className="ml-0.5 text-[0.6em] sm:ml-1">x</span>
           </div>
         </div>
       )}
 
-      {/* CRASHED overlay — pink/red */}
+      {/* Crashed */}
       {isCrashed && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-[#E91E63] text-[10px] sm:text-sm font-bold tracking-widest uppercase mb-1 sm:mb-2">FLEW AWAY!</div>
-            <div className="font-black text-[#E91E63] leading-none"
-              style={{ 
-                fontSize: 'clamp(2rem, 10vw, 6rem)', 
-                letterSpacing: '-0.02em'
-              }}>
-              {crashPoint > 0 ? crashPoint.toFixed(2) : multiplier.toFixed(2)}<span className="text-[0.6em] ml-0.5 sm:ml-1">x</span>
+            <div className="mb-1 text-sm font-medium text-loss sm:mb-2">Flew away</div>
+            <div
+              className="font-bold leading-none tabular-nums text-loss"
+              style={{ fontSize: 'clamp(3rem, 16vw, 6.5rem)', letterSpacing: '-0.02em' }}
+            >
+              {crashPoint > 0 ? crashPoint.toFixed(2) : multiplier.toFixed(2)}<span className="ml-0.5 text-[0.6em] sm:ml-1">x</span>
             </div>
           </div>
         </div>

@@ -12,7 +12,7 @@ const CRASHING_MS = 700;
 const TICK_MS = 100;
 const MAX_HISTORY = 20;
 const MAX_LIVE_BETS = 10;
-const MIN_BOT_BETS = 22;
+const MIN_BOT_BETS = 42; // increased by 20
 const BOT_BET_VARIANCE = 14;
 const INITIAL_NONCE = 1;
 function getServerClientSeed() {
@@ -108,14 +108,16 @@ function seedRoundBotBets() {
     const count = MIN_BOT_BETS + Math.floor(Math.random() * BOT_BET_VARIANCE);
     const highRollerCount = Math.ceil(count * 0.1);
     for (let i = 0; i < count; i++) {
+        const userName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
         const botBet = {
             id: `bot-${gameState.roundId}-${i + 1}`,
-            user: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
+            user: userName,
             rank: 1 + Math.floor(Math.random() * 5),
             bet: getRandomBotBetAmount(i < highRollerCount),
             cashout: null,
             won: null,
             cashoutTarget: getRandomBotCashoutTarget(),
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`,
             roundId: gameState.roundId,
             updatedAt: Date.now()
         };

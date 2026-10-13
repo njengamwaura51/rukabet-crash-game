@@ -313,24 +313,24 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0b0e11] text-white p-6">
+      <div className="min-h-dvh bg-page text-ink p-4 sm:p-6">
         <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <img src="/logo.png" alt="RukaBet" className="h-10 w-auto" />
-              <p className="text-white/50 text-sm mt-1">Admin Login</p>
+              <p className="text-ink-2 text-sm mt-1">Admin Login</p>
             </div>
             <Link to="/">
-              <button className="px-4 py-2 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-sm font-bold">
-                ← Back to Game
+              <button className="min-h-10 px-4 py-2 bg-panel border border-line rounded-lg text-ink-2 hover:text-ink hover:border-line-strong transition-all text-sm font-bold">
+                Back to game
               </button>
             </Link>
           </div>
 
-          <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6">
-            <h2 className="text-lg font-bold mb-4">Admin Login</h2>
+          <div className="bg-panel rounded-lg border border-line p-4 sm:p-6">
+            <h2 className="text-lg font-semibold mb-4">Admin Login</h2>
             {authError && (
-              <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
+              <div className="mb-4 p-3 bg-loss/10 border border-loss/30 rounded-lg text-loss text-sm">
                 {authError}
               </div>
             )}
@@ -340,19 +340,19 @@ export default function AdminDashboard() {
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value)}
                 placeholder="Username"
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
+                className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors mb-4"
               />
               <input
                 type="password"
                 value={passwordInput}
                 onChange={e => setPasswordInput(e.target.value)}
                 placeholder="Password"
-                className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors mb-4"
+                className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors mb-4"
               />
               <button
                 type="submit"
                 disabled={isAuthenticating}
-                className="w-full py-3 rounded-lg font-bold bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full py-3 rounded-lg font-bold bg-brand text-brand-ink hover:bg-brand-hover transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isAuthenticating ? 'Signing in...' : 'Login to Admin Dashboard'}
               </button>
@@ -364,74 +364,73 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0e11] text-white p-6">
+    <div className="min-h-dvh bg-page text-ink p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <img src="/logo.png" alt="RukaBet" className="h-10 w-auto" />
-            <p className="text-white/50 text-sm mt-1">Manage your game settings</p>
+            <p className="text-ink-2 text-sm mt-1">Manage your game settings</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setRefreshKey(prev => prev + 1)}
               disabled={overviewLoading || paymentLoading}
-              className="px-4 py-2 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00C74D] hover:text-[#7DFFA9] transition-all text-sm font-bold disabled:opacity-50"
+              className="min-h-10 px-4 py-2 bg-field border border-line-strong rounded-lg text-ink hover:bg-raised transition-all text-sm font-bold disabled:opacity-50"
             >
               {overviewLoading ? 'Refreshing...' : 'Refresh Data'}
             </button>
             <button
               onClick={handleAdminLogout}
-              className="px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:text-red-300 transition-all text-sm font-bold"
+              className="min-h-10 px-4 py-2 bg-field border border-line-strong rounded-lg text-loss hover:bg-raised transition-all text-sm font-bold"
             >
               Logout
             </button>
             <Link to="/">
-              <button className="px-4 py-2 bg-[#1a1d24] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-sm font-bold">
-                ← Back to Game
+              <button className="min-h-10 px-4 py-2 bg-panel border border-line rounded-lg text-ink-2 hover:text-ink hover:border-line-strong transition-all text-sm font-bold">
+                Back to game
               </button>
             </Link>
           </div>
         </div>
 
-        <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6">
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <span className="text-xl">⚙️</span>
+        <div className="bg-panel rounded-lg border border-line p-4 sm:p-6">
+          <h2 className="text-lg font-semibold mb-5">
             Support Settings
           </h2>
 
           <div className="mb-6">
-            <label className="block text-white/70 text-sm font-bold mb-2">
+            <label className="block text-ink-2 text-sm font-bold mb-2">
               WhatsApp Support Number
             </label>
             <div className="flex gap-3">
               <div className="flex-1 relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-sm">+</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 text-sm">+</span>
                 <input
                   type="tel"
                   value={whatsapp}
                   onChange={e => setWhatsapp(e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="254713934411"
-                  className="w-full bg-[#0f1318] border border-white/10 rounded-lg pl-8 pr-4 py-3 text-white font-mono focus:outline-none focus:border-[#00C74D] transition-colors"
+                  className="w-full bg-field border border-line rounded-lg pl-8 pr-4 py-3 text-ink font-mono focus-visible:border-brand transition-colors"
                 />
               </div>
               <button
                 onClick={handleSave}
                 className={`px-6 py-3 rounded-lg font-bold transition-all ${
                   saved
-                    ? 'bg-[#00C74D] text-black'
-                    : 'bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30'
+                    ? 'bg-brand text-brand-ink'
+                    : 'bg-brand text-brand-ink hover:bg-brand-hover'
                 }`}
               >
-                {saved ? '✓ Saved' : 'Save'}
+                {saved ? 'Saved' : 'Save'}
               </button>
             </div>
-            <p className="text-white/40 text-xs mt-2">
+            <p className="text-ink-3 text-xs mt-2">
               Format: Country code + number (e.g., 254713934411)
             </p>
           </div>
 
-          <div className="bg-[#0f1318] rounded-lg p-4 border border-white/5">
-            <span className="text-white/50 text-xs font-bold uppercase tracking-wider">Preview</span>
+          <div className="bg-field rounded-lg p-4 border border-line">
+            <span className="text-ink-2 text-xs font-bold">Preview</span>
             <div className="mt-3 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
@@ -443,30 +442,29 @@ export default function AdminDashboard() {
                   href={`https://wa.me/${config.whatsappSupportNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white hover:text-[#00C74D] font-bold transition-colors"
+                  className="text-ink hover:text-brand font-bold transition-colors"
                 >
                   +{config.whatsappSupportNumber}
                 </a>
-                <p className="text-white/40 text-xs">Click to open WhatsApp</p>
+                <p className="text-ink-3 text-xs">Click to open WhatsApp</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6 mt-6">
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <span className="text-xl">💳</span>
+        <div className="bg-panel rounded-lg border border-line p-4 sm:p-6 mt-6">
+          <h2 className="text-lg font-semibold mb-5">
             Payment Gateway (IntaSend)
           </h2>
 
           {paymentError && (
-            <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
+            <div className="mb-4 p-3 bg-loss/10 border border-loss/30 rounded-lg text-loss text-sm">
               {paymentError}
             </div>
           )}
 
           <div className="mb-4">
-            <label className="block text-white/70 text-sm font-bold mb-2">
+            <label className="block text-ink-2 text-sm font-bold mb-2">
               Company Name (M-Pesa Display)
             </label>
             <input
@@ -474,13 +472,13 @@ export default function AdminDashboard() {
               value={paymentConfig.companyName}
               onChange={e => setPaymentConfig(prev => ({ ...prev, companyName: e.target.value }))}
               placeholder="RUKA TECH SOLUTIONS"
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00C74D] transition-colors"
+              className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors"
             />
-            <p className="text-white/40 text-xs mt-1">This appears on customer's M-Pesa prompt</p>
+            <p className="text-ink-3 text-xs mt-1">This appears on customer's M-Pesa prompt</p>
           </div>
 
           <div className="mb-4">
-            <label className="block text-white/70 text-sm font-bold mb-2">
+            <label className="block text-ink-2 text-sm font-bold mb-2">
               IntaSend Public Key
             </label>
             <input
@@ -488,12 +486,12 @@ export default function AdminDashboard() {
               value={paymentConfig.intasendPublicKey}
               onChange={e => setPaymentConfig(prev => ({ ...prev, intasendPublicKey: e.target.value }))}
               placeholder="ISPubKey_live_xxx..."
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#00C74D] transition-colors"
+              className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink font-mono text-base focus-visible:border-brand transition-colors"
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-white/70 text-sm font-bold mb-2">
+            <label className="block text-ink-2 text-sm font-bold mb-2">
               IntaSend Secret Key
             </label>
             <input
@@ -501,9 +499,9 @@ export default function AdminDashboard() {
               value={paymentConfig.intasendSecretKey}
               onChange={e => setPaymentConfig(prev => ({ ...prev, intasendSecretKey: e.target.value }))}
               placeholder="ISSecretKey_live_xxx..."
-              className="w-full bg-[#0f1318] border border-white/10 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#00C74D] transition-colors"
+              className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink font-mono text-base focus-visible:border-brand transition-colors"
             />
-            <p className="text-white/40 text-xs mt-1">Keep this secret! Never share publicly.</p>
+            <p className="text-ink-3 text-xs mt-1">Keep this secret! Never share publicly.</p>
           </div>
 
           <button
@@ -511,71 +509,70 @@ export default function AdminDashboard() {
             disabled={paymentLoading}
             className={`w-full py-3 rounded-lg font-bold transition-all ${
               paymentSaved
-                ? 'bg-[#00C74D] text-black'
+                ? 'bg-brand text-brand-ink'
                 : paymentLoading
-                  ? 'bg-[#00C74D]/10 text-[#00C74D]/50 cursor-wait'
-                  : 'bg-[#00C74D]/20 text-[#00C74D] hover:bg-[#00C74D]/30'
+                  ? 'bg-raised text-ink-3 cursor-wait'
+                  : 'bg-brand text-brand-ink hover:bg-brand-hover'
             }`}
           >
-            {paymentSaved ? '✓ Saved' : paymentLoading ? 'Loading...' : 'Save Payment Settings'}
+            {paymentSaved ? 'Saved' : paymentLoading ? 'Loading...' : 'Save Payment Settings'}
           </button>
 
-          <div className="mt-4 bg-[#0f1318] rounded-lg p-4 border border-white/5">
-            <span className="text-white/50 text-xs font-bold uppercase tracking-wider">IntaSend API</span>
-            <p className="text-white/40 text-xs mt-2">
-              Get your API keys from <a href="https://intasend.com" target="_blank" rel="noopener noreferrer" className="text-[#00C74D] hover:underline">intasend.com</a>.
+          <div className="mt-4 bg-field rounded-lg p-4 border border-line">
+            <span className="text-ink-2 text-xs font-bold">IntaSend API</span>
+            <p className="text-ink-3 text-xs mt-2">
+              Get your API keys from <a href="https://intasend.com" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">intasend.com</a>.
               Use sandbox keys for testing, live keys for production.
             </p>
           </div>
         </div>
 
-        <div className="bg-[#1a1d24] rounded-2xl border border-white/10 p-6 mt-6">
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <span className="text-xl">📊</span>
+        <div className="bg-panel rounded-lg border border-line p-4 sm:p-6 mt-6">
+          <h2 className="text-lg font-semibold mb-5">
             Game & User Tracking
           </h2>
 
           {overviewError && (
-            <div className="mb-4 p-3 bg-[#00C74D]/10 border border-[#00C74D]/30 rounded-lg text-[#00E65A] text-sm">
+            <div className="mb-4 p-3 bg-loss/10 border border-loss/30 rounded-lg text-loss text-sm">
               {overviewError}
             </div>
           )}
 
           {overviewLoading && !overview ? (
-            <div className="text-white/60 text-sm">Loading analytics...</div>
+            <div className="text-ink-2 text-sm">Loading analytics...</div>
           ) : overview ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4">
-                  <p className="text-white/50 text-xs uppercase">Total Users</p>
+                <div className="bg-field border border-line rounded-lg p-4">
+                  <p className="text-ink-2 text-xs">Total Users</p>
                   <p className="text-2xl font-bold mt-1">{overview.totals.users}</p>
-                  <p className="text-[#00C74D] text-xs mt-1">+{overview.totals.newUsers24h} last 24h</p>
+                  <p className="text-brand text-xs mt-1">+{overview.totals.newUsers24h} last 24h</p>
                 </div>
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4">
-                  <p className="text-white/50 text-xs uppercase">Bets</p>
+                <div className="bg-field border border-line rounded-lg p-4">
+                  <p className="text-ink-2 text-xs">Bets</p>
                   <p className="text-2xl font-bold mt-1">{overview.totals.bets}</p>
-                  <p className="text-[#00C74D] text-xs mt-1">{overview.totals.activeBets} active</p>
+                  <p className="text-brand text-xs mt-1">{overview.totals.activeBets} active</p>
                 </div>
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4">
-                  <p className="text-white/50 text-xs uppercase">Deposits</p>
+                <div className="bg-field border border-line rounded-lg p-4">
+                  <p className="text-ink-2 text-xs">Deposits</p>
                   <p className="text-2xl font-bold mt-1">{formatMoney(overview.totals.totalDepositsAmount)}</p>
-                  <p className="text-[#00C74D] text-xs mt-1">
+                  <p className="text-brand text-xs mt-1">
                     {overview.totals.completedDeposits} complete / {overview.totals.pendingDeposits} pending
                   </p>
                 </div>
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4">
-                  <p className="text-white/50 text-xs uppercase">House Gross</p>
+                <div className="bg-field border border-line rounded-lg p-4">
+                  <p className="text-ink-2 text-xs">House Gross</p>
                   <p className="text-2xl font-bold mt-1">{formatMoney(overview.totals.houseGross)}</p>
-                  <p className="text-white/50 text-xs mt-1">Wagered {formatMoney(overview.totals.totalWagered)}</p>
+                  <p className="text-ink-2 text-xs mt-1">Wagered {formatMoney(overview.totals.totalWagered)}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-white/80 mb-3">Recent Users</h3>
-                  <table className="w-full text-xs">
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Users</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
                     <thead>
-                      <tr className="text-white/40 text-left">
+                      <tr className="text-ink-3 text-left">
                         <th className="pb-2">User</th>
                         <th className="pb-2">Phone</th>
                         <th className="pb-2">Balance</th>
@@ -584,22 +581,22 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {overview.recentUsers.map(user => (
-                        <tr key={user._id} className="border-t border-white/5">
+                        <tr key={user._id} className="border-t border-line">
                           <td className="py-2">{user.username}</td>
-                          <td className="py-2 text-white/70">{user.phone}</td>
+                          <td className="py-2 text-ink-2">{user.phone}</td>
                           <td className="py-2">{formatMoney(user.balance)}</td>
-                          <td className="py-2 text-white/60">{formatDate(user.createdAt)}</td>
+                          <td className="py-2 text-ink-2">{formatDate(user.createdAt)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-white/80 mb-3">Recent Deposits</h3>
-                  <table className="w-full text-xs">
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Deposits</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
                     <thead>
-                      <tr className="text-white/40 text-left">
+                      <tr className="text-ink-3 text-left">
                         <th className="pb-2">User</th>
                         <th className="pb-2">Amount</th>
                         <th className="pb-2">Status</th>
@@ -608,11 +605,11 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {overview.recentDeposits.map(deposit => (
-                        <tr key={deposit._id} className="border-t border-white/5">
+                        <tr key={deposit._id} className="border-t border-line">
                           <td className="py-2">{deposit.userId?.username || 'Unknown'}</td>
                           <td className="py-2">{formatMoney(deposit.amount)}</td>
-                          <td className="py-2 uppercase text-white/70">{deposit.status}</td>
-                          <td className="py-2 text-white/60">{formatDate(deposit.createdAt)}</td>
+                          <td className="py-2 text-ink-2">{deposit.status}</td>
+                          <td className="py-2 text-ink-2">{formatDate(deposit.createdAt)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -621,11 +618,11 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-white/80 mb-3">Recent Bets</h3>
-                  <table className="w-full text-xs">
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Bets</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
                     <thead>
-                      <tr className="text-white/40 text-left">
+                      <tr className="text-ink-3 text-left">
                         <th className="pb-2">User</th>
                         <th className="pb-2">Round</th>
                         <th className="pb-2">Bet</th>
@@ -634,11 +631,11 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {overview.recentBets.map(bet => (
-                        <tr key={bet._id} className="border-t border-white/5">
+                        <tr key={bet._id} className="border-t border-line">
                           <td className="py-2">{bet.userId?.username || 'Unknown'}</td>
-                          <td className="py-2 text-white/70">{bet.roundId}</td>
+                          <td className="py-2 text-ink-2">{bet.roundId}</td>
                           <td className="py-2">{formatMoney(bet.amount)}</td>
-                          <td className="py-2 text-white/70">
+                          <td className="py-2 text-ink-2">
                             {bet.status} {bet.status === 'won' ? `(${formatMoney(bet.winAmount)})` : ''}
                           </td>
                         </tr>
@@ -647,11 +644,11 @@ export default function AdminDashboard() {
                   </table>
                 </div>
 
-                <div className="bg-[#0f1318] border border-white/5 rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-white/80 mb-3">Top Players by Wagered Amount</h3>
-                  <table className="w-full text-xs">
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Top Players by Wagered Amount</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
                     <thead>
-                      <tr className="text-white/40 text-left">
+                      <tr className="text-ink-3 text-left">
                         <th className="pb-2">User</th>
                         <th className="pb-2">Bets</th>
                         <th className="pb-2">Wagered</th>
@@ -660,7 +657,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {overview.topPlayers.map(player => (
-                        <tr key={player.userId} className="border-t border-white/5">
+                        <tr key={player.userId} className="border-t border-line">
                           <td className="py-2">{player.username}</td>
                           <td className="py-2">{player.totalBets}</td>
                           <td className="py-2">{formatMoney(player.totalBetAmount)}</td>
@@ -673,11 +670,11 @@ export default function AdminDashboard() {
               </div>
             </>
           ) : (
-            <div className="text-white/60 text-sm">No analytics data available.</div>
+            <div className="text-ink-2 text-sm">No analytics data available.</div>
           )}
         </div>
 
-        <div className="mt-6 text-center text-white/30 text-xs">
+        <div className="mt-6 text-center text-ink-3 text-xs">
           RukaBet Admin Panel v2.0
         </div>
       </div>

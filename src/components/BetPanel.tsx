@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Minus, Plus } from 'lucide-react'
 import { useBetting } from '@/contexts/BettingContext'
 import { Phase } from '@/hooks/useGameState'
 
@@ -27,29 +28,36 @@ function formatNumber(num: number): string {
   return fixed.replace(/\.?0+$/, '') || '0'
 }
 
-function ToggleSwitch({ 
-  enabled, 
-  onToggle, 
-  disabled = false 
-}: { 
+function ToggleSwitch({
+  enabled,
+  onToggle,
+  disabled = false,
+  label,
+}: {
   enabled: boolean
   onToggle: () => void
-  disabled?: boolean 
+  disabled?: boolean
+  label: string
 }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
       onClick={onToggle}
       disabled={disabled}
-      className={`relative w-9 h-[18px] rounded-full transition-all duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
-        enabled ? 'bg-[#00C74D] shadow-sm shadow-[#00C74D]/30' : 'bg-white/10'
-      }`}
+      className="flex h-10 w-12 shrink-0 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
     >
       <span
-        className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform duration-200 ${
-          enabled ? 'translate-x-[18px]' : 'translate-x-0'
-        }`}
-      />
+        className={`relative block h-[22px] w-10 rounded-full transition-colors ${enabled ? 'bg-brand' : 'bg-raised'}`}
+      >
+        <span
+          className={`absolute left-[3px] top-[3px] size-4 rounded-full bg-white transition-transform ${
+            enabled ? 'translate-x-[18px]' : 'translate-x-0'
+          }`}
+        />
+      </span>
     </button>
   )
 }
@@ -169,154 +177,147 @@ export default function BetPanelRefactored({
     }
   }
 
-  let buttonText = 'BET'
+  // Sentence-case labels, flat solid colours (dark text on green/amber for contrast)
+  let buttonText = 'Bet'
   let buttonSubtext = `${formatNumber(amount)} ${currency}`
-  let buttonBg = 'from-[#00D455] to-[#00A83D]'
+  let buttonStyle = 'bg-brand text-brand-ink hover:bg-brand-hover active:bg-brand-hover'
   let isDisabled = false
-  let buttonShadow = 'shadow-[#00C74D]/25'
 
   if (!isLoggedIn) {
-    buttonText = 'BET'
-    buttonSubtext = `${formatNumber(amount)} ${currency}`
-    buttonBg = 'from-[#00D455] to-[#00A83D]'
-    buttonShadow = 'shadow-[#00C74D]/25'
+    buttonText = 'Bet'
   } else if (cashedOutBet && gamePhase !== 'waiting') {
-    buttonText = 'WAIT'
-    buttonSubtext = 'Next Round'
-    buttonBg = 'from-[#374151] to-[#1F2937]'
-    buttonShadow = 'shadow-black/20'
+    buttonText = 'Wait'
+    buttonSubtext = 'Next round'
+    buttonStyle = 'bg-raised text-ink-2'
     isDisabled = true
   } else if (queuedBet) {
-    buttonText = 'CANCEL'
-    buttonSubtext = `Next Round`
-    buttonBg = 'from-[#EF4444] to-[#DC2626]'
-    buttonShadow = 'shadow-red-500/25'
+    buttonText = 'Cancel'
+    buttonSubtext = 'Next round'
+    buttonStyle = 'bg-[#d93036] text-white hover:bg-[#c42a30] active:bg-[#c42a30]'
   } else if (activeBet && gamePhase === 'flying') {
     const potentialWin = formatNumber(activeBet.amount * currentMultiplier)
-    buttonText = 'CASH OUT'
+    buttonText = 'Cash out'
     buttonSubtext = `${potentialWin} ${currency}`
-    buttonBg = 'from-[#F59E0B] to-[#D97706]'
-    buttonShadow = 'shadow-amber-500/25'
+    buttonStyle = 'bg-cashout text-[#2b1700] hover:brightness-95 active:brightness-95'
   } else if (activeBet && gamePhase === 'waiting') {
-    buttonText = 'ACTIVE'
+    buttonText = 'Bet placed'
     buttonSubtext = `${formatNumber(activeBet.amount)} ${currency}`
-    buttonBg = 'from-[#374151] to-[#1F2937]'
-    buttonShadow = 'shadow-black/20'
+    buttonStyle = 'bg-raised text-ink-2'
     isDisabled = true
   } else if (gamePhase === 'crashed' || gamePhase === 'crashing') {
-    buttonText = 'BET NEXT'
-    buttonSubtext = `${formatNumber(amount)} ${currency}`
-    buttonBg = 'from-[#00D455] to-[#00A83D]'
-    buttonShadow = 'shadow-[#00C74D]/25'
+    buttonText = 'Bet next'
   }
 
+  const controlsLocked = !!activeBet || !!queuedBet || !isLoggedIn
+
   return (
-    <div className="bg-[#131820] rounded-2xl border border-white/[0.06] w-full max-w-full overflow-hidden shadow-lg shadow-black/20">
-      {/* Error Toast */}
+    <div className="w-full max-w-full overflow-hidden rounded-lg border border-line bg-panel">
       {error && (
-        <div className="mx-2.5 mt-2.5 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-xl text-center animate-fade-in">
-          <span className="text-red-400 text-[10px] font-bold">{error}</span>
+        <div
+          role="alert"
+          className="animate-fade-in mx-3 mt-3 rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-center text-sm font-medium text-loss"
+        >
+          {error}
         </div>
       )}
 
-      {/* Main layout */}
-      <div className="flex flex-row w-full gap-2 items-stretch p-2.5">
-        {/* Left Block: All Controls */}
-        <div className="w-1/2 flex flex-col gap-1.5">
-          {/* Amount stepper */}
-          <div className="flex items-center bg-[#0d1117] rounded-xl p-0.5 w-full border border-white/[0.06]">
-            <button
-              type="button"
-              onClick={decrease}
-              disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-white/[0.12] active:scale-90 transition-all duration-150 flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none"
-            >
-              −
-            </button>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={amount.toLocaleString()}
-              onChange={handleAmountChange}
-              disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="flex-1 bg-transparent text-center font-mono text-sm font-black text-white truncate focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
-            />
-            <button
-              type="button"
-              onClick={increase}
-              disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-              className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[#00C74D] text-sm font-black hover:bg-white/[0.12] active:scale-90 transition-all duration-150 flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none"
-            >
-              +
-            </button>
-          </div>
-
-          {/* Quick bet buttons */}
-          <div className="grid grid-cols-4 gap-1 w-full">
-            {QUICK_AMOUNTS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setAmount(Math.min(v, maxBalance || v))}
-                disabled={!!activeBet || !!queuedBet || !isLoggedIn}
-                className="h-7 rounded-lg bg-[#0d1117] text-[9px] font-mono font-bold text-white/60 hover:bg-white/[0.08] hover:text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none border border-white/[0.06] truncate"
-              >
-                {v >= 1000 ? `${v / 1000}k` : v}
-              </button>
-            ))}
-          </div>
-
-          {/* Auto toggles row */}
-          <div className="flex flex-row items-center w-full bg-[#0d1117] rounded-xl px-2 py-1.5 border border-white/[0.04]">
-            <div className="flex items-center gap-1">
-              <span className="text-white/40 text-[9px] font-semibold">Auto</span>
-              <ToggleSwitch
-                enabled={autoBetEnabled}
-                onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
-                disabled={!isLoggedIn}
-              />
-            </div>
-
-            <div className="flex-1" />
-
-            <div className="flex items-center gap-0.5">
-              <span className="text-white/40 text-[9px] font-semibold">@</span>
-              <ToggleSwitch
-                enabled={autoCashoutEnabled}
-                onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
-                disabled={!isLoggedIn}
-              />
-              <div className="flex items-center bg-white/[0.04] rounded-lg border border-white/[0.06] overflow-hidden">
-                <input
-                  type="text"
-                  value={autoCashout}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.]/g, '')
-                    setAutoCashout(val)
-                  }}
-                  disabled={!autoCashoutEnabled || !isLoggedIn}
-                  className="w-9 h-5 bg-transparent text-white text-[10px] font-mono font-bold text-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-                />
-                <span className="text-[10px] text-white/30 font-bold pr-1">x</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Block: BET Button */}
-        <div className="w-1/2">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,0.62fr)] gap-2 p-3">
+        {/* Amount stepper */}
+        <div className="flex h-11 items-center rounded-md border border-line bg-field">
           <button
             type="button"
-            onClick={handleClick}
-            disabled={isDisabled}
-            className={`h-full w-full rounded-2xl flex flex-col justify-center items-center bg-gradient-to-b ${buttonBg} hover:brightness-110 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none shadow-lg ${buttonShadow}`}
+            onClick={decrease}
+            disabled={controlsLocked}
+            aria-label="Decrease bet"
+            className="flex h-full w-11 shrink-0 items-center justify-center rounded-l-md text-brand hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
           >
-            <span className="text-base sm:text-lg font-black text-white tracking-wide drop-shadow-sm">{buttonText}</span>
-            <span className="text-[10px] sm:text-xs font-bold text-white/80 font-mono mt-0.5 truncate max-w-full px-2">
-              {buttonSubtext}
-            </span>
+            <Minus className="size-4" aria-hidden="true" />
           </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label={`Bet amount in ${currency}`}
+            value={amount.toLocaleString()}
+            onChange={handleAmountChange}
+            disabled={controlsLocked}
+            className="h-full min-w-0 flex-1 bg-transparent text-center text-base font-semibold tabular-nums text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={increase}
+            disabled={controlsLocked}
+            aria-label="Increase bet"
+            className="flex h-full w-11 shrink-0 items-center justify-center rounded-r-md text-brand hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Main action: spans stepper + quick amounts */}
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={isDisabled}
+          className={`row-span-2 flex min-h-[5.75rem] w-full flex-col items-center justify-center rounded-md px-2 text-center transition-colors disabled:cursor-not-allowed ${buttonStyle}`}
+        >
+          <span className="text-lg font-bold leading-tight">{buttonText}</span>
+          <span className="mt-0.5 max-w-full truncate text-sm font-medium tabular-nums opacity-90">
+            {buttonSubtext}
+          </span>
+        </button>
+
+        {/* Quick amounts */}
+        <div className="grid grid-cols-4 gap-1.5">
+          {QUICK_AMOUNTS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setAmount(Math.min(v, maxBalance || v))}
+              disabled={controlsLocked}
+              className="h-9 rounded-md border border-line bg-field text-xs font-semibold tabular-nums text-ink-2 hover:bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {v >= 1000 ? `${v / 1000}k` : v}
+            </button>
+          ))}
+        </div>
+
+        {/* Auto play */}
+        <div className="col-span-2 flex flex-wrap items-center justify-between gap-x-3 rounded-md border border-line bg-field pl-3 pr-1">
+          <div className="flex items-center">
+            <span className="text-sm text-ink-2">Auto bet</span>
+            <ToggleSwitch
+              label={`Auto bet, panel ${panelId}`}
+              enabled={autoBetEnabled}
+              onToggle={() => onAutoBetToggle?.(!autoBetEnabled)}
+              disabled={!isLoggedIn}
+            />
+          </div>
+
+          <div className="flex items-center">
+            <span className="text-sm text-ink-2">Auto cash out</span>
+            <ToggleSwitch
+              label={`Auto cash out, panel ${panelId}`}
+              enabled={autoCashoutEnabled}
+              onToggle={() => setAutoCashoutEnabled(!autoCashoutEnabled)}
+              disabled={!isLoggedIn}
+            />
+            <div className="flex h-8 items-center rounded border border-line bg-page px-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                aria-label="Auto cash out multiplier"
+                value={autoCashout}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9.]/g, '')
+                  setAutoCashout(val)
+                }}
+                disabled={!autoCashoutEnabled || !isLoggedIn}
+                className="w-10 bg-transparent text-center text-base font-semibold tabular-nums text-ink disabled:cursor-not-allowed disabled:opacity-40"
+              />
+              <span className="text-sm text-ink-3">x</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

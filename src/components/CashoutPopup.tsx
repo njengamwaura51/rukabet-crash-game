@@ -35,21 +35,15 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
   }
 
   return (
-    <div className="absolute inset-0 flex items-start justify-center pt-16 pointer-events-none z-50">
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-start justify-center pt-14">
       <div
-        className={`
-          bg-black/80 backdrop-blur-md rounded-2xl px-7 py-4 
-          flex flex-col items-center gap-1
-          border border-[#00C74D]/25
-          shadow-xl shadow-[#00C74D]/15
-          transform transition-all duration-[220ms] ease-out
-          ${animClasses[animState]}
-        `}
+        role="status"
+        className={`flex flex-col items-center gap-0.5 rounded-lg border border-brand/40 bg-page px-6 py-3 shadow-md transition-all duration-200 ease-out ${animClasses[animState]}`}
       >
-        <span className="text-white/70 text-[11px] font-bold tracking-widest uppercase">You Cashed Out</span>
-        <span className="text-white text-3xl font-black tabular-nums">{multiplier.toFixed(2)}x</span>
-        <span className="text-[#00E676] text-sm font-black tracking-wide">
-          WON {amount.toLocaleString()} {currency}
+        <span className="text-sm text-ink-2">You cashed out</span>
+        <span className="text-3xl font-bold tabular-nums text-ink">{multiplier.toFixed(2)}x</span>
+        <span className="text-base font-semibold tabular-nums text-brand">
+          Won {amount.toLocaleString()} {currency}
         </span>
       </div>
     </div>

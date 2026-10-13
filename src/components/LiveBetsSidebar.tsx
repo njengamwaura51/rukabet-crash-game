@@ -35,26 +35,29 @@ function getOddsBadgeColor(v: number): string {
   return '#ec4899'
 }
 
-// User avatar with initial, custom color, or image URL
+// User avatar: initial, custom colour, or image URL
 function UserAvatar({ name, isUser, color }: { name: string; isUser?: boolean; color?: string }) {
   if (color && (color.startsWith('http') || color.startsWith('/'))) {
-    return (
-      <img src={color} alt={name} className="w-6 h-6 rounded-full flex-shrink-0 bg-white/10" />
-    )
+    return <img src={color} alt="" className="size-6 shrink-0 rounded-full bg-raised" />
   }
-
-  const bgStyle = isUser
-    ? 'bg-gradient-to-br from-[#00D455] to-[#00A83D] shadow-sm shadow-[#00C74D]/20'
-    : (!color ? 'bg-white/[0.08]' : '')
 
   return (
     <div
-      className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${bgStyle}`}
-      style={!isUser && color ? { backgroundColor: color } : undefined}
+      className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+        isUser ? 'bg-brand text-brand-ink' : 'bg-raised text-ink-2'
+      }`}
+      style={!isUser && color ? { backgroundColor: color, color: '#fff' } : undefined}
     >
-      <span className={`text-[9px] font-black ${isUser ? 'text-black' : 'text-white/90'}`}>
-        {name.charAt(0).toUpperCase()}
-      </span>
+      <span className="text-[11px] font-semibold">{name.charAt(0).toUpperCase()}</span>
+    </div>
+  )
+}
+
+function EmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="flex h-32 flex-col items-center justify-center px-4 text-center">
+      <span className="text-sm font-medium text-ink-2">{title}</span>
+      <span className="mt-1 text-xs text-ink-3">{hint}</span>
     </div>
   )
 }
@@ -92,110 +95,76 @@ export function LiveBetsSidebar({
   // Count of total bets
   const betCount = liveRows.length
 
-  // Render a single bet pill
+  const ROW = 'flex items-center gap-2 border-b border-line/70 px-3 py-2 text-[13px] last:border-b-0'
+
+  // Render a single bet row
   const renderBetPill = (row: LiveBet, index: number) => {
     const hasWon = row.cashout !== null
     const badgeColor = hasWon ? getOddsBadgeColor(row.cashout!) : null
-    
+
     return (
       <div
         key={`${row.id}-${index}`}
-        className={`mx-1.5 mb-1 rounded-xl px-2.5 py-1.5 flex items-center transition-all text-[11px] ${
-          hasWon 
-            ? 'bg-gradient-to-r from-[#00C74D]/15 to-[#00C74D]/5 border border-[#00C74D]/30' 
-            : 'bg-white/[0.03] border border-white/[0.04] hover:border-white/[0.08]'
-        } ${row.isUser ? 'border-[#00C74D]/60 shadow-lg shadow-[#00C74D]/10' : ''}`}
+        className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''} ${row.isUser ? 'border-l-2 border-l-brand' : ''}`}
       >
-        {/* Left: Avatar + Name */}
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <UserAvatar name={row.user} isUser={row.isUser} color={row.avatar} />
-          <span className={`font-bold truncate ${row.isUser ? 'text-[#00C74D]' : 'text-white/70'}`}>
-            {row.user}
-          </span>
+          <span className={`truncate font-medium ${row.isUser ? 'text-brand' : 'text-ink'}`}>{row.user}</span>
         </div>
-        
-        {/* Center: Bet amount */}
-        <div className="flex items-center px-2">
-          <span className="text-white/50 font-mono font-bold">
-            {row.bet.toLocaleString()}
-          </span>
-        </div>
-        
-        {/* Right: Multiplier + Win */}
-        <div className="flex items-center gap-1.5 min-w-[70px] justify-end">
+
+        <span className="shrink-0 tabular-nums text-ink-2">{row.bet.toLocaleString()}</span>
+
+        <div className="flex min-w-[6.5rem] shrink-0 items-center justify-end gap-2">
           {hasWon && badgeColor ? (
             <>
               <span
-                className="rounded-md px-1.5 py-0.5 text-[9px] font-black"
+                className="rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums"
                 style={{ backgroundColor: badgeColor, color: '#000' }}
               >
                 {row.cashout!.toFixed(2)}x
               </span>
-              <span className="font-mono font-black text-[#00C74D] text-[10px]">
-                {row.won?.toLocaleString()}
-              </span>
+              <span className="font-semibold tabular-nums text-brand">{row.won?.toLocaleString()}</span>
             </>
           ) : (
-            <span className="text-white/15 font-medium">—</span>
+            <span className="text-ink-3">–</span>
           )}
         </div>
       </div>
     )
   }
 
-  // Render user bet history as pills
+  // Render the signed-in user's bet history
   const renderUserBetHistory = () => {
     if (userBetHistory.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-32 text-white/30">
-          <svg className="w-10 h-10 mb-2 opacity-30" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H6v-2h6v2zm4-4H6v-2h10v2zm0-4H6V7h10v2z"/>
-          </svg>
-          <span className="text-xs font-bold">No bets yet</span>
-          <span className="text-[10px] text-white/20 mt-1">Place a bet to see history</span>
-        </div>
-      )
+      return <EmptyState title="No bets yet" hint="Your bets will show up here" />
     }
 
     return (
-      <div className="py-1">
+      <div>
         {userBetHistory.map((bet, index) => {
           const hasWon = bet.cashoutMultiplier !== null
-          const badgeColor = hasWon ? getOddsBadgeColor(bet.cashoutMultiplier!) : '#ef4444'
-          
+          const badgeColor = hasWon ? getOddsBadgeColor(bet.cashoutMultiplier!) : '#ff5c6c'
+
           return (
-            <div
-              key={`${bet.id}-${index}`}
-              className={`mx-1.5 mb-1 rounded-xl px-2.5 py-1.5 flex items-center justify-between transition-all text-[11px] ${
-                hasWon 
-                  ? 'bg-gradient-to-r from-[#00C74D]/15 to-[#00C74D]/5 border border-[#00C74D]/30' 
-                  : 'bg-gradient-to-r from-red-500/10 to-red-500/5 border border-red-500/20'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <div key={`${bet.id}-${index}`} className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''}`}>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <UserAvatar name={username} isUser />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-[#00C74D]">{username}</span>
-                  {bet.isFreebet && (
-                    <span className="text-[8px] text-[#FBBF24] font-bold">FREEBET</span>
-                  )}
+                <div className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate font-medium text-brand">{username}</span>
+                  {bet.isFreebet && <span className="text-[11px] font-medium text-bonus">Freebet</span>}
                 </div>
               </div>
-              
-              <div className="flex items-center px-2">
-                <span className="text-white/50 font-mono font-bold">
-                  {bet.amount.toLocaleString()}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-1.5 min-w-[70px] justify-end">
+
+              <span className="shrink-0 tabular-nums text-ink-2">{bet.amount.toLocaleString()}</span>
+
+              <div className="flex min-w-[6.5rem] shrink-0 items-center justify-end gap-2">
                 <span
-                  className="rounded-md px-1.5 py-0.5 text-[9px] font-black"
+                  className="rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums"
                   style={{ backgroundColor: badgeColor, color: '#000' }}
                 >
-                  {hasWon ? `${bet.cashoutMultiplier!.toFixed(2)}x` : 'LOST'}
+                  {hasWon ? `${bet.cashoutMultiplier!.toFixed(2)}x` : 'Lost'}
                 </span>
-                <span className={`font-mono font-black text-[10px] ${hasWon ? 'text-[#00C74D]' : 'text-red-400'}`}>
+                <span className={`font-semibold tabular-nums ${hasWon ? 'text-brand' : 'text-loss'}`}>
                   {hasWon ? `+${bet.won?.toLocaleString()}` : `-${bet.amount.toLocaleString()}`}
                 </span>
               </div>
@@ -206,102 +175,61 @@ export function LiveBetsSidebar({
     )
   }
 
-  const renderTopWins = () => {
-    return (
-      <div className="flex flex-col items-center justify-center h-32 text-white/25">
-        <svg className="w-10 h-10 mb-2 opacity-25" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-        </svg>
-        <span className="text-xs font-bold">Top wins coming soon</span>
-        <span className="text-[10px] text-white/15 mt-1">Play to see the leaderboard</span>
-      </div>
-    )
-  }
+  const renderTopWins = () => (
+    <EmptyState title="Top wins are coming soon" hint="The leaderboard will appear here" />
+  )
+
+  const tabs: { id: SidebarTab; label: string }[] = [
+    { id: 'live', label: 'All bets' },
+    { id: 'mine', label: 'My bets' },
+    { id: 'top', label: 'Top wins' },
+  ]
 
   return (
-    <div className={`flex flex-col h-full min-h-0 w-full overflow-hidden ${variant === 'sidebar' ? 'p-1.5' : 'p-1.5 border-t border-white/[0.04]'}`}
-      style={{ background: '#0b0e11' }}
-    >
-      <div className="flex flex-col flex-1 h-full max-h-full min-h-0 bg-[#151920]/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/[0.06]">
-        
-        {/* Pill-shaped tabs with bet count */}
-        <div className="flex-shrink-0 p-2.5 pb-1.5">
-          <div className="flex bg-white/[0.04] rounded-xl p-0.5 border border-white/[0.04]">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-line bg-panel">
+      {/* Tabs */}
+      <div className="shrink-0 p-2">
+        <div role="tablist" aria-label="Bets" className="flex rounded-md bg-field p-0.5">
+          {tabs.map(t => (
             <button
+              key={t.id}
               type="button"
-              onClick={() => setTab('live')}
-              className={`flex-1 py-1.5 text-[10px] font-black tracking-wide rounded-lg transition-all duration-200 flex items-center justify-center gap-1 ${
-                tab === 'live'
-                  ? 'bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black shadow-sm shadow-[#00C74D]/20'
-                  : 'text-white/40 hover:text-white/60'
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded text-[13px] font-medium transition-colors ${
+                tab === t.id ? 'bg-raised text-ink' : 'text-ink-3 hover:text-ink-2'
               }`}
             >
-              ALL
-              {betCount > 0 && (
-                <span className={`text-[8px] rounded-full px-1.5 py-0.5 font-black ${
-                  tab === 'live' ? 'bg-black/20 text-black' : 'bg-white/10 text-white/40'
-                }`}>
-                  {betCount}
-                </span>
+              {t.label}
+              {t.id === 'live' && betCount > 0 && (
+                <span className="text-xs tabular-nums text-ink-3">{betCount}</span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => setTab('mine')}
-              className={`flex-1 py-1.5 text-[10px] font-black tracking-wide rounded-lg transition-all duration-200 ${
-                tab === 'mine'
-                  ? 'bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black shadow-sm shadow-[#00C74D]/20'
-                  : 'text-white/40 hover:text-white/60'
-              }`}
-            >
-              MINE
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('top')}
-              className={`flex-1 py-1.5 text-[10px] font-black tracking-wide rounded-lg transition-all duration-200 ${
-                tab === 'top'
-                  ? 'bg-gradient-to-b from-[#00D455] to-[#00A83D] text-black shadow-sm shadow-[#00C74D]/20'
-                  : 'text-white/40 hover:text-white/60'
-              }`}
-            >
-              TOP WINS
-            </button>
-          </div>
+          ))}
         </div>
+      </div>
 
-        {/* Column headers */}
-        <div className="flex-shrink-0 flex items-center px-4 py-1.5 text-[8px] font-black uppercase tracking-wider text-white/25 border-b border-white/[0.04]">
-          <span className="flex-1">Player</span>
-          <span className="px-2">Bet</span>
-          <span className="min-w-[70px] text-right">Multiplier / Win</span>
-        </div>
+      {/* Column headers */}
+      <div className="flex shrink-0 items-center gap-2 border-y border-line px-3 py-1.5 text-xs text-ink-3">
+        <span className="flex-1">Player</span>
+        <span>Bet</span>
+        <span className="min-w-[6.5rem] text-right">Cash out</span>
+      </div>
 
-        {/* Bet pills list - scrollable */}
-        <div className="flex-1 min-h-0 w-full overflow-y-auto live-bets-scroll scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent py-1">
-          {tab === 'live' && (
-            liveRows.length > 0
-              ? liveRows.map((row, index) => renderBetPill(row, index))
-              : (
-                <div className="flex flex-col items-center justify-center h-32 text-white/25">
-                  <svg className="w-10 h-10 mb-2 opacity-25" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  </svg>
-                  <span className="text-xs font-bold">Waiting for bets</span>
-                  <span className="text-[10px] text-white/15 mt-1">Place a bet to get started</span>
-                </div>
-              )
-          )}
-          {tab === 'mine' && renderUserBetHistory()}
-          {tab === 'top' && renderTopWins()}
-        </div>
+      {/* Rows */}
+      <div role="tabpanel" className="live-bets-scroll min-h-0 w-full flex-1 overflow-y-auto">
+        {tab === 'live' && (
+          liveRows.length > 0
+            ? liveRows.map((row, index) => renderBetPill(row, index))
+            : <EmptyState title="Waiting for bets" hint="Place a bet to get started" />
+        )}
+        {tab === 'mine' && renderUserBetHistory()}
+        {tab === 'top' && renderTopWins()}
+      </div>
 
-        {/* Footer */}
-        <div className="flex-shrink-0 px-3 py-1.5 border-t border-white/[0.04]">
-          <div className="text-[8px] text-white/15 text-center font-bold tracking-wider">
-            Provably Fair
-          </div>
-        </div>
+      <div className="shrink-0 border-t border-line px-3 py-2 text-center text-xs text-ink-3">
+        Provably fair
       </div>
     </div>
   )

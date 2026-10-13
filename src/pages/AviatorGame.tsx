@@ -66,9 +66,8 @@ export default function AviatorGame() {
       onBalanceChange={handleBalanceChange}
       onCashoutSuccess={handleCashoutSuccess}
     >
-      <div className="min-h-screen bg-[#0b0e11] flex flex-col overflow-x-hidden">
-        {/* Header with dynamic wallet display */}
-        <Header 
+      <div className="flex min-h-dvh flex-col overflow-x-clip bg-page">
+        <Header
           user={auth.user}
           onLogin={auth.login}
           onRegister={auth.register}
@@ -77,27 +76,22 @@ export default function AviatorGame() {
           activeWallet={activeWallet}
         />
 
-        {/* Body: sidebar + main game - responsive layout */}
-        <div className="flex flex-col lg:flex-row lg:items-start w-full gap-1.5 sm:gap-2 p-1.5 sm:p-2 lg:px-2 lg:py-3">
-
-          {/* Left sidebar: live bets — desktop only (lg+) - constrained to main content height */}
-          <aside className="hidden lg:flex w-[300px] xl:w-[320px] flex-shrink-0 flex-col sticky top-0 max-h-[calc(100vh-60px)] overflow-hidden">
-            <LiveBetsSidebar 
-              phase={game.phase} 
+        <div className="flex w-full flex-1 flex-col gap-2 p-2 sm:p-3 lg:flex-row lg:items-start lg:gap-3">
+          {/* Live bets: side column on desktop */}
+          <aside className="sticky top-[4.25rem] hidden max-h-[calc(100dvh_-_5.5rem)] w-[300px] shrink-0 flex-col lg:flex xl:w-[340px]">
+            <LiveBetsSidebar
+              phase={game.phase}
               multiplier={game.multiplier}
               username={auth.user?.username}
               sharedBets={allLiveBets}
             />
           </aside>
 
-          {/* Main column: history + canvas + bet panels */}
-          <main className="flex flex-col flex-1 min-w-0 w-full gap-1.5 sm:gap-2 max-w-full">
-
-            {/* Multiplier history bar */}
+          <main className="flex w-full min-w-0 max-w-full flex-1 flex-col gap-2">
             <RoundHistory history={game.roundHistory} />
 
-            {/* Game canvas - constrained height on all screen sizes */}
-            <div className="flex-shrink-0 h-[220px] sm:h-[260px] md:h-[300px] lg:h-[330px] xl:h-[370px] relative w-full max-w-full">
+            {/* Game canvas */}
+            <div className="relative h-[clamp(200px,32dvh,380px)] w-full shrink-0 overflow-hidden rounded-lg border border-line">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}
@@ -110,8 +104,7 @@ export default function AviatorGame() {
                 freebetLocked={freebetLocked}
                 freebetAmount={displayFreebet}
               />
-              
-              {/* Cashout popup overlay */}
+
               {cashoutPopup && (
                 <CashoutPopup
                   multiplier={cashoutPopup.multiplier}
@@ -121,13 +114,13 @@ export default function AviatorGame() {
               )}
             </div>
 
-            {/* Bet panels — stacked on mobile, side by side on xl+ */}
-            <div className="flex-shrink-0 flex flex-col xl:flex-row w-full gap-2 max-w-full">
+            {/* Bet panels: stacked on phones, side by side on xl */}
+            <div className="flex w-full max-w-full shrink-0 flex-col gap-2 xl:flex-row">
               <div className="w-full max-w-full">
-                <BetPanel 
+                <BetPanel
                   panelId={1}
-                  defaultAmount={25} 
-                  currency="KSH" 
+                  defaultAmount={25}
+                  currency="KSH"
                   gamePhase={game.phase}
                   currentMultiplier={game.multiplier}
                   isLoggedIn={auth.isLoggedIn}
@@ -139,9 +132,9 @@ export default function AviatorGame() {
                 />
               </div>
               <div className="w-full max-w-full">
-                <BetPanel 
+                <BetPanel
                   panelId={2}
-                  defaultAmount={18} 
+                  defaultAmount={18}
                   currency="KSH"
                   gamePhase={game.phase}
                   currentMultiplier={game.multiplier}
@@ -155,16 +148,20 @@ export default function AviatorGame() {
               </div>
             </div>
 
-            {/* Live bets — mobile/tablet only (below lg), at bottom */}
-            <div className="lg:hidden w-full max-w-full max-h-[400px] flex flex-col">
-              <LiveBetsSidebar 
-                phase={game.phase} 
-                variant="bottom" 
+            {/* Live bets: below the panels on phones and tablets */}
+            <div className="flex h-[min(26rem,60dvh)] w-full max-w-full flex-col lg:hidden">
+              <LiveBetsSidebar
+                phase={game.phase}
+                variant="bottom"
                 multiplier={game.multiplier}
                 username={auth.user?.username}
                 sharedBets={allLiveBets}
               />
             </div>
+
+            <p className="px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 text-center text-xs text-ink-3">
+              18+ only. Betting involves risk, so only play with money you can afford to lose.
+            </p>
           </main>
         </div>
       </div>
