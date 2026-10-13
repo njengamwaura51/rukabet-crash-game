@@ -505,9 +505,13 @@ function BetModeToggle({
   freebetLocked?: boolean
   freebetAmount?: number
 }) {
-  const base = 'h-8 rounded px-3 text-xs font-semibold transition-colors'
+  const base = 'h-7 rounded px-2.5 text-[11px] font-semibold transition-colors'
   return (
-    <div role="group" aria-label="Bet wallet" className="flex rounded-md border border-line bg-page p-0.5">
+    <div
+      role="group"
+      aria-label="Bet wallet"
+      className="flex origin-top-left scale-[0.833] rounded-md border border-line bg-page/90 p-0.5 shadow-sm backdrop-blur"
+    >
       <button
         type="button"
         aria-pressed={betMode === 'money'}

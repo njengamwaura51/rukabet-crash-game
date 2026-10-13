@@ -76,9 +76,9 @@ export default function AviatorGame() {
           activeWallet={activeWallet}
         />
 
-        <div className="flex w-full flex-1 flex-col gap-2 p-2 sm:p-3 lg:flex-row lg:items-stretch lg:gap-3">
+        <div className="flex w-full flex-1 flex-col gap-2 p-2 sm:p-3 lg:flex-row lg:items-stretch lg:gap-3 lg:h-[calc(100dvh_-_4.75rem)] lg:max-h-[calc(100dvh_-_4.75rem)] lg:overflow-hidden">
           {/* Live bets: side column on desktop */}
-          <aside className="sticky top-[4.25rem] hidden h-[calc(100dvh_-_5.5rem)] max-h-[calc(100dvh_-_5.5rem)] w-[300px] shrink-0 flex-col lg:flex xl:w-[340px]">
+          <aside className="hidden h-full max-h-full w-[280px] shrink-0 flex-col overflow-hidden lg:flex xl:w-[320px]">
             <LiveBetsSidebar
               phase={game.phase}
               multiplier={game.multiplier}
@@ -87,13 +87,13 @@ export default function AviatorGame() {
             />
           </aside>
 
-          <main className="flex w-full min-w-0 max-w-full flex-1 flex-col gap-2 lg:h-[calc(100dvh_-_5.5rem)] lg:justify-between">
+          <main className="flex h-full max-h-full w-full min-w-0 max-w-full flex-1 flex-col justify-between gap-2 overflow-hidden">
             <div className="shrink-0">
               <RoundHistory history={game.roundHistory} />
             </div>
 
-            {/* Game canvas - flexible and expansive on desktop */}
-            <div className="relative h-[clamp(200px,34dvh,380px)] w-full shrink-0 overflow-hidden rounded-lg border border-line lg:h-auto lg:min-h-[380px] lg:flex-1 xl:min-h-[440px]">
+            {/* Game canvas - flexible and expansive on desktop, fits remaining vertical space */}
+            <div className="relative h-[clamp(200px,32dvh,340px)] w-full shrink-0 overflow-hidden rounded-lg border border-line lg:h-auto lg:min-h-0 lg:flex-1">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}
@@ -116,9 +116,9 @@ export default function AviatorGame() {
               )}
             </div>
 
-            {/* Bet panels: stacked on phones, side by side on xl */}
-            <div className="flex w-full max-w-full shrink-0 flex-col gap-2 xl:flex-row">
-              <div className="w-full max-w-full">
+            {/* Bet panels: side by side on desktop (lg+), stacked on phones */}
+            <div className="grid w-full shrink-0 grid-cols-1 gap-2 lg:grid-cols-2">
+              <div className="w-full min-w-0">
                 <BetPanel
                   panelId={1}
                   defaultAmount={25}
@@ -133,7 +133,7 @@ export default function AviatorGame() {
                   onAutoBetToggle={setAutoBetPanel1}
                 />
               </div>
-              <div className="w-full max-w-full">
+              <div className="w-full min-w-0">
                 <BetPanel
                   panelId={2}
                   defaultAmount={18}
@@ -161,7 +161,7 @@ export default function AviatorGame() {
               />
             </div>
 
-            <p className="shrink-0 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 text-center text-xs text-ink-3">
+            <p className="shrink-0 px-1 pt-0.5 text-center text-[10px] text-ink-3">
               18+ only. Betting involves risk, so only play with money you can afford to lose.
             </p>
           </main>
