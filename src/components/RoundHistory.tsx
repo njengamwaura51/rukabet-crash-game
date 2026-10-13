@@ -40,8 +40,8 @@ export function RoundHistory({ history }: RoundHistoryProps) {
     }
   }, [isOpen])
 
-  // Past 10 rounds odds in reverse chronological order (most recent first)
-  const past10 = [...history].reverse().slice(0, 10)
+  // Past 20 rounds odds in reverse chronological order (most recent first)
+  const past20 = [...history].reverse().slice(0, 20)
 
   return (
     <div
@@ -75,7 +75,7 @@ export function RoundHistory({ history }: RoundHistoryProps) {
           className={`flex shrink-0 items-center gap-1 rounded-md border border-line bg-field px-2 py-1 text-xs font-medium transition-colors ${
             isOpen ? 'border-brand/40 bg-raised text-brand' : 'text-ink-2 hover:bg-raised hover:text-ink'
           }`}
-          title="Past 10 rounds history"
+          title="Past 20 rounds history"
           aria-expanded={isOpen}
         >
           <History className="size-3.5" />
@@ -83,14 +83,14 @@ export function RoundHistory({ history }: RoundHistoryProps) {
         </button>
       </div>
 
-      {/* Dropdown preview of past 10 rounds */}
+      {/* Dropdown preview of past 20 rounds - compact solid design without glassmorphism or ash numbers */}
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-72 sm:w-80 rounded-xl border border-line bg-panel p-3 shadow-2xl backdrop-blur">
-          <div className="mb-2.5 flex items-center justify-between border-b border-line pb-2">
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-72 sm:w-80 md:w-96 rounded-lg border border-line bg-panel p-2.5 shadow-xl">
+          <div className="mb-2 flex items-center justify-between border-b border-line pb-1.5">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold uppercase tracking-wider text-ink">Round History</span>
               <span className="rounded bg-raised px-1.5 py-0.5 text-[10px] font-semibold text-brand">
-                Past 10
+                Last 20
               </span>
             </div>
             <button
@@ -103,16 +103,15 @@ export function RoundHistory({ history }: RoundHistoryProps) {
             </button>
           </div>
 
-          {past10.length === 0 ? (
-            <p className="py-4 text-center text-xs text-ink-3">No rounds recorded yet</p>
+          {past20.length === 0 ? (
+            <p className="py-3 text-center text-xs text-ink-3">No rounds recorded yet</p>
           ) : (
-            <div className="grid grid-cols-5 gap-1.5">
-              {past10.map((v, i) => (
+            <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
+              {past20.map((v, i) => (
                 <div
                   key={i}
-                  className="flex flex-col items-center justify-center rounded-lg border border-line/60 bg-field p-1.5 text-center transition-transform hover:scale-105"
+                  className="flex items-center justify-center rounded border border-line bg-field px-1.5 py-1 text-center transition-colors hover:bg-raised"
                 >
-                  <span className="text-[9px] font-medium text-ink-3">#{i + 1}</span>
                   <span
                     className="text-xs font-bold tabular-nums"
                     style={{ color: tierColor(v) }}

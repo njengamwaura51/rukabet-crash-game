@@ -229,7 +229,7 @@ export function LiveBetsSidebar({
       </div>
 
       <div className="shrink-0 border-t border-line px-3 py-2 text-center text-xs text-ink-3">
-        Provably fair
+        Provably fair • 18+ Play responsibly
       </div>
     </div>
   )

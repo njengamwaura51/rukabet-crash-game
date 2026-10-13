@@ -78,7 +78,7 @@ export default function AviatorGame() {
 
         <div className="flex w-full flex-1 flex-col gap-2 p-2 sm:p-3 lg:flex-row lg:items-start lg:gap-3">
           {/* Live bets: side column on desktop */}
-          <aside className="sticky top-[4.25rem] hidden max-h-[calc(100dvh_-_5.5rem)] w-[300px] shrink-0 flex-col lg:flex xl:w-[340px]">
+          <aside className="sticky top-[4.25rem] hidden h-[calc(100dvh_-_5.5rem)] max-h-[calc(100dvh_-_5.5rem)] w-[300px] shrink-0 flex-col lg:flex xl:w-[340px]">
             <LiveBetsSidebar
               phase={game.phase}
               multiplier={game.multiplier}
@@ -90,8 +90,8 @@ export default function AviatorGame() {
           <main className="flex w-full min-w-0 max-w-full flex-1 flex-col gap-2">
             <RoundHistory history={game.roundHistory} />
 
-            {/* Game canvas - exact original stable clamp height */}
-            <div className="relative h-[clamp(200px,32dvh,380px)] w-full shrink-0 overflow-hidden rounded-lg border border-line">
+            {/* Game canvas - expanded on desktop to push bet panels down and align bottom edges horizontally with left sidebar */}
+            <div className="relative h-[clamp(200px,32dvh,380px)] lg:h-[calc(100dvh_-_19.25rem)] lg:min-h-[320px] w-full shrink-0 overflow-hidden rounded-lg border border-line">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}
@@ -159,7 +159,7 @@ export default function AviatorGame() {
               />
             </div>
 
-            <p className="px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 text-center text-xs text-ink-3">
+            <p className="px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 text-center text-xs text-ink-3 lg:hidden">
               18+ only. Betting involves risk, so only play with money you can afford to lose.
             </p>
           </main>
