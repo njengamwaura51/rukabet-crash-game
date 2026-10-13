@@ -827,17 +827,15 @@ export function GameCanvas({
     <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ display: 'block' }} />
 
-      {/* Top-left: wallet toggle + connection status */}
-      <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-2 sm:left-3 sm:top-3">
+      {/* Top bar: wallet toggle + connection status moved right to avoid blocking Y-axis (at x=18px) */}
+      <div className="absolute left-12 top-2 z-10 flex items-center gap-2 sm:left-14 sm:top-2.5">
         <BetModeToggle
           betMode={betMode}
           onToggle={onToggleBetMode}
           freebetLocked={freebetLocked}
           freebetAmount={freebetAmount}
         />
-        <div className="pl-1">
-          <NetworkStatus />
-        </div>
+        <NetworkStatus />
       </div>
 
       {/* Waiting for the next round */}
