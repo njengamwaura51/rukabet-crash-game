@@ -38,17 +38,17 @@ function getOddsBadgeColor(v: number): string {
 // User avatar: initial, custom colour, or image URL
 function UserAvatar({ name, isUser, color }: { name: string; isUser?: boolean; color?: string }) {
   if (color && (color.startsWith('http') || color.startsWith('/'))) {
-    return <img src={color} alt="" className="size-6 shrink-0 rounded-full bg-raised" />
+    return <img src={color} alt="" className="size-5 shrink-0 rounded-full bg-raised" />
   }
 
   return (
     <div
-      className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+      className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
         isUser ? 'bg-brand text-brand-ink' : 'bg-raised text-ink-2'
       }`}
       style={!isUser && color ? { backgroundColor: color, color: '#fff' } : undefined}
     >
-      <span className="text-[11px] font-semibold">{name.charAt(0).toUpperCase()}</span>
+      <span className="text-[10px] font-semibold">{name.charAt(0).toUpperCase()}</span>
     </div>
   )
 }
@@ -95,7 +95,7 @@ export function LiveBetsSidebar({
   // Count of total bets
   const betCount = liveRows.length
 
-  const ROW = 'flex items-center gap-2 border-b border-line/70 px-3 py-2 text-[13px] last:border-b-0'
+  const ROW = 'grid grid-cols-[minmax(0,1fr)_48px_44px_54px] items-center gap-1.5 border-b border-line/70 px-2.5 py-1.5 text-xs last:border-b-0'
 
   // Render a single bet row
   const renderBetPill = (row: LiveBet, index: number) => {
@@ -107,26 +107,37 @@ export function LiveBetsSidebar({
         key={`${row.id}-${index}`}
         className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''} ${row.isUser ? 'border-l-2 border-l-brand' : ''}`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/* Col 1: Player */}
+        <div className="flex min-w-0 items-center gap-1.5">
           <UserAvatar name={row.user} isUser={row.isUser} color={row.avatar} />
           <span className={`truncate font-medium ${row.isUser ? 'text-brand' : 'text-ink'}`}>{row.user}</span>
         </div>
 
-        <span className="shrink-0 tabular-nums text-ink-2">{row.bet.toLocaleString()}</span>
+        {/* Col 2: Bet Amount (locked vertical alignment) */}
+        <span className="text-right tabular-nums text-ink-2 truncate">{row.bet.toLocaleString()}</span>
 
-        <div className="flex min-w-[6.5rem] shrink-0 items-center justify-end gap-2">
+        {/* Col 3: Multiplier Badge (locked vertical alignment) */}
+        <div className="flex items-center justify-center">
           {hasWon && badgeColor ? (
-            <>
-              <span
-                className="rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums"
-                style={{ backgroundColor: badgeColor, color: '#000' }}
-              >
-                {row.cashout!.toFixed(2)}x
-              </span>
-              <span className="font-semibold tabular-nums text-brand">{row.won?.toLocaleString()}</span>
-            </>
+            <span
+              className="inline-block w-full text-center rounded px-1 py-0.5 text-[10px] font-bold tabular-nums leading-none"
+              style={{ backgroundColor: badgeColor, color: '#000' }}
+            >
+              {row.cashout!.toFixed(2)}x
+            </span>
           ) : (
-            <span className="text-ink-3">–</span>
+            <span className="text-ink-3 text-xs">–</span>
+          )}
+        </div>
+
+        {/* Col 4: Cash Out / Won Amount (locked vertical alignment) */}
+        <div className="text-right truncate">
+          {hasWon ? (
+            <span className="font-semibold tabular-nums text-brand truncate">
+              {row.won?.toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-ink-3 text-xs">–</span>
           )}
         </div>
       </div>
@@ -147,24 +158,37 @@ export function LiveBetsSidebar({
 
           return (
             <div key={`${bet.id}-${index}`} className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''}`}>
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+              {/* Col 1: Player */}
+              <div className="flex min-w-0 items-center gap-1.5">
                 <UserAvatar name={username} isUser />
                 <div className="flex min-w-0 flex-col leading-tight">
                   <span className="truncate font-medium text-brand">{username}</span>
-                  {bet.isFreebet && <span className="text-[11px] font-medium text-bonus">Freebet</span>}
+                  {bet.isFreebet && <span className="text-[10px] font-medium text-bonus">Freebet</span>}
                 </div>
               </div>
 
-              <span className="shrink-0 tabular-nums text-ink-2">{bet.amount.toLocaleString()}</span>
+              {/* Col 2: Bet Amount */}
+              <span className="text-right tabular-nums text-ink-2 truncate">{bet.amount.toLocaleString()}</span>
 
-              <div className="flex min-w-[6.5rem] shrink-0 items-center justify-end gap-2">
-                <span
-                  className="rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums"
-                  style={{ backgroundColor: badgeColor, color: '#000' }}
-                >
-                  {hasWon ? `${bet.cashoutMultiplier!.toFixed(2)}x` : 'Lost'}
-                </span>
-                <span className={`font-semibold tabular-nums ${hasWon ? 'text-brand' : 'text-loss'}`}>
+              {/* Col 3: Multiplier / Status Badge */}
+              <div className="flex items-center justify-center">
+                {hasWon ? (
+                  <span
+                    className="inline-block w-full text-center rounded px-1 py-0.5 text-[10px] font-bold tabular-nums leading-none"
+                    style={{ backgroundColor: badgeColor, color: '#000' }}
+                  >
+                    {bet.cashoutMultiplier!.toFixed(2)}x
+                  </span>
+                ) : (
+                  <span className="inline-block w-full text-center rounded bg-field text-ink-3 px-1 py-0.5 text-[10px] font-semibold leading-none">
+                    Lost
+                  </span>
+                )}
+              </div>
+
+              {/* Col 4: Won / Lost Amount */}
+              <div className="text-right truncate">
+                <span className={`font-semibold tabular-nums ${hasWon ? 'text-brand' : 'text-loss'} truncate`}>
                   {hasWon ? `+${bet.won?.toLocaleString()}` : `-${bet.amount.toLocaleString()}`}
                 </span>
               </div>
@@ -211,10 +235,11 @@ export function LiveBetsSidebar({
       </div>
 
       {/* Column headers */}
-      <div className="flex shrink-0 items-center gap-2 border-y border-line px-3 py-1.5 text-xs text-ink-3">
-        <span className="flex-1">Player</span>
-        <span>Bet</span>
-        <span className="min-w-[6.5rem] text-right">Cash out</span>
+      <div className="grid grid-cols-[minmax(0,1fr)_48px_44px_54px] items-center gap-1.5 border-y border-line px-2.5 py-1.5 text-[11px] font-medium text-ink-3">
+        <span>Player</span>
+        <span className="text-right">Bet</span>
+        <span className="text-center">X</span>
+        <span className="text-right">Cash out</span>
       </div>
 
       {/* Rows */}
