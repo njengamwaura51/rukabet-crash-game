@@ -34,7 +34,18 @@ import { initiateDeposit } from './controllers/depositController.js'
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js'
 import { intasendWebhook } from './controllers/webhookController.js'
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js'
-import { getAdminOverview, adminLogin } from './controllers/adminController.js'
+import { 
+  getAdminOverview, 
+  adminLogin,
+  getAdminUsers,
+  getAdminUserDetail,
+  adjustUserBalance,
+  adjustUserFreebet,
+  toggleUserFreeze,
+  resetUserPassword,
+  getAdminWithdrawals,
+  updateWithdrawalStatus
+} from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
 
@@ -100,6 +111,18 @@ app.get('/api/admin/settings', adminRateLimit, adminMiddleware, getSettings)
 app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings)
 app.put('/api/admin/settings', adminRateLimit, adminMiddleware, updateSettings)
 app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview)
+
+// Advanced admin user tracking & operations
+app.get('/api/admin/users', adminRateLimit, adminMiddleware, getAdminUsers)
+app.get('/api/admin/users/:id', adminRateLimit, adminMiddleware, getAdminUserDetail)
+app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware, adjustUserBalance)
+app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet)
+app.post('/api/admin/users/:id/toggle-freeze', adminRateLimit, adminMiddleware, toggleUserFreeze)
+app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware, resetUserPassword)
+
+// Admin withdrawal management
+app.get('/api/admin/withdrawals', adminRateLimit, adminMiddleware, getAdminWithdrawals)
+app.post('/api/admin/withdrawals/:id/status', adminRateLimit, adminMiddleware, updateWithdrawalStatus)
 
 // Catch-all 404 for unhandled API requests
 app.all('/api/{*splat}', (req, res) => {

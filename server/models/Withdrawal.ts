@@ -4,7 +4,7 @@ export interface IWithdrawal extends Document {
   userId: mongoose.Types.ObjectId
   phone: string
   amount: number
-  status: 'pending' | 'completed' | 'failed'
+  status: 'pending' | 'completed' | 'failed' | 'rejected'
   createdAt: Date
   updatedAt: Date
 }
@@ -27,7 +27,7 @@ const WithdrawalSchema = new Schema<IWithdrawal>({
   },
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed'],
+    enum: ['pending', 'completed', 'failed', 'rejected'],
     default: 'pending'
   }
 }, {

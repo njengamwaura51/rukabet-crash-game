@@ -33,16 +33,16 @@ export async function getSettings(req: Request, res: Response) {
 
     const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY)
     const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY)
-    const effectivePubKey = envPubKey || settings.intasendPublicKey || ''
-    const hasSecret = !!(envSecKey || settings.intasendSecretKey)
+    const effectivePubKey = settings.intasendPublicKey || envPubKey || ''
+    const hasSecret = !!(settings.intasendSecretKey || envSecKey)
 
-    // Never send secret key to frontend
+    // Never send full secret key to frontend
     return res.json({
       success: true,
       settings: {
         intasendPublicKey: effectivePubKey,
         isSecretConfigured: hasSecret,
-        isManagedViaEnv: !!(envPubKey && envSecKey),
+        isManagedViaAdmin: !!(settings.intasendPublicKey || settings.intasendSecretKey),
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,
         minDeposit: settings.minDeposit,
@@ -94,14 +94,16 @@ export async function updateSettings(req: Request, res: Response) {
 
     const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY)
     const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY)
+    const effectivePubKey = settings.intasendPublicKey || envPubKey || ''
+    const hasSecret = !!(settings.intasendSecretKey || envSecKey)
 
     return res.json({
       success: true,
       message: 'Settings updated successfully',
       settings: {
-        intasendPublicKey: envPubKey || settings.intasendPublicKey || '',
-        isSecretConfigured: !!(envSecKey || settings.intasendSecretKey),
-        isManagedViaEnv: !!(envPubKey && envSecKey),
+        intasendPublicKey: effectivePubKey,
+        isSecretConfigured: hasSecret,
+        isManagedViaAdmin: true,
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,
         minDeposit: settings.minDeposit,

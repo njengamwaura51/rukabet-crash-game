@@ -53,6 +53,10 @@ const UserSchema = new mongoose.Schema({
   wagerRequired: {
     type: Number,
     default: 0
+  },
+  isFrozen: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true,

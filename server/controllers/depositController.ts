@@ -37,10 +37,10 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: 'Invalid phone number' })
     }
 
-    // Get IntaSend config from environment first, with database settings as fallback
+    // Get IntaSend config from admin database settings first, falling back to env if not set
     const settings = await Settings.findOne()
-    const intasendPublicKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY) || sanitizeKey(settings?.intasendPublicKey)
-    const intasendSecretKey = sanitizeKey(process.env.INTASEND_SECRET_KEY) || sanitizeKey(settings?.intasendSecretKey)
+    const intasendPublicKey = sanitizeKey(settings?.intasendPublicKey) || sanitizeKey(process.env.INTASEND_PUBLIC_KEY)
+    const intasendSecretKey = sanitizeKey(settings?.intasendSecretKey) || sanitizeKey(process.env.INTASEND_SECRET_KEY)
 
     if (!intasendPublicKey || !intasendSecretKey) {
       return res.status(500).json({ error: 'Payment gateway not configured' })

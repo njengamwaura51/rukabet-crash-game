@@ -63,6 +63,10 @@ export async function login(req: Request, res: Response) {
       return res.status(401).json({ error: 'Invalid phone or password' })
     }
 
+    if ((user as any).isFrozen) {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' })
+    }
+
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })
 
     const userObj = user.toObject()

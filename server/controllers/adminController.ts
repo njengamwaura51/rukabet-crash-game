@@ -163,3 +163,248 @@ export async function getAdminOverview(req: Request, res: Response) {
     return res.status(500).json({ error: error.message })
   }
 }
+
+export async function getAdminUsers(req: Request, res: Response) {
+  try {
+    const { search, status, sortBy = 'createdAt', sortOrder = 'desc', page = '1', limit = '20' } = req.query
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1)
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 20))
+    const skip = (pageNum - 1) * limitNum
+
+    const query: any = {}
+    if (search && typeof search === 'string' && search.trim()) {
+      const cleanSearch = search.trim().replace(/^0/, '')
+      query.$or = [
+        { phone: { $regex: cleanSearch, $options: 'i' } },
+        { username: { $regex: search.trim(), $options: 'i' } }
+      ]
+    }
+    if (status === 'frozen') {
+      query.isFrozen = true
+    } else if (status === 'active') {
+      query.isFrozen = { $ne: true }
+    }
+
+    const sortObj: any = {}
+    sortObj[sortBy as string] = sortOrder === 'asc' ? 1 : -1
+
+    const [users, total] = await Promise.all([
+      User.find(query).sort(sortObj).skip(skip).limit(limitNum).select('-password'),
+      User.countDocuments(query)
+    ])
+
+    return res.json({
+      success: true,
+      users,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum)
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function getAdminUserDetail(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const user = await User.findById(id).select('-password')
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const [recentBets, recentDeposits, recentWithdrawals, betsAgg] = await Promise.all([
+      Bet.find({ userId: id }).sort({ createdAt: -1 }).limit(15),
+      Deposit.find({ userId: id }).sort({ createdAt: -1 }).limit(15),
+      Withdrawal.find({ userId: id }).sort({ createdAt: -1 }).limit(15),
+      Bet.aggregate([
+        { $match: { userId: user._id } },
+        { $group: {
+          _id: null,
+          totalBets: { $sum: 1 },
+          totalWagered: { $sum: '$amount' },
+          totalWon: { $sum: '$winAmount' }
+        }}
+      ])
+    ])
+
+    const stats = {
+      totalBets: betsAgg[0]?.totalBets || 0,
+      totalWagered: betsAgg[0]?.totalWagered || 0,
+      totalWon: betsAgg[0]?.totalWon || 0,
+      netProfitLoss: (betsAgg[0]?.totalWon || 0) - (betsAgg[0]?.totalWagered || 0)
+    }
+
+    return res.json({
+      success: true,
+      user,
+      stats,
+      recentBets,
+      recentDeposits,
+      recentWithdrawals
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function adjustUserBalance(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { amount, type } = req.body
+    const numAmount = Number(amount)
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Amount must be a positive number' })
+    }
+    if (type !== 'credit' && type !== 'debit') {
+      return res.status(400).json({ error: 'Type must be credit or debit' })
+    }
+
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    if (type === 'debit' && user.balance < numAmount) {
+      return res.status(400).json({ error: `Cannot debit KSH ${numAmount}. User balance is only KSH ${user.balance}` })
+    }
+
+    const delta = type === 'credit' ? numAmount : -numAmount
+    user.balance = Math.max(0, Math.round((user.balance + delta) * 100) / 100)
+    await user.save()
+
+    return res.json({
+      success: true,
+      message: `Successfully ${type}ed KSH ${numAmount}. New balance: KSH ${user.balance}`,
+      user: {
+        _id: user._id,
+        username: user.username,
+        phone: user.phone,
+        balance: user.balance
+      }
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function adjustUserFreebet(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { amount, freebetLocked } = req.body
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    if (amount !== undefined) {
+      const num = Number(amount)
+      if (Number.isFinite(num) && num >= 0) user.freebet = num
+    }
+    if (typeof freebetLocked === 'boolean') {
+      user.freebetLocked = freebetLocked
+    }
+    await user.save()
+
+    return res.json({
+      success: true,
+      message: 'Freebet updated successfully',
+      user: {
+        _id: user._id,
+        freebet: user.freebet,
+        freebetLocked: user.freebetLocked
+      }
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function toggleUserFreeze(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const currentFrozen = !!(user as any).isFrozen
+    ;(user as any).isFrozen = !currentFrozen
+    await user.save()
+
+    const statusMsg = !currentFrozen ? 'suspended' : 'activated'
+    return res.json({
+      success: true,
+      message: `User account has been ${statusMsg}`,
+      isFrozen: !currentFrozen
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function resetUserPassword(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { newPassword } = req.body
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters' })
+    }
+
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    user.password = newPassword
+    await user.save()
+
+    return res.json({
+      success: true,
+      message: `Password reset successfully for ${user.username}`
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function getAdminWithdrawals(req: Request, res: Response) {
+  try {
+    const { status = 'all' } = req.query
+    const query: any = {}
+    if (status && status !== 'all') {
+      query.status = status
+    }
+    const withdrawals = await Withdrawal.find(query)
+      .sort({ createdAt: -1 })
+      .limit(60)
+      .populate('userId', 'username phone balance')
+
+    return res.json({ success: true, withdrawals })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+export async function updateWithdrawalStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+    if (!['completed', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be completed or rejected' })
+    }
+
+    const withdrawal = await Withdrawal.findById(id)
+    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
+
+    // If rejecting a pending withdrawal, refund user's balance!
+    if (withdrawal.status === 'pending' && status === 'rejected') {
+      await User.findByIdAndUpdate(withdrawal.userId, {
+        $inc: { balance: withdrawal.amount }
+      })
+    }
+
+    withdrawal.status = status
+    await withdrawal.save()
+
+    return res.json({
+      success: true,
+      message: status === 'rejected' 
+        ? `Withdrawal of KSH ${withdrawal.amount} rejected and balance refunded to user`
+        : `Withdrawal marked as completed`,
+      withdrawal
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message })
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, Loader2, Lock, Receipt } from 'lucide-react'
 import { Modal } from './Modal'
 import { useConfig } from '@/hooks/useConfig'
@@ -29,13 +29,14 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
   const { config } = useConfig()
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
+  const [depositPhone, setDepositPhone] = useState(userPhone || '')
   const [isProcessing, setIsProcessing] = useState(false)
   const [withdrawPhone, setWithdrawPhone] = useState(userPhone || '')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [transactions, setTransactions] = useState<{ id: string; type: string; amount: number; date: string; status: string }[]>([])
-  const registeredPhone = normalizeToNineDigitPhone(userPhone)
+  const registeredPhone = normalizeToNineDigitPhone(depositPhone) || normalizeToNineDigitPhone(userPhone)
 
   // Fetch real transaction history when user opens the transactions tab
   useEffect(() => {
@@ -285,7 +286,21 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
             ))}
           </div>
 
-          <p className="mt-3 text-sm text-ink-3">An M-Pesa prompt will be sent to your registered number.</p>
+          <label htmlFor="deposit-phone" className="mb-1.5 mt-3 block text-sm font-medium text-ink-2">
+            M-Pesa Phone Number
+          </label>
+          <input
+            id="deposit-phone"
+            type="tel"
+            inputMode="numeric"
+            value={depositPhone}
+            onChange={e => setDepositPhone(e.target.value)}
+            placeholder="0712345678"
+            className="h-12 w-full rounded-md border border-line bg-field px-3 text-lg font-semibold tabular-nums text-ink placeholder:text-base placeholder:font-normal placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none disabled:opacity-60"
+            disabled={isProcessing}
+          />
+
+          <p className="mt-2 text-sm text-ink-3">An M-Pesa prompt will be sent to this number.</p>
 
           <button
             type="button"
