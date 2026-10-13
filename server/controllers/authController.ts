@@ -96,3 +96,36 @@ export async function getMe(req: AuthRequest, res: Response) {
     return res.status(500).json({ error: error.message })
   }
 }
+
+export async function changePassword(req: AuthRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' })
+    }
+
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' })
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters' })
+    }
+
+    if (!req.user.comparePassword(currentPassword)) {
+      return res.status(400).json({ error: 'Current password is incorrect' })
+    }
+
+    req.user.password = newPassword
+    await req.user.save()
+
+    return res.json({
+      success: true,
+      message: 'Password changed successfully'
+    })
+  } catch (error: any) {
+    console.error('Change password error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to update password' })
+  }
+}

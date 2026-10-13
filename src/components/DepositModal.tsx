@@ -30,9 +30,32 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [withdrawPhone, setWithdrawPhone] = useState(userPhone || '')
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
-  const [transactions] = useState<{ id: string; type: string; amount: number; date: string; status: string }[]>([])
+  const [transactions, setTransactions] = useState<{ id: string; type: string; amount: number; date: string; status: string }[]>([])
   const registeredPhone = normalizeToNineDigitPhone(userPhone)
+
+  // Fetch real transaction history when user opens the transactions tab
+  useEffect(() => {
+    if (tab !== 'transactions') return
+    const token = TOKEN_STORAGE_KEYS
+      .map(key => localStorage.getItem(key))
+      .find((value): value is string => !!value)
+    if (!token) return
+
+    fetch(`${config.apiBaseUrl}/api/user/transactions`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.transactions)) {
+          setTransactions(data.transactions)
+        }
+      })
+      .catch(err => console.error('Failed to load transactions:', err))
+  }, [tab, config.apiBaseUrl])
 
   const quickAmounts = [50, 100, 500, 1000]
 
@@ -102,6 +125,70 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
         message: error instanceof Error ? error.message : 'Payment failed. Please try again.' 
       })
       setIsProcessing(false)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    const withdrawAmt = parseFloat(withdrawAmount)
+    if (isNaN(withdrawAmt) || withdrawAmt < 50) {
+      setStatus({ type: 'error', message: 'Minimum withdrawal is KSH 50' })
+      return
+    }
+
+    if (withdrawAmt > balance) {
+      setStatus({ type: 'error', message: 'Insufficient account balance' })
+      return
+    }
+
+    const phoneToUse = withdrawPhone || userPhone
+    if (!phoneToUse) {
+      setStatus({ type: 'error', message: 'Please enter a valid M-Pesa phone number' })
+      return
+    }
+
+    setIsWithdrawing(true)
+    setStatus({ type: 'info', message: 'Submitting withdrawal request...' })
+
+    try {
+      const token = TOKEN_STORAGE_KEYS
+        .map(key => localStorage.getItem(key))
+        .find((value): value is string => !!value)
+      if (!token) {
+        setStatus({ type: 'error', message: 'Please login to withdraw' })
+        setIsWithdrawing(false)
+        return
+      }
+
+      const response = await fetch(`${config.apiBaseUrl}/api/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: withdrawAmt,
+          phone: phoneToUse
+        })
+      })
+
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
+        setStatus({
+          type: 'success',
+          message: data.message || `Withdrawal request of KSH ${withdrawAmt} submitted.`
+        })
+        setWithdrawAmount('')
+        onDeposit(-withdrawAmt)
+      } else {
+        setStatus({
+          type: 'error',
+          message: data?.error || 'Withdrawal request failed'
+        })
+      }
+    } catch {
+      setStatus({ type: 'error', message: 'Network error. Please try again.' })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -228,8 +315,11 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
             type="tel"
             inputMode="numeric"
             autoComplete="tel"
+            value={withdrawPhone}
+            onChange={e => setWithdrawPhone(e.target.value)}
             placeholder="0712345678"
             maxLength={10}
+            disabled={isWithdrawing}
             className="h-12 w-full rounded-md border border-line bg-field px-3 text-lg font-semibold tabular-nums text-ink placeholder:text-base placeholder:font-normal placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none disabled:opacity-60"
           />
 
@@ -240,17 +330,29 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
             id="withdraw-amount"
             type="number"
             inputMode="numeric"
+            value={withdrawAmount}
+            onChange={e => setWithdrawAmount(e.target.value)}
             placeholder="Minimum 50"
             min={50}
+            disabled={isWithdrawing}
             className="h-12 w-full rounded-md border border-line bg-field px-3 text-lg font-semibold tabular-nums text-ink placeholder:text-base placeholder:font-normal placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none disabled:opacity-60"
           />
-          <p className="mt-2 text-sm text-ink-3">Minimum withdrawal is KSH 50.</p>
+          <p className="mt-2 text-sm text-ink-3">Minimum withdrawal is KSH 50. Processing to your M-Pesa account.</p>
 
           <button
             type="button"
-            className="mt-4 h-12 w-full rounded-md bg-brand text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover"
+            onClick={handleWithdraw}
+            disabled={isWithdrawing || !withdrawAmount || !withdrawPhone}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Withdraw
+            {isWithdrawing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Processing withdrawal...
+              </>
+            ) : (
+              'Withdraw to M-Pesa'
+            )}
           </button>
         </div>
       )}

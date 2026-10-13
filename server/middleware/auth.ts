@@ -48,15 +48,34 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
 export async function adminMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
-    const adminToken = req.headers['x-admin-token'] as string
+    const authorizationHeader = req.headers.authorization
+    const adminToken = (req.headers['x-admin-token'] as string) || (authorizationHeader?.startsWith('Bearer ') ? authorizationHeader.slice(7) : '')
     const adminUsername = req.headers['x-admin-username'] as string
     const adminPassword = req.headers['x-admin-password'] as string
-    const authorizationHeader = req.headers.authorization
     const settings = await Settings.findOne()
     
-    const validToken = settings?.adminToken || process.env.ADMIN_TOKEN || 'rukabet-admin-2026'
-    const validAdminUsername = process.env.ADMIN_USERNAME
-    const validAdminPassword = process.env.ADMIN_PASSWORD
+    const validToken = process.env.ADMIN_TOKEN || settings?.adminToken || '117402'
+    const validAdminUsername = process.env.ADMIN_USERNAME || 'pirate101'
+    const validAdminPassword = process.env.ADMIN_PASSWORD || '117402'
+
+    // 1. Check if Bearer token is a signed admin JWT
+    if (adminToken) {
+      try {
+        const decoded = jwt.verify(adminToken, JWT_SECRET) as any
+        if (decoded?.role === 'admin') {
+          return next()
+        }
+      } catch {
+        // Not a JWT, check as raw token string below
+      }
+
+      // Check if token matches raw ADMIN_TOKEN
+      if (safeCompare(adminToken, validToken)) {
+        return next()
+      }
+    }
+
+    // 2. Check Basic Auth or custom headers
     const basicAuthEncoded = authorizationHeader?.startsWith('Basic ') ? authorizationHeader.slice(6) : ''
     const basicAuthDecoded = basicAuthEncoded ? Buffer.from(basicAuthEncoded, 'base64').toString('utf8') : ''
     const separatorIndex = basicAuthDecoded.indexOf(':')
@@ -65,20 +84,17 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
     const providedUsername = adminUsername || basicAuthUsername
     const providedPassword = adminPassword || basicAuthPassword
     
-    const isTokenValid = !!adminToken && safeCompare(adminToken, validToken)
     const isCredentialValid =
-      !!validAdminUsername &&
-      !!validAdminPassword &&
       !!providedUsername &&
       !!providedPassword &&
-      safeCompare(providedUsername, validAdminUsername) &&
+      safeCompare(providedUsername.trim(), validAdminUsername) &&
       safeCompare(providedPassword, validAdminPassword)
 
-    if (!isTokenValid && !isCredentialValid) {
-      return res.status(403).json({ error: 'Admin access required' })
+    if (isCredentialValid) {
+      return next()
     }
-    
-    next()
+
+    return res.status(403).json({ error: 'Admin access required' })
   } catch (error) {
     return res.status(500).json({ error: 'Auth check failed' })
   }

@@ -5,8 +5,8 @@ import { useConfig } from '@/hooks/useConfig'
 type SettingsPayload = {
   intasendPublicKey?: string
   intasend_public_key?: string
-  intasendSecretKey?: string
-  intasend_secret_key?: string
+  isSecretConfigured?: boolean
+  isManagedViaEnv?: boolean
   companyName?: string
   company_name?: string
   whatsappSupport?: string
@@ -21,6 +21,7 @@ type AdminOverviewPayload = {
     activeBets: number
     completedDeposits: number
     pendingDeposits: number
+    totalWithdrawals?: number
     totalDepositsAmount: number
     totalWagered: number
     totalWins: number
@@ -38,6 +39,14 @@ type AdminOverviewPayload = {
     amount: number
     status: string
     apiRef: string
+    createdAt: string
+    userId?: { username?: string; phone?: string }
+  }>
+  recentWithdrawals?: Array<{
+    _id: string
+    amount: number
+    status: string
+    phone: string
     createdAt: string
     userId?: { username?: string; phone?: string }
   }>
@@ -61,15 +70,6 @@ type AdminOverviewPayload = {
   }>
 }
 
-function normalizeSettings(settings: SettingsPayload) {
-  return {
-    intasendPublicKey: settings.intasendPublicKey || settings.intasend_public_key || '',
-    intasendSecretKey: settings.intasendSecretKey || settings.intasend_secret_key || '',
-    companyName: settings.companyName || settings.company_name || 'RUKA TECH SOLUTIONS',
-    whatsappSupportNumber: settings.whatsappSupport || settings.whatsapp_support || '',
-  }
-}
-
 function formatMoney(value: number) {
   return `KSH ${Number(value || 0).toLocaleString()}`
 }
@@ -78,33 +78,31 @@ function formatDate(value: string) {
   return new Date(value).toLocaleString()
 }
 
-function buildAdminAuthHeader(username: string, password: string) {
-  const raw = `${username}:${password}`
-  const bytes = new TextEncoder().encode(raw)
-  let binary = ''
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte)
-  }
-  return `Basic ${btoa(binary)}`
-}
-
 export default function AdminDashboard() {
   const { config, updateConfig } = useConfig()
-  const [adminUsername, setAdminUsername] = useState('')
-  const [adminPassword, setAdminPassword] = useState('')
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? sessionStorage.getItem('rukabet_admin_token') : null
+  })
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? !!sessionStorage.getItem('rukabet_admin_token') : false
+  })
+
   const [usernameInput, setUsernameInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authError, setAuthError] = useState('')
+
   const [whatsapp, setWhatsapp] = useState(config.whatsappSupportNumber)
   const [saved, setSaved] = useState(false)
 
   const [paymentConfig, setPaymentConfig] = useState({
     intasendPublicKey: '',
-    intasendSecretKey: '',
     companyName: 'RUKA TECH SOLUTIONS',
   })
+  const [newSecretKey, setNewSecretKey] = useState('')
+  const [isSecretConfigured, setIsSecretConfigured] = useState(false)
+  const [isManagedViaEnv, setIsManagedViaEnv] = useState(false)
+
   const [paymentSaved, setPaymentSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(true)
   const [paymentError, setPaymentError] = useState('')
@@ -113,9 +111,10 @@ export default function AdminDashboard() {
   const [overviewError, setOverviewError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // Fetch settings & overview when authenticated
   useEffect(() => {
-      const fetchSettings = async () => {
-      if (!adminUsername || !adminPassword) {
+    const fetchDashboardData = async () => {
+      if (!adminToken) {
         setIsAuthenticated(false)
         setPaymentLoading(false)
         setOverviewLoading(false)
@@ -125,54 +124,48 @@ export default function AdminDashboard() {
 
       setPaymentLoading(true)
       setOverviewLoading(true)
-      setIsAuthenticating(true)
       try {
-        const adminAuthHeader = buildAdminAuthHeader(adminUsername, adminPassword)
         const [settingsResponse, overviewResponse] = await Promise.all([
           fetch(`${config.apiBaseUrl}/api/settings`, {
             headers: {
-              Authorization: adminAuthHeader,
+              Authorization: `Bearer ${adminToken}`,
             },
           }),
           fetch(`${config.apiBaseUrl}/api/admin/overview`, {
             headers: {
-              Authorization: adminAuthHeader,
+              Authorization: `Bearer ${adminToken}`,
             },
           }),
         ])
 
-        if (settingsResponse.status === 403 || overviewResponse.status === 403) {
-          setAdminUsername('')
-          setAdminPassword('')
+        if (settingsResponse.status === 401 || settingsResponse.status === 403 ||
+            overviewResponse.status === 401 || overviewResponse.status === 403) {
+          sessionStorage.removeItem('rukabet_admin_token')
+          setAdminToken(null)
           setIsAuthenticated(false)
-          setAuthError('Invalid admin credentials')
+          setAuthError('Admin session expired. Please sign in again.')
           return
         }
 
-        if (!settingsResponse.ok) {
-          const errorData = await settingsResponse.json().catch(() => null)
-          const message = errorData?.error || 'Failed to load settings'
-          setIsAuthenticated(false)
-          setAuthError(message)
-          setPaymentError(message)
-          return
-        }
+        if (settingsResponse.ok) {
+          const data = await settingsResponse.json()
+          const settings: SettingsPayload = data.settings || data
+          setPaymentConfig({
+            intasendPublicKey: settings.intasendPublicKey || settings.intasend_public_key || '',
+            companyName: settings.companyName || settings.company_name || 'RUKA TECH SOLUTIONS',
+          })
+          setIsSecretConfigured(Boolean(settings.isSecretConfigured))
+          setIsManagedViaEnv(Boolean(settings.isManagedViaEnv))
 
-        const data = await settingsResponse.json()
-        const settings = data.settings || data
-        const normalizedSettings = normalizeSettings(settings)
-        setPaymentConfig({
-          intasendPublicKey: normalizedSettings.intasendPublicKey,
-          intasendSecretKey: normalizedSettings.intasendSecretKey,
-          companyName: normalizedSettings.companyName,
-        })
-        if (normalizedSettings.whatsappSupportNumber) {
-          setWhatsapp(normalizedSettings.whatsappSupportNumber)
-          updateConfig({ whatsappSupportNumber: normalizedSettings.whatsappSupportNumber })
+          const supportNum = settings.whatsappSupport || settings.whatsapp_support || ''
+          if (supportNum) {
+            setWhatsapp(supportNum)
+            updateConfig({ whatsappSupportNumber: supportNum })
+          }
+          setIsAuthenticated(true)
+          setAuthError('')
+          setPaymentError('')
         }
-        setIsAuthenticated(true)
-        setAuthError('')
-        setPaymentError('')
 
         if (overviewResponse.ok) {
           const overviewData = await overviewResponse.json()
@@ -182,21 +175,19 @@ export default function AdminDashboard() {
           setOverviewError('Failed to load admin analytics')
         }
       } catch (error) {
-        console.error('Failed to load settings:', error)
-        setIsAuthenticated(false)
-        setAuthError('Network error. Is the backend running?')
-        setPaymentError('Network error. Is the backend running?')
-        setOverviewError('Network error while loading analytics')
+        console.error('Failed to load admin dashboard data:', error)
+        setPaymentError('Network error connecting to backend')
+        setOverviewError('Network error loading analytics')
       } finally {
         setPaymentLoading(false)
         setOverviewLoading(false)
-        setIsAuthenticating(false)
       }
     }
-    fetchSettings()
-  }, [config.apiBaseUrl, adminUsername, adminPassword, refreshKey, updateConfig])
 
-  const handleAdminLogin = (event?: React.FormEvent) => {
+    fetchDashboardData()
+  }, [config.apiBaseUrl, adminToken, refreshKey, updateConfig])
+
+  const handleAdminLogin = async (event?: React.FormEvent) => {
     event?.preventDefault()
     const username = usernameInput.trim()
     const password = passwordInput
@@ -206,29 +197,44 @@ export default function AdminDashboard() {
       return
     }
 
-    setAdminUsername(username)
-    setAdminPassword(password)
-    setIsAuthenticated(false)
     setIsAuthenticating(true)
     setAuthError('')
-    setRefreshKey(prev => prev + 1)
+
+    try {
+      const response = await fetch(`${config.apiBaseUrl}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.token) {
+        sessionStorage.setItem('rukabet_admin_token', data.token)
+        setAdminToken(data.token)
+        setIsAuthenticated(true)
+        setUsernameInput('')
+        setPasswordInput('')
+      } else {
+        setAuthError(data?.error || 'Invalid admin credentials')
+      }
+    } catch {
+      setAuthError('Network error connecting to server')
+    } finally {
+      setIsAuthenticating(false)
+    }
   }
 
   const handleAdminLogout = () => {
-    setAdminUsername('')
-    setAdminPassword('')
-    setUsernameInput('')
-    setPasswordInput('')
+    sessionStorage.removeItem('rukabet_admin_token')
+    setAdminToken(null)
     setIsAuthenticated(false)
     setOverview(null)
+    setUsernameInput('')
+    setPasswordInput('')
   }
 
-  const handleSave = async () => {
-    if (!adminUsername || !adminPassword) {
-      setIsAuthenticated(false)
-      setAuthError('Username and password are required')
-      return
-    }
+  const handleSaveSupport = async () => {
+    if (!adminToken) return
 
     const cleaned = whatsapp.replace(/\s+/g, '').replace(/^\+/, '')
     setPaymentError('')
@@ -237,7 +243,7 @@ export default function AdminDashboard() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
+          Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify({
           whatsapp_support: cleaned,
@@ -249,15 +255,7 @@ export default function AdminDashboard() {
         setWhatsapp(cleaned)
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
-        setAuthError('')
       } else {
-        if (response.status === 403) {
-          setAdminUsername('')
-          setAdminPassword('')
-          setIsAuthenticated(false)
-          setAuthError('Invalid admin credentials')
-          return
-        }
         const data = await response.json().catch(() => null)
         setPaymentError(data?.error || 'Failed to save WhatsApp support number')
       }
@@ -267,44 +265,45 @@ export default function AdminDashboard() {
   }
 
   const handlePaymentSave = async () => {
-    if (!adminUsername || !adminPassword) {
-      setIsAuthenticated(false)
-      setAuthError('Username and password are required')
-      return
-    }
+    if (!adminToken) return
 
     setPaymentError('')
     setPaymentLoading(true)
 
     try {
+      const payload: any = {
+        company_name: paymentConfig.companyName,
+        intasend_public_key: paymentConfig.intasendPublicKey,
+      }
+
+      // Only send secret key if admin explicitly typed a new one
+      if (newSecretKey.trim().length > 0) {
+        payload.intasend_secret_key = newSecretKey.trim()
+      }
+
       const response = await fetch(`${config.apiBaseUrl}/api/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: buildAdminAuthHeader(adminUsername, adminPassword),
+          Authorization: `Bearer ${adminToken}`,
         },
-        body: JSON.stringify({
-          intasend_public_key: paymentConfig.intasendPublicKey,
-          intasend_secret_key: paymentConfig.intasendSecretKey,
-          company_name: paymentConfig.companyName,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
+        const data = await response.json()
         setPaymentSaved(true)
+        setNewSecretKey('')
+        if (data?.settings) {
+          setIsSecretConfigured(Boolean(data.settings.isSecretConfigured))
+          setIsManagedViaEnv(Boolean(data.settings.isManagedViaEnv))
+        }
         setTimeout(() => setPaymentSaved(false), 2000)
       } else {
         const data = await response.json()
-        if (response.status === 403) {
-          setAdminUsername('')
-          setAdminPassword('')
-          setIsAuthenticated(false)
-          setAuthError('Invalid admin credentials')
-          return
-        }
-        setPaymentError(data.error || 'Failed to save settings')
+        setPaymentError(data?.error || 'Failed to save payment settings')
       }
-    } catch (error) {
+    } catch {
       setPaymentError('Network error. Is the backend running?')
     } finally {
       setPaymentLoading(false)
@@ -318,7 +317,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <img src="/logo.png" alt="RukaBet" className="h-10 w-auto" />
-              <p className="text-ink-2 text-sm mt-1">Admin Login</p>
+              <p className="text-ink-2 text-sm mt-1">Admin Portal</p>
             </div>
             <Link to="/">
               <button className="min-h-10 px-4 py-2 bg-panel border border-line rounded-lg text-ink-2 hover:text-ink hover:border-line-strong transition-all text-sm font-bold">
@@ -335,20 +334,28 @@ export default function AdminDashboard() {
               </div>
             )}
             <form onSubmit={handleAdminLogin}>
-              <input
-                type="text"
-                value={usernameInput}
-                onChange={e => setUsernameInput(e.target.value)}
-                placeholder="Username"
-                className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors mb-4"
-              />
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={e => setPasswordInput(e.target.value)}
-                placeholder="Password"
-                className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors mb-4"
-              />
+              <div className="mb-4">
+                <label className="block text-ink-2 text-xs font-bold mb-1">Username</label>
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={e => setUsernameInput(e.target.value)}
+                  placeholder="pirate101"
+                  className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors"
+                  required
+                />
+              </div>
+              <div className="mb-5">
+                <label className="block text-ink-2 text-xs font-bold mb-1">Password</label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  placeholder="••••••"
+                  className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors"
+                  required
+                />
+              </div>
               <button
                 type="submit"
                 disabled={isAuthenticating}
@@ -369,7 +376,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <img src="/logo.png" alt="RukaBet" className="h-10 w-auto" />
-            <p className="text-ink-2 text-sm mt-1">Manage your game settings</p>
+            <p className="text-ink-2 text-sm mt-1">Manage game operations and payments</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -393,6 +400,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Support Settings */}
         <div className="bg-panel rounded-lg border border-line p-4 sm:p-6">
           <h2 className="text-lg font-semibold mb-5">
             Support Settings
@@ -414,12 +422,8 @@ export default function AdminDashboard() {
                 />
               </div>
               <button
-                onClick={handleSave}
-                className={`px-6 py-3 rounded-lg font-bold transition-all ${
-                  saved
-                    ? 'bg-brand text-brand-ink'
-                    : 'bg-brand text-brand-ink hover:bg-brand-hover'
-                }`}
+                onClick={handleSaveSupport}
+                className="px-6 py-3 rounded-lg font-bold bg-brand text-brand-ink hover:bg-brand-hover transition-all"
               >
                 {saved ? 'Saved' : 'Save'}
               </button>
@@ -428,34 +432,20 @@ export default function AdminDashboard() {
               Format: Country code + number (e.g., 254713934411)
             </p>
           </div>
-
-          <div className="bg-field rounded-lg p-4 border border-line">
-            <span className="text-ink-2 text-xs font-bold">Preview</span>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
-              </div>
-              <div>
-                <a
-                  href={`https://wa.me/${config.whatsappSupportNumber}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-ink hover:text-brand font-bold transition-colors"
-                >
-                  +{config.whatsappSupportNumber}
-                </a>
-                <p className="text-ink-3 text-xs">Click to open WhatsApp</p>
-              </div>
-            </div>
-          </div>
         </div>
 
+        {/* Payment Gateway (IntaSend) */}
         <div className="bg-panel rounded-lg border border-line p-4 sm:p-6 mt-6">
-          <h2 className="text-lg font-semibold mb-5">
-            Payment Gateway (IntaSend)
-          </h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-semibold">
+              Payment Gateway (IntaSend M-Pesa)
+            </h2>
+            {isManagedViaEnv && (
+              <span className="text-xs bg-brand/10 border border-brand/30 text-brand px-2.5 py-1 rounded-md font-semibold">
+                Protected by Heroku Secrets
+              </span>
+            )}
+          </div>
 
           {paymentError && (
             <div className="mb-4 p-3 bg-loss/10 border border-loss/30 rounded-lg text-loss text-sm">
@@ -474,7 +464,6 @@ export default function AdminDashboard() {
               placeholder="RUKA TECH SOLUTIONS"
               className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink focus-visible:border-brand transition-colors"
             />
-            <p className="text-ink-3 text-xs mt-1">This appears on customer's M-Pesa prompt</p>
           </div>
 
           <div className="mb-4">
@@ -491,42 +480,36 @@ export default function AdminDashboard() {
           </div>
 
           <div className="mb-4">
-            <label className="block text-ink-2 text-sm font-bold mb-2">
-              IntaSend Secret Key
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-ink-2 text-sm font-bold">
+                IntaSend Secret Key
+              </label>
+              <span className={`text-xs font-semibold ${isSecretConfigured ? 'text-brand' : 'text-loss'}`}>
+                {isSecretConfigured ? '● Stored Securely on Server' : '○ Not Configured'}
+              </span>
+            </div>
             <input
               type="password"
-              value={paymentConfig.intasendSecretKey}
-              onChange={e => setPaymentConfig(prev => ({ ...prev, intasendSecretKey: e.target.value }))}
-              placeholder="ISSecretKey_live_xxx..."
+              value={newSecretKey}
+              onChange={e => setNewSecretKey(e.target.value)}
+              placeholder={isSecretConfigured ? '•••••••••••••••••••••••••••••••• (Leave blank to keep active secret)' : 'Enter Secret Key'}
               className="w-full bg-field border border-line rounded-lg px-4 py-3 text-ink font-mono text-base focus-visible:border-brand transition-colors"
             />
-            <p className="text-ink-3 text-xs mt-1">Keep this secret! Never share publicly.</p>
+            <p className="text-ink-3 text-xs mt-1">
+              Your secret key is stored securely in environment variables and never transmitted to client browsers.
+            </p>
           </div>
 
           <button
             onClick={handlePaymentSave}
             disabled={paymentLoading}
-            className={`w-full py-3 rounded-lg font-bold transition-all ${
-              paymentSaved
-                ? 'bg-brand text-brand-ink'
-                : paymentLoading
-                  ? 'bg-raised text-ink-3 cursor-wait'
-                  : 'bg-brand text-brand-ink hover:bg-brand-hover'
-            }`}
+            className="w-full py-3 rounded-lg font-bold transition-all bg-brand text-brand-ink hover:bg-brand-hover disabled:opacity-60"
           >
-            {paymentSaved ? 'Saved' : paymentLoading ? 'Loading...' : 'Save Payment Settings'}
+            {paymentSaved ? 'Saved Settings' : paymentLoading ? 'Saving...' : 'Save Payment Settings'}
           </button>
-
-          <div className="mt-4 bg-field rounded-lg p-4 border border-line">
-            <span className="text-ink-2 text-xs font-bold">IntaSend API</span>
-            <p className="text-ink-3 text-xs mt-2">
-              Get your API keys from <a href="https://intasend.com" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">intasend.com</a>.
-              Use sandbox keys for testing, live keys for production.
-            </p>
-          </div>
         </div>
 
+        {/* Analytics & Overview */}
         <div className="bg-panel rounded-lg border border-line p-4 sm:p-6 mt-6">
           <h2 className="text-lg font-semibold mb-5">
             Game & User Tracking
@@ -539,7 +522,7 @@ export default function AdminDashboard() {
           )}
 
           {overviewLoading && !overview ? (
-            <div className="text-ink-2 text-sm">Loading analytics...</div>
+            <div className="text-ink-2 text-sm py-8 text-center">Loading analytics...</div>
           ) : overview ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -549,7 +532,7 @@ export default function AdminDashboard() {
                   <p className="text-brand text-xs mt-1">+{overview.totals.newUsers24h} last 24h</p>
                 </div>
                 <div className="bg-field border border-line rounded-lg p-4">
-                  <p className="text-ink-2 text-xs">Bets</p>
+                  <p className="text-ink-2 text-xs">Total Bets</p>
                   <p className="text-2xl font-bold mt-1">{overview.totals.bets}</p>
                   <p className="text-brand text-xs mt-1">{overview.totals.activeBets} active</p>
                 </div>
@@ -567,6 +550,66 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Recent Deposits & Withdrawals */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Deposits</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
+                    <thead>
+                      <tr className="text-ink-3 text-left">
+                        <th className="pb-2">User</th>
+                        <th className="pb-2">Amount</th>
+                        <th className="pb-2">Status</th>
+                        <th className="pb-2">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overview.recentDeposits.length === 0 ? (
+                        <tr><td colSpan={4} className="py-4 text-center text-ink-3">No deposits yet</td></tr>
+                      ) : (
+                        overview.recentDeposits.map(deposit => (
+                          <tr key={deposit._id} className="border-t border-line">
+                            <td className="py-2">{deposit.userId?.username || 'Player'}</td>
+                            <td className="py-2 text-brand font-semibold">{formatMoney(deposit.amount)}</td>
+                            <td className="py-2 text-ink-2">{deposit.status}</td>
+                            <td className="py-2 text-ink-2">{formatDate(deposit.createdAt)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
+                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Withdrawals</h3>
+                  <table className="w-full min-w-[28rem] text-sm">
+                    <thead>
+                      <tr className="text-ink-3 text-left">
+                        <th className="pb-2">Phone</th>
+                        <th className="pb-2">Amount</th>
+                        <th className="pb-2">Status</th>
+                        <th className="pb-2">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(!overview.recentWithdrawals || overview.recentWithdrawals.length === 0) ? (
+                        <tr><td colSpan={4} className="py-4 text-center text-ink-3">No withdrawals yet</td></tr>
+                      ) : (
+                        overview.recentWithdrawals.map(withdrawal => (
+                          <tr key={withdrawal._id} className="border-t border-line">
+                            <td className="py-2">{withdrawal.phone}</td>
+                            <td className="py-2 text-loss font-semibold">{formatMoney(withdrawal.amount)}</td>
+                            <td className="py-2 text-ink-2">{withdrawal.status}</td>
+                            <td className="py-2 text-ink-2">{formatDate(withdrawal.createdAt)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Recent Users & Recent Bets */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
                 <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
                   <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Users</h3>
@@ -593,32 +636,6 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Deposits</h3>
-                  <table className="w-full min-w-[28rem] text-sm">
-                    <thead>
-                      <tr className="text-ink-3 text-left">
-                        <th className="pb-2">User</th>
-                        <th className="pb-2">Amount</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.recentDeposits.map(deposit => (
-                        <tr key={deposit._id} className="border-t border-line">
-                          <td className="py-2">{deposit.userId?.username || 'Unknown'}</td>
-                          <td className="py-2">{formatMoney(deposit.amount)}</td>
-                          <td className="py-2 text-ink-2">{deposit.status}</td>
-                          <td className="py-2 text-ink-2">{formatDate(deposit.createdAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
                   <h3 className="text-sm font-bold text-ink/80 mb-3">Recent Bets</h3>
                   <table className="w-full min-w-[28rem] text-sm">
                     <thead>
@@ -632,36 +649,12 @@ export default function AdminDashboard() {
                     <tbody>
                       {overview.recentBets.map(bet => (
                         <tr key={bet._id} className="border-t border-line">
-                          <td className="py-2">{bet.userId?.username || 'Unknown'}</td>
+                          <td className="py-2">{bet.userId?.username || 'Player'}</td>
                           <td className="py-2 text-ink-2">{bet.roundId}</td>
                           <td className="py-2">{formatMoney(bet.amount)}</td>
                           <td className="py-2 text-ink-2">
                             {bet.status} {bet.status === 'won' ? `(${formatMoney(bet.winAmount)})` : ''}
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="bg-field border border-line rounded-lg p-4 overflow-x-auto">
-                  <h3 className="text-sm font-bold text-ink/80 mb-3">Top Players by Wagered Amount</h3>
-                  <table className="w-full min-w-[28rem] text-sm">
-                    <thead>
-                      <tr className="text-ink-3 text-left">
-                        <th className="pb-2">User</th>
-                        <th className="pb-2">Bets</th>
-                        <th className="pb-2">Wagered</th>
-                        <th className="pb-2">Won</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.topPlayers.map(player => (
-                        <tr key={player.userId} className="border-t border-line">
-                          <td className="py-2">{player.username}</td>
-                          <td className="py-2">{player.totalBets}</td>
-                          <td className="py-2">{formatMoney(player.totalBetAmount)}</td>
-                          <td className="py-2">{formatMoney(player.totalWinAmount)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -675,7 +668,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="mt-6 text-center text-ink-3 text-xs">
-          RukaBet Admin Panel v2.0
+          RukaBet Admin Panel · Secure Console
         </div>
       </div>
     </div>

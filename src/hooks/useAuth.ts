@@ -11,6 +11,10 @@ export interface User {
   hasPlayedWithMoney: boolean
   createdAt: number
   referredBy?: string // userId of referrer
+  referralsCount?: number
+  referralsEarnings?: number
+  wagerProgress?: number
+  wagerRequired?: number
   hasReceivedReferralReward?: boolean
 }
 
@@ -95,6 +99,10 @@ function normalizeUser(apiUser: any): User {
     freebetLocked: Boolean(apiUser?.freebetLocked ?? true),
     hasDeposited: Number(apiUser?.balance || 0) >= 20,
     hasPlayedWithMoney: Boolean(apiUser?.hasPlayedWithMoney ?? false),
+    referralsCount: Number(apiUser?.referralsCount || 0),
+    referralsEarnings: Number(apiUser?.referralsEarnings || 0),
+    wagerProgress: Number(apiUser?.wagerProgress || 0),
+    wagerRequired: Number(apiUser?.wagerRequired || 0),
     createdAt: apiUser?.createdAt ? Date.parse(apiUser.createdAt) || Date.now() : Date.now(),
   }
 }

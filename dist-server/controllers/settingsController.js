@@ -13,20 +13,31 @@ export async function getPublicConfig(req, res) {
         return res.status(500).json({ error: error.message });
     }
 }
+function sanitizeKey(value) {
+    if (typeof value !== 'string')
+        return '';
+    return value.trim().replace(/^["']|["']$/g, '');
+}
 export async function getSettings(req, res) {
     try {
         let settings = await Settings.findOne();
         if (!settings) {
             settings = await Settings.create({
-                adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
+                adminToken: process.env.ADMIN_TOKEN || '117402',
                 jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
             });
         }
-        // Don't expose secrets in response
+        const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY);
+        const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY);
+        const effectivePubKey = envPubKey || settings.intasendPublicKey || '';
+        const hasSecret = !!(envSecKey || settings.intasendSecretKey);
+        // Never send secret key to frontend
         return res.json({
             success: true,
             settings: {
-                intasendPublicKey: settings.intasendPublicKey,
+                intasendPublicKey: effectivePubKey,
+                isSecretConfigured: hasSecret,
+                isManagedViaEnv: !!(envPubKey && envSecKey),
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,
                 minDeposit: settings.minDeposit,
@@ -53,21 +64,30 @@ export async function updateSettings(req, res) {
         ];
         const sanitizedUpdates = {};
         for (const key of allowedFields) {
-            // Handle both camelCase and snake_case input
             const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-            if (updates[key] !== undefined) {
-                sanitizedUpdates[key] = updates[key];
-            }
-            else if (updates[snakeKey] !== undefined) {
-                sanitizedUpdates[key] = updates[snakeKey];
+            const val = updates[key] !== undefined ? updates[key] : updates[snakeKey];
+            if (val !== undefined) {
+                // If updating secret key, only set if non-empty string and not masked
+                if (key === 'intasendSecretKey') {
+                    if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
+                        sanitizedUpdates[key] = sanitizeKey(val);
+                    }
+                }
+                else {
+                    sanitizedUpdates[key] = typeof val === 'string' ? sanitizeKey(val) : val;
+                }
             }
         }
         const settings = await Settings.findOneAndUpdate({}, { $set: sanitizedUpdates }, { new: true, upsert: true });
+        const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY);
+        const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY);
         return res.json({
             success: true,
-            message: 'Settings updated',
+            message: 'Settings updated successfully',
             settings: {
-                intasendPublicKey: settings.intasendPublicKey,
+                intasendPublicKey: envPubKey || settings.intasendPublicKey || '',
+                isSecretConfigured: !!(envSecKey || settings.intasendSecretKey),
+                isManagedViaEnv: !!(envPubKey && envSecKey),
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,
                 minDeposit: settings.minDeposit,

@@ -37,6 +37,22 @@ const UserSchema = new mongoose.Schema({
   hasPlayedWithMoney: {
     type: Boolean,
     default: false
+  },
+  referralsCount: {
+    type: Number,
+    default: 0
+  },
+  referralsEarnings: {
+    type: Number,
+    default: 0
+  },
+  wagerProgress: {
+    type: Number,
+    default: 0
+  },
+  wagerRequired: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true,

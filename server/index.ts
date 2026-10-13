@@ -29,11 +29,12 @@ import { initializeSocket } from './socket.js'
 import { Settings } from './models/Settings.js'
 
 // Controllers
-import { register, login, getMe } from './controllers/authController.js'
+import { register, login, getMe, changePassword } from './controllers/authController.js'
 import { initiateDeposit } from './controllers/depositController.js'
+import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js'
 import { intasendWebhook } from './controllers/webhookController.js'
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js'
-import { getAdminOverview } from './controllers/adminController.js'
+import { getAdminOverview, adminLogin } from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
 
@@ -78,9 +79,12 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.N
 app.post('/api/auth/register', register)
 app.post('/api/auth/login', login)
 app.get('/api/auth/me', authMiddleware, getMe)
+app.post('/api/auth/change-password', authMiddleware, changePassword)
 
-// Deposit routes
+// Deposit & Withdrawal routes
 app.post('/api/deposit', depositRateLimit, authMiddleware, initiateDeposit)
+app.post('/api/withdraw', depositRateLimit, authMiddleware, requestWithdrawal)
+app.get('/api/user/transactions', authMiddleware, getUserTransactions)
 
 // Public configuration
 app.get('/api/public-config', getPublicConfig)
@@ -90,6 +94,7 @@ app.post(INTASEND_WEBHOOK_PATH, webhookRateLimit, intasendWebhook)
 console.log(`🔔 IntaSend webhook URL: ${INTASEND_WEBHOOK_URL}`)
 
 // Admin routes
+app.post('/api/admin/login', adminRateLimit, adminLogin)
 app.get('/api/settings', adminRateLimit, adminMiddleware, getSettings)
 app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings)
 app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview)

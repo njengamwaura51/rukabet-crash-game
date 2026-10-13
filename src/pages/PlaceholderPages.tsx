@@ -66,26 +66,58 @@ export function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' })
+    setMessage(null)
+
+    if (!currentPassword) {
+      setMessage({ type: 'error', text: 'Please enter your current password' })
+      return
+    }
+
+    if (newPassword.length < 4) {
+      setMessage({ type: 'error', text: 'New password must be at least 4 characters' })
       return
     }
     
     if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Passwords do not match' })
+      setMessage({ type: 'error', text: 'New passwords do not match' })
       return
     }
 
-    // Simulate password change
-    setMessage({ type: 'success', text: 'Password changed successfully!' })
-    setCurrentPassword('')
-    setNewPassword('')
-    setConfirmPassword('')
-    setTimeout(() => setMessage(null), 3000)
+    const token = localStorage.getItem('rukabet_token') || localStorage.getItem('token') || localStorage.getItem('aspirebet_token')
+    if (!token) {
+      setMessage({ type: 'error', text: 'You must be logged in to change your password' })
+      return
+    }
+
+    setIsUpdating(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      })
+
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success) {
+        setMessage({ type: 'success', text: 'Password updated successfully!' })
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      } else {
+        setMessage({ type: 'error', text: data?.error || 'Failed to update password' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const rows: [string, string, string?][] = [
@@ -157,9 +189,10 @@ export function ProfilePage() {
           />
           <button
             type="submit"
-            className="h-12 w-full rounded-md bg-brand text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover"
+            disabled={isUpdating}
+            className="h-12 w-full rounded-md bg-brand text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Update password
+            {isUpdating ? 'Updating password...' : 'Update password'}
           </button>
         </form>
       </section>
@@ -175,9 +208,9 @@ export function ReferralsPage() {
   const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || 'guest'
   const referralLink = `https://rukabet.live/ref/${referralCode}`
   
-  // Mock stats
-  const totalReferrals = 3
-  const totalEarned = 60
+  // Real stats from user account
+  const totalReferrals = user?.referralsCount ?? 0
+  const totalEarned = user?.referralsEarnings ?? 0
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink)
@@ -242,10 +275,10 @@ export function BonusesPage() {
   const { user } = useAuth()
   const freebetBalance = user?.freebet ?? 0
   
-  // Mock deposit bonus progress
-  const wagerRequired = 198 // 99 * 2x
-  const wagerProgress = 45 // Mock progress
-  const progressPercent = Math.min((wagerProgress / wagerRequired) * 100, 100)
+  // Real deposit bonus progress
+  const wagerRequired = user?.wagerRequired ?? (user?.hasPlayedWithMoney ? 0 : 20)
+  const wagerProgress = user?.wagerProgress ?? (user?.hasPlayedWithMoney ? wagerRequired : 0)
+  const progressPercent = wagerRequired > 0 ? Math.min((wagerProgress / wagerRequired) * 100, 100) : (user?.hasPlayedWithMoney ? 100 : 0)
 
   return (
     <PageShell title="Bonuses" subtitle="Your rewards and promotions">
