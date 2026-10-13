@@ -41,7 +41,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 console.log(`📁 Static files: ${distPath}`);
 const app = express();
 const httpServer = createServer(app);
-app.enable('trust proxy');
+app.set('trust proxy', 1);
 // CORS - allow all origins in production (we serve everything from same domain)
 // In production, static files and API are on same origin, so CORS is permissive
 app.use(cors({
@@ -78,8 +78,14 @@ console.log(`🔔 IntaSend webhook URL: ${INTASEND_WEBHOOK_URL}`);
 // Admin routes
 app.post('/api/admin/login', adminRateLimit, adminLogin);
 app.get('/api/settings', adminRateLimit, adminMiddleware, getSettings);
+app.get('/api/admin/settings', adminRateLimit, adminMiddleware, getSettings);
 app.put('/api/settings', adminRateLimit, adminMiddleware, updateSettings);
+app.put('/api/admin/settings', adminRateLimit, adminMiddleware, updateSettings);
 app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview);
+// Catch-all 404 for unhandled API requests
+app.all('/api/{*splat}', (req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
+});
 // Production: Serve static files from Vite build
 if (isProduction) {
     console.log(`📂 Serving static files from: ${distPath}`);
@@ -87,9 +93,7 @@ if (isProduction) {
     // SPA catch-all - send all non-API routes to index.html
     // Express 5 requires named parameter for catch-all routes
     app.get('/{*splat}', (req, res) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(distPath, 'index.html'));
-        }
+        res.sendFile(path.join(distPath, 'index.html'));
     });
 }
 // Initialize Socket.IO with Heroku-friendly settings
