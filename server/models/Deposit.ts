@@ -7,8 +7,12 @@ export interface IDeposit extends Document {
   amount: number
   apiRef: string
   status: 'pending' | 'completed' | 'failed'
-  intasendInvoiceId: string | null
-  intasendTrackerId: string | null
+  paydReference?: string | null
+  externalRef?: string | null
+  mpesaReceipt?: string | null
+  failureReason?: string | null
+  intasendInvoiceId?: string | null
+  intasendTrackerId?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -39,6 +43,24 @@ const DepositSchema = new Schema<IDeposit>({
     type: String,
     enum: ['pending', 'completed', 'failed'],
     default: 'pending'
+  },
+  paydReference: {
+    type: String,
+    default: null,
+    index: true
+  },
+  externalRef: {
+    type: String,
+    default: null,
+    index: true
+  },
+  mpesaReceipt: {
+    type: String,
+    default: null
+  },
+  failureReason: {
+    type: String,
+    default: null
   },
   intasendInvoiceId: {
     type: String,

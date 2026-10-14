@@ -2,8 +2,13 @@ import mongoose, { Schema, Document } from 'mongoose'
 
 export interface ISettings extends Document {
   _id: mongoose.Types.ObjectId
-  intasendPublicKey: string
-  intasendSecretKey: string
+  paydWalletUsername: string
+  paydApiUsername: string
+  paydApiPassword: string
+  paydApiBaseUrl: string
+  paydCallbackUrl: string
+  intasendPublicKey?: string
+  intasendSecretKey?: string
   companyName: string
   whatsappSupport: string
   minDeposit: number
@@ -14,6 +19,26 @@ export interface ISettings extends Document {
 }
 
 const SettingsSchema = new Schema<ISettings>({
+  paydWalletUsername: {
+    type: String,
+    default: ''
+  },
+  paydApiUsername: {
+    type: String,
+    default: ''
+  },
+  paydApiPassword: {
+    type: String,
+    default: ''
+  },
+  paydApiBaseUrl: {
+    type: String,
+    default: 'https://api.mypayd.app/api/v2/payments'
+  },
+  paydCallbackUrl: {
+    type: String,
+    default: ''
+  },
   intasendPublicKey: {
     type: String,
     default: ''

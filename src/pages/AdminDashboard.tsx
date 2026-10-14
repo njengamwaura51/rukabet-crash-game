@@ -42,8 +42,15 @@ type OddsAuditLog = {
 }
 
 type SettingsPayload = {
-  intasendPublicKey?: string
-  intasend_public_key?: string
+  paydWalletUsername?: string
+  payd_wallet_username?: string
+  paydApiUsername?: string
+  payd_api_username?: string
+  paydApiBaseUrl?: string
+  payd_api_base_url?: string
+  paydCallbackUrl?: string
+  payd_callback_url?: string
+  isPasswordConfigured?: boolean
   isSecretConfigured?: boolean
   isManagedViaAdmin?: boolean
   companyName?: string
@@ -52,6 +59,8 @@ type SettingsPayload = {
   whatsapp_support?: string
   minDeposit?: number
   minWithdrawal?: number
+  intasendPublicKey?: string
+  intasend_public_key?: string
 }
 
 type AdminOverviewPayload = {
@@ -236,15 +245,18 @@ export default function AdminDashboard() {
 
   // Gateway & System Settings State
   const [paymentConfig, setPaymentConfig] = useState({
-    intasendPublicKey: '',
+    paydWalletUsername: '',
+    paydApiUsername: '',
+    paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments',
+    paydCallbackUrl: '',
     companyName: 'RUKA TECH SOLUTIONS',
     whatsappSupport: '254719858034',
     minDeposit: 10,
     minWithdrawal: 50,
   })
-  const [newSecretKey, setNewSecretKey] = useState('')
-  const [showSecretKey, setShowSecretKey] = useState(false)
-  const [isSecretConfigured, setIsSecretConfigured] = useState(false)
+  const [newApiPassword, setNewApiPassword] = useState('')
+  const [showApiPassword, setShowApiPassword] = useState(false)
+  const [isPasswordConfigured, setIsPasswordConfigured] = useState(false)
   const [paymentSaved, setPaymentSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentMessage, setPaymentMessage] = useState('')
@@ -286,13 +298,16 @@ export default function AdminDashboard() {
           const sData = await settingsRes.json()
           const s: SettingsPayload = sData.settings || sData
           setPaymentConfig({
-            intasendPublicKey: s.intasendPublicKey || s.intasend_public_key || '',
+            paydWalletUsername: s.paydWalletUsername || s.payd_wallet_username || '',
+            paydApiUsername: s.paydApiUsername || s.payd_api_username || '',
+            paydApiBaseUrl: s.paydApiBaseUrl || s.payd_api_base_url || 'https://api.mypayd.app/api/v2/payments',
+            paydCallbackUrl: s.paydCallbackUrl || s.payd_callback_url || '',
             companyName: s.companyName || s.company_name || 'RUKA TECH SOLUTIONS',
             whatsappSupport: s.whatsappSupport || s.whatsapp_support || '254719858034',
             minDeposit: s.minDeposit ?? 10,
             minWithdrawal: s.minWithdrawal ?? 50,
           })
-          setIsSecretConfigured(Boolean(s.isSecretConfigured))
+          setIsPasswordConfigured(Boolean(s.isPasswordConfigured))
         }
 
         if (overviewRes.ok) {
@@ -676,7 +691,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // Save Payment Gateway (IntaSend) Keys
+  // Save Payment Gateway (Payd) Credentials
   const handleSaveGateway = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!adminToken) return
@@ -685,10 +700,13 @@ export default function AdminDashboard() {
 
     try {
       const payload: any = {
-        intasendPublicKey: paymentConfig.intasendPublicKey.trim(),
+        paydWalletUsername: paymentConfig.paydWalletUsername.trim(),
+        paydApiUsername: paymentConfig.paydApiUsername.trim(),
+        paydApiBaseUrl: paymentConfig.paydApiBaseUrl.trim() || 'https://api.mypayd.app/api/v2/payments',
+        paydCallbackUrl: paymentConfig.paydCallbackUrl.trim(),
       }
-      if (newSecretKey.trim()) {
-        payload.intasendSecretKey = newSecretKey.trim()
+      if (newApiPassword.trim()) {
+        payload.paydApiPassword = newApiPassword.trim()
       }
 
       const res = await fetch(`${config.apiBaseUrl}/api/settings`, {
@@ -702,14 +720,14 @@ export default function AdminDashboard() {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        setIsSecretConfigured(Boolean(data.settings?.isSecretConfigured))
-        setNewSecretKey('')
-        showNotice('success', 'IntaSend gateway keys saved to database successfully!')
+        setIsPasswordConfigured(Boolean(data.settings?.isPasswordConfigured))
+        setNewApiPassword('')
+        showNotice('success', 'Payd gateway credentials saved directly to database successfully!')
       } else {
         showNotice('error', data.error || 'Failed to save gateway configuration')
       }
     } catch {
-      showNotice('error', 'Network error saving gateway keys')
+      showNotice('error', 'Network error saving gateway configuration')
     } finally {
       setPaymentLoading(false)
     }
@@ -753,7 +771,7 @@ export default function AdminDashboard() {
   }
 
   const copyWebhookUrl = () => {
-    const url = `${window.location.origin}/api/webhooks/intasend`
+    const url = paymentConfig.paydCallbackUrl.trim() || `${window.location.origin}/api/webhooks/payd`
     navigator.clipboard.writeText(url)
     setCopiedWebhook(true)
     setTimeout(() => setCopiedWebhook(false), 2500)
@@ -938,7 +956,7 @@ export default function AdminDashboard() {
               }`}
             >
               <Key className="size-3.5" />
-              IntaSend Gateway
+              Payd Gateway
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -1984,7 +2002,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════
-            TAB 4: PAYMENT GATEWAY (INTASEND)
+            TAB 4: PAYMENT GATEWAY (PAYD)
             ══════════════════════════════════════════════════════════════ */}
         {activeTab === 'gateway' && (
           <div className="mx-auto max-w-2xl space-y-4">
@@ -1994,66 +2012,115 @@ export default function AdminDashboard() {
                 <span>Single Source of Truth: Configured in Admin Panel</span>
               </div>
               <p className="mt-1">
-                Keys set here are saved directly to the database and used for all M-Pesa STK push payments. 
-                You do not need duplicate environment variables.
+                Payd credentials set here are stored securely in the database and used for all M-Pesa STK push deposits. 
+                No Heroku environment variables or duplicate keys needed.
               </p>
             </div>
 
             <form onSubmit={handleSaveGateway} className="space-y-4 rounded-lg border border-line bg-panel p-5">
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h2 className="text-sm font-semibold text-ink">IntaSend M-Pesa API Credentials</h2>
+                <div>
+                  <h2 className="text-sm font-semibold text-ink">Payd M-Pesa API Credentials</h2>
+                  <p className="text-[11px] text-ink-3">app.payd.money REST STK Push & Webhook Gateway</p>
+                </div>
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className={`size-2 rounded-full ${isSecretConfigured ? 'bg-brand' : 'bg-amber-500'}`}></span>
-                  <span className={isSecretConfigured ? 'text-brand' : 'text-amber-500'}>
-                    {isSecretConfigured ? 'Active & Configured' : 'Needs Secret Key'}
+                  <span className={`size-2 rounded-full ${isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'bg-brand' : 'bg-amber-500'}`}></span>
+                  <span className={isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'text-brand font-medium' : 'text-amber-500 font-medium'}>
+                    {isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'Active & Configured' : 'Setup Required'}
                   </span>
                 </div>
               </div>
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-ink-2">
-                  IntaSend Publishable / Public Key
+                  Payd Wallet Username (<span className="font-mono text-brand">username</span>)
                 </label>
                 <input
                   type="text"
-                  value={paymentConfig.intasendPublicKey}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, intasendPublicKey: e.target.value }))}
-                  placeholder="ISPubKey_live_..."
+                  value={paymentConfig.paydWalletUsername}
+                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydWalletUsername: e.target.value }))}
+                  placeholder="e.g. your_wallet_username"
                   required
                   className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
                 />
-                <p className="mt-1 text-[11px] text-ink-3">Live or sandbox public key provided in your IntaSend dashboard.</p>
+                <p className="mt-1 text-[11px] text-ink-3">Your Payd account wallet username registered on app.payd.money.</p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">
+                  Payd API Username (<span className="font-mono text-brand">API_USERNAME</span>)
+                </label>
+                <input
+                  type="text"
+                  value={paymentConfig.paydApiUsername}
+                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiUsername: e.target.value }))}
+                  placeholder="e.g. your_api_username"
+                  required
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-ink-3">Found under Developer / API Settings in your Payd dashboard.</p>
               </div>
 
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
-                  <span>IntaSend Secret Key</span>
+                  <span>Payd API Password (<span className="font-mono text-brand">API_PASSWORD</span>)</span>
                   <button
                     type="button"
-                    onClick={() => setShowSecretKey(!showSecretKey)}
+                    onClick={() => setShowApiPassword(!showApiPassword)}
                     className="flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink"
                   >
-                    {showSecretKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                    {showSecretKey ? 'Hide' : 'Show'}
+                    {showApiPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    {showApiPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
                 <input
-                  type={showSecretKey ? 'text' : 'password'}
-                  value={newSecretKey}
-                  onChange={e => setNewSecretKey(e.target.value)}
-                  placeholder={isSecretConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing)' : 'ISSecretKey_live_...'}
+                  type={showApiPassword ? 'text' : 'password'}
+                  value={newApiPassword}
+                  onChange={e => setNewApiPassword(e.target.value)}
+                  placeholder={isPasswordConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing password)' : 'Enter Payd API password...'}
                   className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
                 />
                 <p className="mt-1 text-[11px] text-ink-3">
-                  Secured on the backend and never exposed to standard browser visitors.
+                  Used for HTTP Basic authentication. Secured in database and never exposed to public visitors.
                 </p>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
+                  <span>Payd API Base URL</span>
+                  <div className="flex gap-2 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments' }))}
+                      className="rounded bg-raised px-1.5 py-0.5 text-brand hover:underline"
+                    >
+                      Production Default
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: 'https://sandbox.mypayd.app/api/v2/payments' }))}
+                      className="rounded bg-raised px-1.5 py-0.5 text-amber-500 hover:underline"
+                    >
+                      Sandbox Preset
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={paymentConfig.paydApiBaseUrl}
+                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: e.target.value }))}
+                  placeholder="https://api.mypayd.app/api/v2/payments"
+                  required
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-ink-3">The Payd Collections REST API endpoint.</p>
               </div>
 
               {/* Webhook Endpoint Info */}
               <div className="rounded-md border border-line bg-field p-3 text-xs">
-                <span className="font-semibold text-ink">IntaSend Webhook Notification URL:</span>
+                <span className="font-semibold text-ink">Payd Webhook Callback URL:</span>
                 <div className="mt-1 flex items-center justify-between gap-2 rounded bg-raised px-2.5 py-1.5 font-mono text-[11px] text-brand">
-                  <span className="truncate">{typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/intasend` : '/api/webhooks/intasend'}</span>
+                  <span className="truncate">{typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/payd` : '/api/webhooks/payd'}</span>
                   <button
                     type="button"
                     onClick={copyWebhookUrl}
@@ -2064,7 +2131,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <p className="mt-1.5 text-[11px] text-ink-3">
-                  Paste this URL into your IntaSend account under Settings &gt; Webhooks to receive automatic payment confirmations.
+                  Paste this URL into your Payd Dashboard under Settings &gt; Webhooks / Developer API to receive automatic instant M-Pesa payment confirmations.
                 </p>
               </div>
 
@@ -2074,7 +2141,7 @@ export default function AdminDashboard() {
                   disabled={paymentLoading}
                   className="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
                 >
-                  {paymentLoading ? <RefreshCw className="size-3.5 animate-spin" /> : 'Save Gateway Keys'}
+                  {paymentLoading ? <RefreshCw className="size-3.5 animate-spin" /> : 'Save Payd Configuration'}
                 </button>
               </div>
             </form>

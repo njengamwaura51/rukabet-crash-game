@@ -85,7 +85,7 @@ export function DepositModal({ balance, freebet, freebetLocked, userPhone, onClo
         return
       }
 
-      // Call backend IntaSend STK Push API
+      // Call backend Payd STK Push API
       const response = await fetch(`${config.apiBaseUrl}/api/deposit`, {
         method: 'POST',
         headers: {

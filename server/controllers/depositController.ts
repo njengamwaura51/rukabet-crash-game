@@ -4,18 +4,23 @@ import { AuthRequest } from '../middleware/auth.js'
 import { Deposit } from '../models/Deposit.js'
 import { Settings } from '../models/Settings.js'
 
-const MIN_DEPOSIT = 10
-
-function getIntaSendUrl(secretKey: string): string {
-  if (secretKey.includes('_test_')) {
-    return 'https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/'
-  }
-  return 'https://api.intasend.com/api/v1/payment/mpesa-stk-push/'
-}
-
 function sanitizeKey(value?: string): string {
   if (typeof value !== 'string') return ''
   return value.trim().replace(/^["']|["']$/g, '')
+}
+
+export function normalizeKenyanPhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('254') && digits.length === 12 && /^254[17]\d{8}$/.test(digits)) {
+    return digits
+  }
+  if (digits.startsWith('0') && digits.length === 10 && /^0[17]\d{8}$/.test(digits)) {
+    return `254${digits.slice(1)}`
+  }
+  if (digits.length === 9 && /^[17]\d{8}$/.test(digits)) {
+    return `254${digits}`
+  }
+  return null
 }
 
 export async function initiateDeposit(req: AuthRequest, res: Response) {
@@ -24,97 +29,127 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
   try {
     const { amount, phone } = req.body
     const userId = req.userId!
-    const normalizedInputPhone = typeof phone === 'string' ? phone.replace(/\D/g, '') : ''
-    const accountPhone = typeof req.user?.phone === 'string' ? req.user.phone.replace(/\D/g, '') : ''
-    const resolvedPhone = normalizedInputPhone || accountPhone
+    const rawPhone = (typeof phone === 'string' && phone.trim()) ? phone.trim() : (req.user?.phone || '')
+    const cleanPhone = normalizeKenyanPhone(rawPhone)
     const depositAmount = Number(amount)
 
-    if (!Number.isFinite(depositAmount) || depositAmount < MIN_DEPOSIT) {
-      return res.status(400).json({ error: 'Minimum deposit is KSH 10' })
+    const settings = await (Settings as any).getSettings()
+    const minDeposit = settings?.minDeposit || 10
+
+    if (!Number.isFinite(depositAmount) || depositAmount < minDeposit) {
+      return res.status(400).json({ error: `Minimum deposit is KSH ${minDeposit}` })
     }
 
-    if (!/^[17]\d{8}$/.test(resolvedPhone)) {
-      return res.status(400).json({ error: 'Invalid phone number' })
+    if (!cleanPhone) {
+      return res.status(400).json({ error: 'Invalid Kenyan phone number. Use 07XXXXXXXX or 01XXXXXXXX.' })
     }
 
-    // Get IntaSend config from admin database settings first, falling back to env if not set
-    const settings = await Settings.findOne()
-    const intasendPublicKey = sanitizeKey(settings?.intasendPublicKey) || sanitizeKey(process.env.INTASEND_PUBLIC_KEY)
-    const intasendSecretKey = sanitizeKey(settings?.intasendSecretKey) || sanitizeKey(process.env.INTASEND_SECRET_KEY)
+    // Payd credentials from database Settings (single source of truth) with optional env fallback
+    const paydWalletUsername = sanitizeKey(settings?.paydWalletUsername) || sanitizeKey(process.env.PAYD_WALLET_USERNAME)
+    const paydApiUsername = sanitizeKey(settings?.paydApiUsername) || sanitizeKey(process.env.PAYD_API_USERNAME)
+    const paydApiPassword = sanitizeKey(settings?.paydApiPassword) || sanitizeKey(process.env.PAYD_API_PASSWORD)
+    const paydApiBaseUrl = sanitizeKey(settings?.paydApiBaseUrl) || sanitizeKey(process.env.PAYD_API_BASE_URL) || 'https://api.mypayd.app/api/v2/payments'
 
-    if (!intasendPublicKey || !intasendSecretKey) {
-      return res.status(500).json({ error: 'Payment gateway not configured' })
+    if (!paydWalletUsername || !paydApiUsername || !paydApiPassword) {
+      console.error('❌ Payd gateway credentials missing in admin settings')
+      return res.status(500).json({ 
+        error: 'Payment gateway not configured. Please configure Payd credentials in Admin Dashboard > Gateway.' 
+      })
     }
 
-    const normalizedPhone = `254${resolvedPhone}`
-    const apiRef = `${resolvedPhone}-RUKABET-${Date.now()}`
+    // Determine callback URL
+    const publicDomain = sanitizeKey(process.env.PUBLIC_APP_URL) || `${req.protocol}://${req.get('host')}`
+    const callbackUrl = sanitizeKey(settings?.paydCallbackUrl) || sanitizeKey(process.env.PAYD_CALLBACK_URL) || `${publicDomain}/api/webhooks/payd`
 
-    // Create pending deposit record
+    const internalRef = `DEP_${Date.now()}_${userId}`
+
+    // Create pending deposit record first
     const deposit = await Deposit.create({
       userId,
-      phone: normalizedPhone,
+      phone: cleanPhone,
       amount: depositAmount,
-      apiRef,
+      apiRef: internalRef,
       status: 'pending'
     })
     depositId = deposit._id.toString()
 
-    // Call IntaSend STK Push API
-    const intasendUrl = getIntaSendUrl(intasendSecretKey)
-    const response = await axios.post(intasendUrl, {
-      amount: depositAmount,
-      phone_number: normalizedPhone,
-      api_ref: apiRef
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + intasendSecretKey
+    // Build HTTP Basic Auth header
+    const basicAuth = Buffer.from(`${paydApiUsername}:${paydApiPassword}`).toString('base64')
+
+    console.log(`📤 Sending Payd STK Push: amount=${depositAmount}, phone=${cleanPhone}, ref=${internalRef}`)
+
+    // Call Payd Collections REST API
+    const paydResponse = await axios.post(
+      paydApiBaseUrl,
+      {
+        username: paydWalletUsername,
+        network_code: '63902', // Safaricom M-Pesa Kenya
+        amount: depositAmount,
+        phone_number: cleanPhone,
+        narration: `Deposit ${internalRef}`,
+        currency: 'KES',
+        callback_url: callbackUrl
+      },
+      {
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        timeout: 25000
       }
-    })
+    )
 
-    console.log('✅ IntaSend STK Push sent:', response.data)
+    console.log('✅ Payd STK Push response:', paydResponse.data)
 
-    // Update deposit with IntaSend invoice ID
-    if (response.data.invoice?.invoice_id) {
-      deposit.intasendInvoiceId = response.data.invoice.invoice_id
+    const externalRef =
+      paydResponse.data?.transaction_reference ||
+      paydResponse.data?.correlator_id ||
+      paydResponse.data?.reference ||
+      paydResponse.data?.data?.transaction_reference ||
+      paydResponse.data?.data?.reference ||
+      null
+
+    if (externalRef) {
+      deposit.paydReference = String(externalRef)
+      deposit.externalRef = String(externalRef)
       await deposit.save()
     }
 
     return res.json({
       success: true,
-      message: 'STK Push sent. Check your phone.',
+      message: 'STK Push sent to your phone. Please enter your M-Pesa PIN.',
       depositId: deposit._id,
-      apiRef
+      apiRef: internalRef,
+      externalRef
     })
   } catch (error: any) {
     if (depositId) {
+      const errMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Deposit initiation failed'
       await Deposit.findByIdAndUpdate(
         depositId,
-        { $set: { status: 'failed' } },
+        { $set: { status: 'failed', failureReason: errMsg } },
         { new: false }
       ).catch((updateError) => {
         console.error('⚠️ Failed to mark deposit as failed:', updateError?.message || updateError)
       })
     }
 
-    const intasendStatus = error?.response?.status
-    const intasendCode = error?.response?.data?.code || error?.code
-    const intasendMessage = error?.response?.data?.message || error?.message || 'Deposit failed'
-    const intasendDetails = error?.response?.data?.detail || error?.response?.data?.errors
-    const responseStatus = Number.isInteger(intasendStatus) && intasendStatus >= 400 && intasendStatus < 600
-      ? intasendStatus
+    const paydStatus = error?.response?.status
+    const paydData = error?.response?.data
+    const paydMessage = paydData?.message || paydData?.error || error?.message || 'STK Push failed'
+    const responseStatus = Number.isInteger(paydStatus) && paydStatus >= 400 && paydStatus < 600
+      ? paydStatus
       : 500
 
-    console.error('❌ IntaSend STK push failed:', {
-      status: intasendStatus ?? 'unknown',
-      code: intasendCode ?? 'unknown',
-      message: intasendMessage
+    console.error('❌ Payd STK push failed:', {
+      status: paydStatus ?? 'unknown',
+      data: paydData ?? error?.message
     })
 
     return res.status(responseStatus).json({
-      error: intasendMessage,
-      code: intasendCode,
-      details: intasendDetails
+      error: paydMessage,
+      details: paydData
     })
   }
 }

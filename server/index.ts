@@ -32,7 +32,7 @@ import { Settings } from './models/Settings.js'
 import { register, login, getMe, changePassword } from './controllers/authController.js'
 import { initiateDeposit } from './controllers/depositController.js'
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js'
-import { intasendWebhook } from './controllers/webhookController.js'
+import { paydWebhook, intasendWebhook } from './controllers/webhookController.js'
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js'
 import { 
   getAdminOverview, 
@@ -54,9 +54,10 @@ import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const PAYD_WEBHOOK_PATH = '/api/webhooks/payd'
 const INTASEND_WEBHOOK_PATH = '/api/webhooks/intasend'
-const INTASEND_PUBLIC_DOMAIN = process.env.PUBLIC_APP_URL || 'https://rukabet.live'
-const INTASEND_WEBHOOK_URL = `${INTASEND_PUBLIC_DOMAIN}${INTASEND_WEBHOOK_PATH}`
+const PUBLIC_DOMAIN = process.env.PUBLIC_APP_URL || 'https://rukabet.live'
+const PAYD_WEBHOOK_URL = `${PUBLIC_DOMAIN}${PAYD_WEBHOOK_PATH}`
 
 const distPath = path.join(__dirname, '../dist')
 const isProduction = process.env.NODE_ENV === 'production'
@@ -103,9 +104,11 @@ app.get('/api/user/transactions', authMiddleware, getUserTransactions)
 // Public configuration
 app.get('/api/public-config', getPublicConfig)
 
-// Webhook (no auth - called by IntaSend)
+// Webhook for Payd payments
+app.post(PAYD_WEBHOOK_PATH, webhookRateLimit, paydWebhook)
+// Transitional legacy IntaSend webhook
 app.post(INTASEND_WEBHOOK_PATH, webhookRateLimit, intasendWebhook)
-console.log(`🔔 IntaSend webhook URL: ${INTASEND_WEBHOOK_URL}`)
+console.log(`🔔 Payd webhook URL: ${PAYD_WEBHOOK_URL}`)
 
 // Admin routes
 app.post('/api/admin/login', adminRateLimit, adminLogin)
@@ -162,7 +165,7 @@ async function startServer() {
     // Connect to MongoDB
     await connectDB()
     
-    // Ensure settings exist (no IntaSend keys required at startup)
+    // Ensure settings exist (no payment gateway keys required at startup)
     console.log('🔄 Initializing settings...')
     try {
       const existingSettings = await Settings.findOne()
@@ -170,12 +173,13 @@ async function startServer() {
         await Settings.create({
           adminToken: process.env.ADMIN_TOKEN || 'rukabet-admin-2026',
           jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026',
-          // IntaSend keys are optional - set via admin dashboard
-          intasendPublicKey: '',
-          intasendSecretKey: '',
+          paydWalletUsername: '',
+          paydApiUsername: '',
+          paydApiPassword: '',
+          paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments',
           companyName: 'RUKA TECH SOLUTIONS'
         })
-        console.log('✅ Default settings created (configure IntaSend in admin dashboard)')
+        console.log('✅ Default settings created (configure Payd in admin dashboard)')
       } else {
         console.log('✅ Settings loaded')
       }

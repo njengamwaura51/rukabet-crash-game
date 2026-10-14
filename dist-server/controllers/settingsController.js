@@ -24,25 +24,28 @@ export async function getSettings(req, res) {
         if (!settings) {
             settings = await Settings.create({
                 adminToken: process.env.ADMIN_TOKEN || '117402',
-                jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
+                jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026',
+                paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments'
             });
         }
-        const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY);
-        const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY);
-        const effectivePubKey = settings.intasendPublicKey || envPubKey || '';
-        const hasSecret = !!(settings.intasendSecretKey || envSecKey);
-        // Never send full secret key to frontend
+        const hasPassword = Boolean(settings.paydApiPassword);
         return res.json({
             success: true,
             settings: {
-                intasendPublicKey: effectivePubKey,
-                isSecretConfigured: hasSecret,
-                isManagedViaAdmin: !!(settings.intasendPublicKey || settings.intasendSecretKey),
+                paydWalletUsername: settings.paydWalletUsername || '',
+                paydApiUsername: settings.paydApiUsername || '',
+                paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
+                paydCallbackUrl: settings.paydCallbackUrl || '',
+                isPasswordConfigured: hasPassword,
+                isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername),
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,
                 minDeposit: settings.minDeposit,
                 minWithdrawal: settings.minWithdrawal,
-                updatedAt: settings.updatedAt
+                updatedAt: settings.updatedAt,
+                // Legacy compatibility
+                intasendPublicKey: '',
+                isSecretConfigured: false
             }
         });
     }
@@ -55,8 +58,11 @@ export async function updateSettings(req, res) {
         const updates = req.body;
         // Sanitize - only allow specific fields to be updated
         const allowedFields = [
-            'intasendPublicKey',
-            'intasendSecretKey',
+            'paydWalletUsername',
+            'paydApiUsername',
+            'paydApiPassword',
+            'paydApiBaseUrl',
+            'paydCallbackUrl',
             'companyName',
             'whatsappSupport',
             'minDeposit',
@@ -67,8 +73,8 @@ export async function updateSettings(req, res) {
             const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
             const val = updates[key] !== undefined ? updates[key] : updates[snakeKey];
             if (val !== undefined) {
-                // If updating secret key, only set if non-empty string and not masked
-                if (key === 'intasendSecretKey') {
+                // If updating password, only set if non-empty string and not masked
+                if (key === 'paydApiPassword') {
                     if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
                         sanitizedUpdates[key] = sanitizeKey(val);
                     }
@@ -79,16 +85,16 @@ export async function updateSettings(req, res) {
             }
         }
         const settings = await Settings.findOneAndUpdate({}, { $set: sanitizedUpdates }, { new: true, upsert: true });
-        const envPubKey = sanitizeKey(process.env.INTASEND_PUBLIC_KEY);
-        const envSecKey = sanitizeKey(process.env.INTASEND_SECRET_KEY);
-        const effectivePubKey = settings.intasendPublicKey || envPubKey || '';
-        const hasSecret = !!(settings.intasendSecretKey || envSecKey);
+        const hasPassword = Boolean(settings.paydApiPassword);
         return res.json({
             success: true,
             message: 'Settings updated successfully',
             settings: {
-                intasendPublicKey: effectivePubKey,
-                isSecretConfigured: hasSecret,
+                paydWalletUsername: settings.paydWalletUsername || '',
+                paydApiUsername: settings.paydApiUsername || '',
+                paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
+                paydCallbackUrl: settings.paydCallbackUrl || '',
+                isPasswordConfigured: hasPassword,
                 isManagedViaAdmin: true,
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,

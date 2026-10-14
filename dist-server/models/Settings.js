@@ -1,5 +1,25 @@
 import mongoose, { Schema } from 'mongoose';
 const SettingsSchema = new Schema({
+    paydWalletUsername: {
+        type: String,
+        default: ''
+    },
+    paydApiUsername: {
+        type: String,
+        default: ''
+    },
+    paydApiPassword: {
+        type: String,
+        default: ''
+    },
+    paydApiBaseUrl: {
+        type: String,
+        default: 'https://api.mypayd.app/api/v2/payments'
+    },
+    paydCallbackUrl: {
+        type: String,
+        default: ''
+    },
     intasendPublicKey: {
         type: String,
         default: ''

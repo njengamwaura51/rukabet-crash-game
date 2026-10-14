@@ -26,6 +26,24 @@ const DepositSchema = new Schema({
         enum: ['pending', 'completed', 'failed'],
         default: 'pending'
     },
+    paydReference: {
+        type: String,
+        default: null,
+        index: true
+    },
+    externalRef: {
+        type: String,
+        default: null,
+        index: true
+    },
+    mpesaReceipt: {
+        type: String,
+        default: null
+    },
+    failureReason: {
+        type: String,
+        default: null
+    },
     intasendInvoiceId: {
         type: String,
         default: null
