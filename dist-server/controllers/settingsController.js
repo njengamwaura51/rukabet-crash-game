@@ -73,9 +73,12 @@ export async function updateSettings(req, res) {
             const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
             const val = updates[key] !== undefined ? updates[key] : updates[snakeKey];
             if (val !== undefined) {
-                // If updating password, only set if non-empty string and not masked
+                // If updating password, set if valid new password, or clear if explicitly empty
                 if (key === 'paydApiPassword') {
-                    if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
+                    if (val === '' || val === null) {
+                        sanitizedUpdates[key] = '';
+                    }
+                    else if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
                         sanitizedUpdates[key] = sanitizeKey(val);
                     }
                 }
