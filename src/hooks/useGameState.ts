@@ -15,16 +15,21 @@ export interface PlaneTransform {
 export interface SharedLiveBet {
   id: string
   user: string
-  rank: number
+  rank?: number
   bet: number
-  cashout: number | null
-  won: number | null
-  cashoutTarget: number
+  cashout?: number | null
+  won?: number | null
+  cashoutTarget?: number
   isUser?: boolean
   avatar?: string
-  roundId: string
-  updatedAt: number
+  roundId?: string
+  updatedAt?: number
+  cashedOut?: boolean
+  cashOut?: number
+  win?: number
 }
+
+export type LiveBet = SharedLiveBet
 
 export interface GameState {
   phase: Phase

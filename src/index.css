@@ -65,95 +65,115 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* App surface scale (flat, no transparency) */
-  --color-page: #0e1115;
-  --color-panel: #151920;
-  --color-field: #1b2028;
-  --color-raised: #232933;
-  --color-line: #2a313b;
-  --color-line-strong: #3a4350;
+  /* ── 4-tier solid matte surface scale (zero alpha anywhere) ──────────── */
+  --color-page: #0b0e14;        /* page canvas */
+  --color-panel: #121620;       /* structural cards & panels */
+  --color-field: #181e2b;       /* recessed inputs & segmented fields */
+  --color-raised: #222a3a;      /* raised & active interactive states */
+  --color-line: #262f40;        /* 1px structural dividers */
+  --color-line-strong: #344156; /* emphasised dividers, scrollbar thumbs */
 
-  /* Text */
-  --color-ink: #eef1f4;
-  --color-ink-2: #a8b0bb;
-  --color-ink-3: #7c8591;
+  /* ── Text hierarchy ──────────────────────────────────────────────────── */
+  --color-ink: #f8fafc;   /* primary numbers & CTAs */
+  --color-ink-2: #94a3b8; /* secondary metadata */
+  --color-ink-3: #64748b; /* micro-labels */
 
-  /* Brand + status */
+  /* ── Brand & status: solid, pre-mixed on #121620 ─────────────────────── */
   --color-brand: #00c74d;
   --color-brand-hover: #00b545;
+  --color-brand-active: #00a33e;
   --color-brand-ink: #03210d;
-  --color-bonus: #f5b83d;
+  --color-brand-ink-2: #0a4a1f;
+  --color-brand-tint: #0f2a1f;
+  --color-brand-line: #0f4d2c;
+
   --color-loss: #ff5c6c;
+  --color-loss-tint: #2b161b;
+  --color-loss-line: #5a2a33;
+
+  --color-bonus: #f5b83d;
+  --color-bonus-tint: #2a2213;
+  --color-bonus-line: #564729;
+
   --color-cashout: #f5a524;
+  --color-cashout-hover: #e9991a;
+  --color-cashout-ink: #2b1700;
+  --color-cashout-ink-2: #5c3300;
+
+  --color-cancel: #d93036;
+  --color-cancel-hover: #c42a30;
+
+  --color-whatsapp: #25d366;
 }
 
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
-  --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(255,255,255, .03);
-  --elevate-2: rgba(255,255,255, .06);
+  color-scheme: dark;
 
-  /* Surfaces */
-  --background: 214 20% 7%;
-  --foreground: 210 21% 95%;
-  --border: 215 17% 20%;
-  --card: 218 21% 10%;
-  --card-foreground: 210 21% 95%;
-  --card-border: 215 17% 20%;
+  /* Solid outlines for the shadcn button/badge primitives */
+  --button-outline: #0a0d12;
+  --badge-outline: #0e1118;
+  --opaque-button-border-intensity: -8;
+
+  /* Surfaces (exact hsl of the matte scale above) */
+  --background: 220 29% 6%;
+  --foreground: 210 40% 98%;
+  --border: 219 25% 20%;
+  --card: 223 28% 10%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 219 25% 20%;
 
   /* Primary */
   --primary: 143 100% 39%;
-  --primary-foreground: 148 80% 7%;
+  --primary-foreground: 140 83% 7%;
   --primary-border: hsl(143 100% 32%);
 
-  /* Secondary */
-  --secondary: 217 19% 13%;
-  --secondary-foreground: 210 21% 90%;
-  --secondary-border: hsl(217 19% 18%);
+  /* Secondary (recessed field) */
+  --secondary: 221 28% 13%;
+  --secondary-foreground: 210 40% 98%;
+  --secondary-border: hsl(219 25% 20%);
 
-  /* Muted */
-  --muted: 218 19% 17%;
-  --muted-foreground: 215 12% 70%;
-  --muted-border: hsl(218 19% 21%);
+  /* Muted (raised) */
+  --muted: 220 26% 18%;
+  --muted-foreground: 215 20% 65%;
+  --muted-border: hsl(219 25% 20%);
 
   /* Accent (hover surfaces, not brand) */
-  --accent: 218 19% 17%;
-  --accent-foreground: 210 21% 95%;
-  --accent-border: hsl(218 19% 22%);
+  --accent: 220 26% 18%;
+  --accent-foreground: 210 40% 98%;
+  --accent-border: hsl(219 25% 20%);
 
   /* Destructive */
   --destructive: 354 100% 68%;
-  --destructive-foreground: 148 80% 7%;
+  --destructive-foreground: 140 83% 7%;
   --destructive-border: hsl(354 80% 55%);
 
   /* Input / ring */
-  --input: 215 17% 20%;
+  --input: 219 25% 20%;
   --ring: 143 100% 39%;
 
   /* Charts */
   --chart-1: 143 100% 39%;
   --chart-2: 354 100% 68%;
-  --chart-3: 41 91% 60%;
+  --chart-3: 40 90% 60%;
   --chart-4: 213 94% 68%;
   --chart-5: 270 95% 75%;
 
   /* Sidebar */
-  --sidebar: 218 21% 10%;
-  --sidebar-foreground: 210 21% 95%;
-  --sidebar-border: 215 17% 20%;
+  --sidebar: 223 28% 10%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 219 25% 20%;
   --sidebar-primary: 143 100% 39%;
-  --sidebar-primary-foreground: 148 80% 7%;
+  --sidebar-primary-foreground: 140 83% 7%;
   --sidebar-primary-border: hsl(143 100% 32%);
-  --sidebar-accent: 218 19% 17%;
-  --sidebar-accent-foreground: 210 21% 95%;
-  --sidebar-accent-border: hsl(218 19% 22%);
+  --sidebar-accent: 220 26% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-accent-border: hsl(219 25% 20%);
   --sidebar-ring: 143 100% 39%;
 
   /* Popover */
-  --popover: 218 21% 10%;
-  --popover-foreground: 210 21% 95%;
-  --popover-border: 215 17% 20%;
+  --popover: 223 28% 10%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 219 25% 20%;
 
   /* Fonts */
   --app-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -164,15 +184,15 @@
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
-  /* Shadows: only floating layers (menus, sheets) use these */
+  /* Shadows: flat UI. Only floating layers (menus, dialogs) cast a hard drop. */
   --shadow-2xs: none;
   --shadow-xs: none;
   --shadow-sm: none;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.5);
-  --shadow-xl: 0 12px 32px rgb(0 0 0 / 0.5);
-  --shadow-2xl: 0 16px 40px rgb(0 0 0 / 0.55);
+  --shadow: none;
+  --shadow-md: 0 4px 12px #000000;
+  --shadow-lg: 0 8px 24px #000000;
+  --shadow-xl: 0 12px 32px #000000;
+  --shadow-2xl: 0 16px 40px #000000;
 }
 
 @layer base {
@@ -183,19 +203,33 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    background-color: var(--color-page);
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased bg-page text-ink;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    min-height: 100vh;
     min-height: 100dvh;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Form controls reset the font shorthand; re-assert fixed-width numerals */
+  input,
+  button,
+  select,
+  textarea {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
   button,
   a,
   [role='button'],
-  [role='switch'] {
+  [role='switch'],
+  [role='tab'] {
     touch-action: manipulation;
   }
 
@@ -210,6 +244,13 @@
     outline-offset: 2px;
   }
 
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    border-color: var(--color-brand);
+  }
+
   input[type='number']::-webkit-outer-spin-button,
   input[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -219,6 +260,17 @@
     -moz-appearance: textfield;
     appearance: textfield;
   }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-3);
+    opacity: 1;
+  }
+
+  img,
+  svg {
+    display: block;
+  }
 }
 
 /* ── Scrollbars ────────────────────────────────────────────────────────────── */
@@ -227,12 +279,18 @@
 
 .live-bets-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-line-strong) transparent;
+  scrollbar-color: var(--color-line-strong) var(--color-panel);
   overscroll-behavior: contain;
+}
+.live-bets-scroll::-webkit-scrollbar { width: 6px; }
+.live-bets-scroll::-webkit-scrollbar-track { background: var(--color-panel); }
+.live-bets-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 3px;
 }
 
 /* ── Modal / sheet entrance ────────────────────────────────────────────────── */
-/* Plays only when the user opens something. Bottom sheet on phones, centred on larger screens. */
+/* Plays only when the user opens something. No blur, no scale: a short rise. */
 @keyframes sheet-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -251,10 +309,17 @@
 }
 .animate-fade-in { animation: fade-in 140ms ease-out; }
 
+/* New rows in the live-bets ledger slide in by one line height */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-row-in { animation: row-in 160ms ease-out; }
+
 /* ── Selection ─────────────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(0, 199, 77, 0.3);
-  color: #fff;
+  background: var(--color-brand-line);
+  color: var(--color-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

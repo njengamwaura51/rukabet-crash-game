@@ -17,6 +17,8 @@ interface HeaderProps {
   activeWallet?: 'main' | 'bonus'
 }
 
+const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeWallet = 'main' }: HeaderProps) {
   const [showAuth, setShowAuth] = useState<'login' | 'register' | null>(null)
   const [showDeposit, setShowDeposit] = useState(false)
@@ -25,64 +27,67 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
 
   const isLoggedIn = !!user
   const isBonus = activeWallet === 'bonus'
-
-  const displayBalance = activeWallet === 'main'
-    ? user?.balance ?? 0
-    : user?.freebet ?? 0
+  const displayBalance = isBonus ? user?.freebet ?? 0 : user?.balance ?? 0
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-line bg-page pt-[env(safe-area-inset-top)]">
-        <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4 lg:px-5">
-          {/* Logo + support */}
-          <div className="flex min-w-0 items-center gap-4">
-            <Link to="/" className="block shrink-0">
+        <div className="flex h-14 items-center justify-between gap-2 px-2.5 sm:px-4 lg:px-5">
+          {/* Brand + support */}
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <Link to="/" className="flex shrink-0 items-center rounded-md">
               <img src="/logo.png" alt="" className="h-8 w-auto sm:h-9" />
-              <span className="sr-only">RukaBet home</span>
+              <span className="sr-only">{config.brandName} home</span>
             </Link>
 
             <a
               href={`https://wa.me/${config.whatsappSupportNumber}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden items-center gap-2 text-sm text-ink-2 hover:text-ink md:flex"
+              className="hidden h-8 items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-xs font-medium text-ink-2 transition-colors hover:bg-field hover:text-ink md:flex"
             >
-              <WhatsAppIcon className="size-4 text-[#25D366]" />
-              <span>Support +{config.whatsappSupportNumber}</span>
+              <WhatsAppIcon className="size-3.5 text-whatsapp" />
+              <span>Support</span>
+              <span className="tabular-nums text-ink-3">+{config.whatsappSupportNumber}</span>
             </a>
           </div>
 
           {/* Account */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {isLoggedIn ? (
-              <>
-                <div className="flex min-w-0 flex-col items-end leading-tight" aria-live="polite">
-                  <span className="text-[11px] text-ink-3">{isBonus ? 'Bonus balance' : 'Balance'}</span>
-                  <span className={`max-w-[7.5rem] truncate text-sm font-semibold tabular-nums sm:max-w-none ${isBonus ? 'text-bonus' : 'text-ink'}`}>
-                    KSH {displayBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="flex h-9 items-stretch overflow-hidden rounded-md border border-line bg-field sm:h-10">
+                <div className="flex min-w-0 flex-col justify-center px-2.5 leading-none sm:px-3" aria-live="polite">
+                  <span className="text-[10px] font-medium text-ink-3">{isBonus ? 'Bonus' : 'Balance'}</span>
+                  <span
+                    className={`mt-0.5 max-w-[6.5rem] truncate text-[13px] font-semibold tabular-nums sm:max-w-[11rem] sm:text-sm ${
+                      isBonus ? 'text-bonus' : 'text-ink'
+                    }`}
+                  >
+                    <span className="mr-1 text-[10px] font-medium text-ink-3 sm:text-[11px]">KSH</span>
+                    {money.format(displayBalance)}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowDeposit(true)}
-                  className="h-10 rounded-md bg-brand px-4 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover"
+                  className="flex items-center bg-brand px-3 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-active sm:px-3.5 sm:text-sm"
                 >
                   Deposit
                 </button>
-              </>
+              </div>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => setShowAuth('login')}
-                  className="h-10 rounded-md border border-line-strong px-3.5 text-sm font-semibold text-ink transition-colors hover:bg-field"
+                  className="h-9 rounded-md border border-line-strong bg-panel px-3 text-[13px] font-semibold text-ink transition-colors hover:bg-field sm:h-10 sm:px-3.5 sm:text-sm"
                 >
                   Log in
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAuth('register')}
-                  className="h-10 rounded-md bg-brand px-3.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover"
+                  className="h-9 rounded-md bg-brand px-3 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-active sm:h-10 sm:px-3.5 sm:text-sm"
                 >
                   Register
                 </button>
@@ -96,7 +101,11 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
               aria-label="Menu"
               aria-expanded={showMenu}
               aria-haspopup="menu"
-              className="flex size-10 items-center justify-center rounded-md text-ink-2 transition-colors hover:bg-field hover:text-ink"
+              className={`flex size-9 items-center justify-center rounded-md border transition-colors sm:size-10 ${
+                showMenu
+                  ? 'border-line-strong bg-raised text-ink'
+                  : 'border-line bg-panel text-ink-2 hover:bg-field hover:text-ink'
+              }`}
             >
               <Menu className="size-5" aria-hidden="true" />
             </button>

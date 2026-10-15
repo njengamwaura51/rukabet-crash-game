@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Modal } from './Modal'
 
 interface AuthModalProps {
@@ -10,43 +9,45 @@ interface AuthModalProps {
   onSwitchMode: () => void
 }
 
-// Safaricom prefixes in 9-digit format (without country code or leading zero):
-// 7xx... (70,71,72,74,75,76,79) and 11x... (110-115)
+// Safaricom ranges in local 0-prefixed form: 07[0,1,2,4,5,6,9]x xxx xxx and 011[0-5]x xxx xx
 const SAFARICOM_REGEX = /^0(7[01245679]\d{7}|11[0-5]\d{6})$/
+const COUNTRY_CODE = '+254'
+const MIN_PASSWORD_LENGTH = 4
 
 function normalizePhoneInput(phone: string): string {
-  let cleaned = phone.replace(/\D/g, '')
-  if (cleaned.startsWith('254')) {
-    cleaned = '0' + cleaned.slice(3)
+  let digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('254')) {
+    digits = '0' + digits.slice(3)
   }
-  if (cleaned.length > 0 && !cleaned.startsWith('0')) {
-    cleaned = '0' + cleaned
+  if (digits.length > 0 && !digits.startsWith('0')) {
+    digits = '0' + digits
   }
-  return cleaned.slice(0, 10)
+  return digits.slice(0, 10)
 }
 
-function validateSafaricomNumber(phone: string): { valid: boolean; normalized: string; isComplete: boolean; error?: string } {
+interface PhoneValidation {
+  valid: boolean
+  normalized: string
+  isComplete: boolean
+  error?: string
+}
+
+function validateSafaricomNumber(phone: string): PhoneValidation {
   const normalized = normalizePhoneInput(phone)
   const isComplete = normalized.length === 10
 
   if (!isComplete) {
-    return { valid: false, normalized, isComplete: false }
+    return { valid: false, normalized, isComplete }
   }
 
   if (!SAFARICOM_REGEX.test(normalized)) {
-    return {
-      valid: false,
-      normalized,
-      isComplete: true,
-      error: 'Only Safaricom numbers are allowed'
-    }
+    return { valid: false, normalized, isComplete, error: 'Safaricom numbers only' }
   }
 
-  return { valid: true, normalized, isComplete: true }
+  return { valid: true, normalized, isComplete }
 }
 
-// Generate auto username from phone: User_XXXXX or anonymized number
-function generateUsername(phone: string): string {
+function generateUsername(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let suffix = ''
   for (let i = 0; i < 5; i++) {
@@ -55,172 +56,244 @@ function generateUsername(phone: string): string {
   return `User_${suffix}`
 }
 
+function EyeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+      aria-hidden="true"
+    >
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+      <path d="M2 2l20 20" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3"
+      aria-hidden="true"
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="size-4 animate-spin" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={2.5} strokeOpacity={0.25} />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: AuthModalProps) {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const isLogin = mode === 'login'
   const validation = validateSafaricomNumber(phone)
+  const phoneInvalid = validation.isComplete && !validation.valid
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    if (value.replace(/\D/g, '').length <= 12) {
+      setPhone(value)
+    }
+  }
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError('')
+    setError(null)
 
-    if (!validation.isComplete) {
-      setError('Enter your 10-digit phone number')
+    if (!phone) {
+      setError('Enter your phone number')
       return
     }
 
-    // Validate Safaricom number (checked only after full input)
     if (!validation.valid) {
-      setError(validation.error || 'Invalid phone number')
+      setError(validation.error ?? 'Enter a valid Safaricom number')
       return
     }
 
-    const normalizedPhone = validation.normalized
-
-    if (mode === 'register') {
-      if (password !== confirmPassword) {
-        setError('Passwords do not match')
-        return
-      }
-      if (password.length < 4) {
-        setError('Password must be at least 4 characters')
-        return
-      }
+    if (!password) {
+      setError('Enter your password')
+      return
     }
 
-    setIsLoading(true)
+    if (!isLogin && password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+      return
+    }
+
+    setLoading(true)
+
     try {
-      let result
-      if (mode === 'login') {
-        result = await onLogin(normalizedPhone, password)
-      } else {
-        const autoUsername = generateUsername(normalizedPhone)
-        result = await onRegister(normalizedPhone, password, autoUsername)
-      }
+      const result = isLogin
+        ? await onLogin(validation.normalized, password)
+        : await onRegister(validation.normalized, password, generateUsername())
 
       if (result.success) {
         onClose()
       } else {
-        setError(result.error || 'An error occurred')
+        setError(result.error ?? (isLogin ? 'Login failed' : 'Registration failed'))
       }
+    } catch {
+      setError('Request failed. Try again.')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const isLogin = mode === 'login'
-
   return (
     <Modal
-      title={isLogin ? 'Welcome back' : 'Create account'}
-      description={isLogin ? 'Log in to continue' : 'Get a KSH 150 freebet bonus'}
+      title={isLogin ? 'Log in' : 'Create account'}
+      description={isLogin ? 'Safaricom M-Pesa number and password' : 'Register with your Safaricom M-Pesa number'}
       onClose={onClose}
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        {/* Phone */}
         <div>
-          <label htmlFor="auth-phone" className="mb-1.5 block text-sm font-medium text-ink-2">
+          <label htmlFor="auth-phone" className="block text-xs font-medium text-ink-2">
             Phone number
           </label>
-          <input
-            id="auth-phone"
-            name="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            value={phone}
-            onChange={e => setPhone(normalizePhoneInput(e.target.value))}
-            placeholder="0712345678"
-            maxLength={10}
-            className="h-12 w-full rounded-md border border-line bg-field px-3 text-base text-ink placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none"
-            required
-          />
-          {mode === 'register' && validation.isComplete && !validation.valid && (
-            <p className="mt-1.5 text-sm text-loss">Only Safaricom numbers are supported</p>
-          )}
+          <div
+            className={`mt-1 flex h-11 overflow-hidden rounded-md border bg-field ${
+              phoneInvalid ? 'border-loss' : 'border-line focus-within:border-brand'
+            }`}
+          >
+            <span className="flex select-none items-center border-r border-line px-3 text-sm font-medium tabular-nums text-ink-2">
+              {COUNTRY_CODE}
+            </span>
+            <input
+              id="auth-phone"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              autoFocus
+              placeholder="712 345 678"
+              value={phone}
+              onChange={handlePhoneChange}
+              aria-invalid={phoneInvalid || undefined}
+              aria-describedby="auth-phone-hint"
+              className="min-w-0 flex-1 bg-transparent px-3 text-sm font-medium tabular-nums text-ink placeholder:text-ink-3 focus:outline-none"
+            />
+            {validation.isComplete && (
+              <span
+                className={`mr-2 flex items-center gap-1 self-center rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                  validation.valid ? 'bg-brand/10 text-brand' : 'bg-loss/10 text-loss'
+                }`}
+              >
+                {validation.valid ? (
+                  <>
+                    <CheckIcon />
+                    Safaricom
+                  </>
+                ) : (
+                  'Not Safaricom'
+                )}
+              </span>
+            )}
+          </div>
+          <p id="auth-phone-hint" className="mt-1 text-xs text-ink-3">
+            Safaricom numbers only
+          </p>
         </div>
 
+        {/* Password */}
         <div>
-          <label htmlFor="auth-password" className="mb-1.5 block text-sm font-medium text-ink-2">
+          <label htmlFor="auth-password" className="block text-xs font-medium text-ink-2">
             Password
           </label>
-          <div className="relative">
+          <div className="relative mt-1">
             <input
               id="auth-password"
-              name="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete={isLogin ? 'current-password' : 'new-password'}
+              placeholder={isLogin ? undefined : `Min ${MIN_PASSWORD_LENGTH} characters`}
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Enter password"
-              className="h-12 w-full rounded-md border border-line bg-field px-3 text-base text-ink placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none pr-12"
-              required
-              minLength={4}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11 w-full rounded-md border border-line bg-field pl-3 pr-11 text-sm font-medium text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
             />
             <button
               type="button"
-              onClick={() => setShowPassword(v => !v)}
+              onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-1 top-1 flex size-10 items-center justify-center rounded-md text-ink-3 hover:text-ink"
+              aria-pressed={showPassword}
+              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-3 transition-colors hover:text-ink focus:outline-none focus-visible:text-ink"
             >
-              {showPassword ? <EyeOff className="size-5" aria-hidden="true" /> : <Eye className="size-5" aria-hidden="true" />}
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
         </div>
 
-        {mode === 'register' && (
-          <div>
-            <label htmlFor="auth-confirm" className="mb-1.5 block text-sm font-medium text-ink-2">
-              Confirm password
-            </label>
-            <input
-              id="auth-confirm"
-              name="confirmPassword"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-              className="h-12 w-full rounded-md border border-line bg-field px-3 text-base text-ink placeholder:text-ink-3 focus-visible:border-brand focus-visible:outline-none"
-              required
-              minLength={4}
-            />
-          </div>
-        )}
-
+        {/* Error */}
         {error && (
-          <div role="alert" className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2.5 text-sm text-loss">
+          <p role="alert" className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-xs font-medium text-loss">
             {error}
-          </div>
+          </p>
         )}
 
+        {/* Submit */}
         <button
           type="submit"
-          disabled={isLoading}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover active:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={loading || phoneInvalid}
+          className="flex h-11 w-full items-center justify-center rounded-md bg-brand text-sm font-bold text-brand-ink transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Processing...
-            </>
-          ) : (
-            isLogin ? 'Log in' : 'Create account'
-          )}
+          {loading ? <SpinnerIcon /> : isLogin ? 'Log in' : 'Create account'}
         </button>
 
-        {mode === 'register' && (
-          <div className="rounded-md border border-bonus/30 bg-bonus/10 px-3 py-2.5">
-            <p className="text-sm font-semibold text-bonus">KSH 150 freebet bonus</p>
-            <p className="mt-0.5 text-sm text-ink-2">Deposit KSH 20 and place a bet to unlock it.</p>
+        {/* Freebet note */}
+        {!isLogin && (
+          <div className="flex items-baseline justify-between rounded-md border border-line bg-field px-3 py-2 text-xs">
+            <span className="font-semibold text-bonus">
+              KSH <span className="tabular-nums">150</span> freebet
+            </span>
+            <span className="text-ink-2">
+              Unlocks on a first deposit of KSH <span className="tabular-nums">20</span>+
+            </span>
           </div>
         )}
 
-        <p className="pt-1 text-center text-sm text-ink-2">
-          {isLogin ? "Don't have an account? " : 'Already have an account? '}
+        {/* Switch mode */}
+        <p className="border-t border-line pt-3 text-center text-xs text-ink-3">
+          {isLogin ? 'No account?' : 'Have an account?'}{' '}
           <button type="button" onClick={onSwitchMode} className="font-semibold text-brand hover:underline">
             {isLogin ? 'Register' : 'Log in'}
           </button>

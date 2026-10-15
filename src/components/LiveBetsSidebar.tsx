@@ -1,260 +1,143 @@
-import { useState, useEffect, useRef } from 'react'
-import { useBetting } from '@/contexts/BettingContext'
-import { SharedLiveBet } from '@/hooks/useGameState'
+import { useMemo, useState } from 'react'
+import type { LiveBet, Phase } from '@/hooks/useGameState'
 
-type SidebarTab = 'live' | 'mine' | 'top'
-
-interface LiveBet {
-  id: number | string
-  user: string
-  rank: number
-  bet: number
-  cashout: number | null
-  won: number | null
-  cashoutTarget: number
-  isUser?: boolean
-  avatar?: string
+interface LiveBetsSidebarProps {
+  phase: Phase
+  multiplier: number
+  username?: string
+  sharedBets?: LiveBet[]
+  variant?: 'sidebar' | 'bottom'
 }
 
-// User bet history item
-export interface UserBetHistory {
-  id: string
-  roundId: number
-  amount: number
-  cashoutMultiplier: number | null
-  won: number | null
-  isFreebet: boolean
-  timestamp: number
-}
+type TabType = 'all' | 'my' | 'top'
 
+const TABS: { id: TabType; label: string }[] = [
+  { id: 'all', label: 'All Bets' },
+  { id: 'my', label: 'My Bets' },
+  { id: 'top', label: 'Top' },
+]
 
+// Shared column template so header and rows stay pixel-aligned.
+const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_64px_64px_72px] gap-2 px-3 py-1.5'
 
-function getOddsBadgeColor(v: number): string {
-  if (v >= 5) return '#00C74D'
-  if (v >= 1.5) return '#f59e0b'
-  return '#ec4899'
-}
+const formatAmount = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 0 })
 
-// User avatar: initial, custom colour, or image URL
-function UserAvatar({ name, isUser, color }: { name: string; isUser?: boolean; color?: string }) {
-  if (color && (color.startsWith('http') || color.startsWith('/'))) {
-    return <img src={color} alt="" className="size-5 shrink-0 rounded-full bg-raised" />
-  }
+export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar' }: LiveBetsSidebarProps) {
+  const [activeTab, setActiveTab] = useState<TabType>('all')
+
+  const totalBetsCount = sharedBets.length
+  const totalBetAmount = useMemo(
+    () => sharedBets.reduce((sum, b) => sum + (b.bet || 0), 0),
+    [sharedBets]
+  )
+
+  const myBets = useMemo(() => {
+    if (!username) return []
+    return sharedBets.filter((b) => b.user === username)
+  }, [sharedBets, username])
+
+  const topBets = useMemo(
+    () =>
+      [...sharedBets]
+        .filter((b) => (b.cashedOut && b.win && b.win > 0) || b.bet >= 500)
+        .sort((a, b) => (b.win || b.bet) - (a.win || a.bet))
+        .slice(0, 30),
+    [sharedBets]
+  )
+
+  const displayedBets = activeTab === 'all' ? sharedBets : activeTab === 'my' ? myBets : topBets
+  const tabCounts: Partial<Record<TabType, number>> = { all: totalBetsCount, my: myBets.length }
+
+  const emptyMessage =
+    activeTab === 'my'
+      ? username
+        ? 'No bets this round'
+        : 'Log in to track your bets'
+      : 'Waiting for bets'
+
+  const isBottom = variant === 'bottom'
 
   return (
     <div
-      className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
-        isUser ? 'bg-brand text-brand-ink' : 'bg-raised text-ink-2'
+      className={`flex h-full flex-col overflow-hidden bg-panel ${
+        isBottom ? 'border-t border-line' : 'rounded-lg border border-line'
       }`}
-      style={!isUser && color ? { backgroundColor: color, color: '#fff' } : undefined}
     >
-      <span className="text-[10px] font-semibold">{name.charAt(0).toUpperCase()}</span>
-    </div>
-  )
-}
-
-function EmptyState({ title, hint }: { title: string; hint: string }) {
-  return (
-    <div className="flex h-32 flex-col items-center justify-center px-4 text-center">
-      <span className="text-sm font-medium text-ink-2">{title}</span>
-      <span className="mt-1 text-xs text-ink-3">{hint}</span>
-    </div>
-  )
-}
-
-interface LiveBetsSidebarProps {
-  phase: string
-  variant?: 'sidebar' | 'bottom'
-  multiplier?: number
-  userBetHistory?: UserBetHistory[]
-  username?: string
-  sharedBets?: SharedLiveBet[]
-}
-
-export function LiveBetsSidebar({ 
-  phase, 
-  variant = 'sidebar', 
-  multiplier = 1,
-  username = 'You',
-  sharedBets = []
-}: LiveBetsSidebarProps) {
-  const [tab, setTab] = useState<SidebarTab>('live')
-  const lastPhaseRef = useRef(phase)
-  
-  const betting = useBetting()
-  const userBetHistory = betting?.betHistory ?? []
-  
-  useEffect(() => {
-    lastPhaseRef.current = phase
-  }, [phase])
-
-  const liveRows: LiveBet[] = sharedBets.length > 0
-    ? [...sharedBets].sort((a, b) => b.bet - a.bet)
-    : []
-
-  // Count of total bets
-  const betCount = liveRows.length
-
-  const ROW = 'grid grid-cols-[minmax(0,1fr)_48px_44px_54px] items-center gap-1.5 border-b border-line/70 px-2.5 py-1.5 text-xs last:border-b-0'
-
-  // Render a single bet row
-  const renderBetPill = (row: LiveBet, index: number) => {
-    const hasWon = row.cashout !== null
-    const badgeColor = hasWon ? getOddsBadgeColor(row.cashout!) : null
-
-    return (
-      <div
-        key={`${row.id}-${index}`}
-        className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''} ${row.isUser ? 'border-l-2 border-l-brand' : ''}`}
-      >
-        {/* Col 1: Player */}
-        <div className="flex min-w-0 items-center gap-1.5">
-          <UserAvatar name={row.user} isUser={row.isUser} color={row.avatar} />
-          <span className={`truncate font-medium ${row.isUser ? 'text-brand' : 'text-ink'}`}>{row.user}</span>
-        </div>
-
-        {/* Col 2: Bet Amount (locked vertical alignment) */}
-        <span className="text-right tabular-nums text-ink-2 truncate">{row.bet.toLocaleString()}</span>
-
-        {/* Col 3: Multiplier Badge (locked vertical alignment) */}
-        <div className="flex items-center justify-center">
-          {hasWon && badgeColor ? (
-            <span
-              className="inline-block w-full text-center rounded px-1 py-0.5 text-[10px] font-bold tabular-nums leading-none"
-              style={{ backgroundColor: badgeColor, color: '#000' }}
-            >
-              {row.cashout!.toFixed(2)}x
-            </span>
-          ) : (
-            <span className="text-ink-3 text-xs">–</span>
-          )}
-        </div>
-
-        {/* Col 4: Cash Out / Won Amount (locked vertical alignment) */}
-        <div className="text-right truncate">
-          {hasWon ? (
-            <span className="font-semibold tabular-nums text-brand truncate">
-              {row.won?.toLocaleString()}
-            </span>
-          ) : (
-            <span className="text-ink-3 text-xs">–</span>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Render the signed-in user's bet history
-  const renderUserBetHistory = () => {
-    if (userBetHistory.length === 0) {
-      return <EmptyState title="No bets yet" hint="Your bets will show up here" />
-    }
-
-    return (
-      <div>
-        {userBetHistory.map((bet, index) => {
-          const hasWon = bet.cashoutMultiplier !== null
-          const badgeColor = hasWon ? getOddsBadgeColor(bet.cashoutMultiplier!) : '#ff5c6c'
-
+      {/* Segmented tab bar */}
+      <div className="grid grid-cols-3 gap-1 border-b border-line bg-field p-1">
+        {TABS.map((tab) => {
+          const active = activeTab === tab.id
+          const count = tabCounts[tab.id]
           return (
-            <div key={`${bet.id}-${index}`} className={`${ROW} ${hasWon ? 'bg-brand/[0.07]' : ''}`}>
-              {/* Col 1: Player */}
-              <div className="flex min-w-0 items-center gap-1.5">
-                <UserAvatar name={username} isUser />
-                <div className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate font-medium text-brand">{username}</span>
-                  {bet.isFreebet && <span className="text-[10px] font-medium text-bonus">Freebet</span>}
-                </div>
-              </div>
-
-              {/* Col 2: Bet Amount */}
-              <span className="text-right tabular-nums text-ink-2 truncate">{bet.amount.toLocaleString()}</span>
-
-              {/* Col 3: Multiplier / Status Badge */}
-              <div className="flex items-center justify-center">
-                {hasWon ? (
-                  <span
-                    className="inline-block w-full text-center rounded px-1 py-0.5 text-[10px] font-bold tabular-nums leading-none"
-                    style={{ backgroundColor: badgeColor, color: '#000' }}
-                  >
-                    {bet.cashoutMultiplier!.toFixed(2)}x
-                  </span>
-                ) : (
-                  <span className="inline-block w-full text-center rounded bg-field text-ink-3 px-1 py-0.5 text-[10px] font-semibold leading-none">
-                    Lost
-                  </span>
-                )}
-              </div>
-
-              {/* Col 4: Won / Lost Amount */}
-              <div className="text-right truncate">
-                <span className={`font-semibold tabular-nums ${hasWon ? 'text-brand' : 'text-loss'} truncate`}>
-                  {hasWon ? `+${bet.won?.toLocaleString()}` : `-${bet.amount.toLocaleString()}`}
-                </span>
-              </div>
-            </div>
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              aria-pressed={active}
+              className={`flex h-7 items-center justify-center gap-1.5 rounded text-xs font-semibold transition-colors ${
+                active ? 'bg-raised text-ink' : 'text-ink-3 hover:text-ink'
+              }`}
+            >
+              {tab.label}
+              {count !== undefined && (
+                <span className={`tabular-nums ${active ? 'text-ink-2' : 'text-ink-3'}`}>{count}</span>
+              )}
+            </button>
           )
         })}
       </div>
-    )
-  }
 
-  const renderTopWins = () => (
-    <EmptyState title="Top wins are coming soon" hint="The leaderboard will appear here" />
-  )
-
-  const tabs: { id: SidebarTab; label: string }[] = [
-    { id: 'live', label: 'All bets' },
-    { id: 'mine', label: 'My bets' },
-    { id: 'top', label: 'Top wins' },
-  ]
-
-  return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-line bg-panel">
-      {/* Tabs */}
-      <div className="shrink-0 p-2">
-        <div role="tablist" aria-label="Bets" className="flex rounded-md bg-field p-0.5">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded text-[13px] font-medium transition-colors ${
-                tab === t.id ? 'bg-raised text-ink' : 'text-ink-3 hover:text-ink-2'
-              }`}
-            >
-              {t.label}
-              {t.id === 'live' && betCount > 0 && (
-                <span className="text-xs tabular-nums text-ink-3">{betCount}</span>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* Round totals */}
+      <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-[11px] font-medium text-ink-3">
+        <span>
+          Total{' '}
+          <span className="tabular-nums text-ink-2">KSH {formatAmount(totalBetAmount)}</span>
+        </span>
+        <span>
+          <span className="tabular-nums text-ink-2">{totalBetsCount}</span> players
+        </span>
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[minmax(0,1fr)_48px_44px_54px] items-center gap-1.5 border-y border-line px-2.5 py-1.5 text-[11px] font-medium text-ink-3">
+      <div className={`${ROW_GRID} border-b border-line text-[10px] font-semibold uppercase tracking-wide text-ink-3`}>
         <span>Player</span>
         <span className="text-right">Bet</span>
-        <span className="text-center">X</span>
-        <span className="text-right">Cash out</span>
+        <span className="text-right">×</span>
+        <span className="text-right">Win</span>
       </div>
 
       {/* Rows */}
-      <div role="tabpanel" className="live-bets-scroll min-h-0 w-full flex-1 overflow-y-auto">
-        {tab === 'live' && (
-          liveRows.length > 0
-            ? liveRows.map((row, index) => renderBetPill(row, index))
-            : <EmptyState title="Waiting for bets" hint="Place a bet to get started" />
-        )}
-        {tab === 'mine' && renderUserBetHistory()}
-        {tab === 'top' && renderTopWins()}
-      </div>
+      <div className="live-bets-scroll flex-1 divide-y divide-line/30 overflow-y-auto overscroll-contain">
+        {displayedBets.length === 0 ? (
+          <div className="px-3 py-8 text-center text-xs text-ink-3">{emptyMessage}</div>
+        ) : (
+          displayedBets.map((b) => {
+            const hasCashed = b.cashedOut
+            const wonAmount = b.win || (hasCashed && b.cashOut ? b.bet * b.cashOut : 0)
 
-      <div className="shrink-0 border-t border-line px-3 py-2 text-center text-xs text-ink-3">
-        Provably fair • 18+ Play responsibly
+            return (
+              <div
+                key={b.id || `${b.user}-${b.bet}`}
+                className={`${ROW_GRID} items-center text-xs ${hasCashed ? 'bg-brand/5' : ''}`}
+              >
+                <span className="truncate font-medium text-ink">{b.user}</span>
+                <span className="text-right tabular-nums text-ink">{formatAmount(b.bet)}</span>
+                <span className="text-right tabular-nums">
+                  {hasCashed && b.cashOut ? (
+                    <span className="inline-block rounded bg-brand/10 px-1.5 py-0.5 text-[11px] font-bold leading-none text-brand">
+                      {b.cashOut.toFixed(2)}x
+                    </span>
+                  ) : (
+                    <span className="text-ink-3">—</span>
+                  )}
+                </span>
+                <span className={`text-right font-semibold tabular-nums ${hasCashed ? 'text-brand' : 'text-ink-3'}`}>
+                  {hasCashed ? formatAmount(wonAmount) : '—'}
+                </span>
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )
