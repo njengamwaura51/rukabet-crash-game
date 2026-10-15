@@ -5,7 +5,7 @@ import { Bet } from '../models/Bet.js';
 import { Deposit } from '../models/Deposit.js';
 import { Withdrawal } from '../models/Withdrawal.js';
 import { OddsControl } from '../models/OddsControl.js';
-import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal } from '../socket.js';
+import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO } from '../socket.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 function safeCompare(a, b) {
     if (typeof a !== 'string' || typeof b !== 'string')
@@ -148,17 +148,33 @@ export async function getAdminOverview(req, res) {
 }
 export async function getAdminUsers(req, res) {
     try {
-        const { search, status, sortBy = 'createdAt', sortOrder = 'desc', page = '1', limit = '20' } = req.query;
+        const { search, status, sortBy = 'createdAt', sortOrder = 'desc', page = '1', limit = '50' } = req.query;
         const pageNum = Math.max(1, parseInt(page, 10) || 1);
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+        const isAll = limit === 'all';
+        const limitNum = isAll ? 500 : Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
         const skip = (pageNum - 1) * limitNum;
         const query = {};
         if (search && typeof search === 'string' && search.trim()) {
-            const cleanSearch = search.trim().replace(/^0/, '');
-            query.$or = [
-                { phone: { $regex: cleanSearch, $options: 'i' } },
-                { username: { $regex: search.trim(), $options: 'i' } }
+            const trimmed = search.trim();
+            const digits = trimmed.replace(/\D/g, '');
+            const last9 = digits.length >= 9 ? digits.slice(-9) : digits;
+            const orConditions = [
+                { username: { $regex: trimmed, $options: 'i' } }
             ];
+            // If valid 24-character hex ID, search by ID
+            if (trimmed.length === 24 && /^[0-9a-fA-F]{24}$/.test(trimmed)) {
+                orConditions.push({ _id: trimmed });
+            }
+            // Robust phone matching across raw 9 digits, 07..., 254... formats
+            if (last9.length >= 3) {
+                orConditions.push({ phone: { $regex: last9, $options: 'i' } });
+                orConditions.push({ phone: { $regex: `0${last9}`, $options: 'i' } });
+                orConditions.push({ phone: { $regex: `254${last9}`, $options: 'i' } });
+            }
+            else {
+                orConditions.push({ phone: { $regex: trimmed, $options: 'i' } });
+            }
+            query.$or = orConditions;
         }
         if (status === 'frozen') {
             query.isFrozen = true;
@@ -169,15 +185,25 @@ export async function getAdminUsers(req, res) {
         const sortObj = {};
         sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
         const [users, total] = await Promise.all([
-            User.find(query).sort(sortObj).skip(skip).limit(limitNum).select('-password'),
+            User.find(query).sort(sortObj).skip(skip).limit(limitNum).select('-password').lean(),
             User.countDocuments(query)
         ]);
+        // Normalize users to guarantee numbers for balance, freebet, and sensible fallbacks for early users
+        const normalizedUsers = users.map((u) => ({
+            ...u,
+            balance: Number.isFinite(Number(u.balance)) ? Number(u.balance) : 0,
+            freebet: Number.isFinite(Number(u.freebet)) ? Number(u.freebet) : 0,
+            freebetLocked: typeof u.freebetLocked === 'boolean' ? u.freebetLocked : true,
+            isFrozen: Boolean(u.isFrozen),
+            username: u.username || `User_${u.phone ? u.phone.slice(-4) : 'Player'}`
+        }));
         return res.json({
             success: true,
-            users,
+            users: normalizedUsers,
             total,
             page: pageNum,
-            totalPages: Math.ceil(total / limitNum)
+            limit: limitNum,
+            totalPages: Math.max(1, Math.ceil(total / limitNum))
         });
     }
     catch (error) {
@@ -212,7 +238,11 @@ export async function getAdminUserDetail(req, res) {
         };
         return res.json({
             success: true,
-            user,
+            user: {
+                ...user.toObject(),
+                balance: Number.isFinite(Number(user.balance)) ? Number(user.balance) : 0,
+                freebet: Number.isFinite(Number(user.freebet)) ? Number(user.freebet) : 0
+            },
             stats,
             recentBets,
             recentDeposits,
@@ -226,32 +256,113 @@ export async function getAdminUserDetail(req, res) {
 export async function adjustUserBalance(req, res) {
     try {
         const { id } = req.params;
-        const { amount, type } = req.body;
+        const { amount, type, reason } = req.body;
         const numAmount = Number(amount);
-        if (!Number.isFinite(numAmount) || numAmount <= 0) {
-            return res.status(400).json({ error: 'Amount must be a positive number' });
+        if (!Number.isFinite(numAmount) || numAmount < 0) {
+            return res.status(400).json({ error: 'Amount must be a valid non-negative number' });
         }
-        if (type !== 'credit' && type !== 'debit') {
-            return res.status(400).json({ error: 'Type must be credit or debit' });
+        if (type !== 'credit' && type !== 'debit' && type !== 'set') {
+            return res.status(400).json({ error: 'Type must be credit, debit, or set' });
         }
         const user = await User.findById(id);
         if (!user)
             return res.status(404).json({ error: 'User not found' });
-        if (type === 'debit' && user.balance < numAmount) {
-            return res.status(400).json({ error: `Cannot debit KSH ${numAmount}. User balance is only KSH ${user.balance}` });
+        const currentBalance = Number.isFinite(Number(user.balance)) ? Number(user.balance) : 0;
+        let newBalance = currentBalance;
+        if (type === 'set') {
+            newBalance = Math.round(numAmount * 100) / 100;
         }
-        const delta = type === 'credit' ? numAmount : -numAmount;
-        user.balance = Math.max(0, Math.round((user.balance + delta) * 100) / 100);
+        else if (type === 'debit') {
+            if (currentBalance < numAmount) {
+                return res.status(400).json({ error: `Cannot debit KSH ${numAmount}. Current balance is KSH ${currentBalance}` });
+            }
+            newBalance = Math.max(0, Math.round((currentBalance - numAmount) * 100) / 100);
+        }
+        else if (type === 'credit') {
+            newBalance = Math.round((currentBalance + numAmount) * 100) / 100;
+        }
+        user.balance = newBalance;
         await user.save();
+        // Create a transaction tracking record for complete wallet auditing
+        const adjustmentDelta = newBalance - currentBalance;
+        if (adjustmentDelta !== 0) {
+            const apiRef = `ADM-ADJ-${Date.now()}-${user._id.toString().slice(-4)}`;
+            await Deposit.create({
+                userId: user._id,
+                phone: user.phone || '0700000000',
+                amount: Math.abs(adjustmentDelta),
+                apiRef,
+                status: adjustmentDelta > 0 ? 'completed' : 'failed',
+                failureReason: adjustmentDelta < 0 ? `Admin Debit: ${reason || 'Manual deduction'}` : null
+            }).catch((err) => console.warn('⚠️ Could not log adjustment record to deposits:', err.message));
+        }
+        // Real-time WebSocket emission to instant-update user's active game screen
+        const io = getIO();
+        if (io) {
+            io.to(`user:${user._id}`).emit('DEPOSIT_SUCCESS', {
+                amount: Math.abs(adjustmentDelta),
+                newBalance: user.balance,
+                apiRef: `ADM-BALANCE-UPDATE-${Date.now()}`,
+                timestamp: new Date().toISOString()
+            });
+            io.to(`user:${user._id}`).emit('BALANCE_UPDATE', {
+                balance: user.balance,
+                freebet: user.freebet
+            });
+        }
         return res.json({
             success: true,
-            message: `Successfully ${type}ed KSH ${numAmount}. New balance: KSH ${user.balance}`,
+            message: `Successfully updated balance for ${user.username} (${user.phone}). New balance: KSH ${user.balance}`,
             user: {
                 _id: user._id,
                 username: user.username,
                 phone: user.phone,
                 balance: user.balance
             }
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+}
+// Database refresh & early user synchronization endpoint
+export async function syncDatabaseUsers(req, res) {
+    try {
+        const allUsers = await User.find({});
+        let normalizedCount = 0;
+        for (const u of allUsers) {
+            let changed = false;
+            if (u.balance === undefined || u.balance === null || isNaN(u.balance)) {
+                u.balance = 0;
+                changed = true;
+            }
+            if (u.freebet === undefined || u.freebet === null || isNaN(u.freebet)) {
+                u.freebet = 150;
+                changed = true;
+            }
+            if (u.freebetLocked === undefined || u.freebetLocked === null) {
+                u.freebetLocked = true;
+                changed = true;
+            }
+            if (u.isFrozen === undefined || u.isFrozen === null) {
+                u.isFrozen = false;
+                changed = true;
+            }
+            if (!u.username || !u.username.trim()) {
+                u.username = `User_${u.phone ? u.phone.slice(-4) : Math.random().toString(36).slice(-4)}`;
+                changed = true;
+            }
+            if (changed) {
+                await u.save();
+                normalizedCount++;
+            }
+        }
+        const totalUsers = await User.countDocuments({});
+        return res.json({
+            success: true,
+            message: `Database synced successfully! ${totalUsers} total users tracked (${normalizedCount} early user records normalized).`,
+            totalUsers,
+            normalizedCount
         });
     }
     catch (error) {

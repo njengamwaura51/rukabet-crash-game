@@ -40,7 +40,10 @@ export async function initiateDeposit(req, res) {
         const paydApiUsername = sanitizeKey(settings?.paydApiUsername) || sanitizeKey(process.env.PAYD_API_USERNAME);
         const paydApiPassword = sanitizeKey(settings?.paydApiPassword) || sanitizeKey(process.env.PAYD_API_PASSWORD);
         const paydApiSecret = sanitizeKey(settings?.paydApiSecret) || sanitizeKey(process.env.PAYD_API_SECRET);
-        const paydApiBaseUrl = sanitizeKey(settings?.paydApiBaseUrl) || sanitizeKey(process.env.PAYD_API_BASE_URL) || 'https://api.mypayd.app/api/v2/payments';
+        let paydApiBaseUrl = sanitizeKey(settings?.paydApiBaseUrl) || sanitizeKey(process.env.PAYD_API_BASE_URL) || 'https://api.payd.money/api/v2/payments';
+        if (paydApiBaseUrl.includes('mypayd.app')) {
+            paydApiBaseUrl = paydApiBaseUrl.replace(/api\.mypayd\.app/g, 'api.payd.money').replace(/mypayd\.app/g, 'payd.money');
+        }
         if (!paydApiUsername || (!paydApiPassword && !paydApiSecret)) {
             console.error('❌ Payd gateway credentials missing in admin settings');
             return res.status(500).json({

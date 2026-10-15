@@ -218,13 +218,18 @@ export default function AdminDashboard() {
   const [usersLoading, setUsersLoading] = useState(false)
   const [userSearch, setUserSearch] = useState('')
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'frozen'>('all')
+  const [usersPage, setUsersPage] = useState(1)
+  const [usersLimit, setUsersLimit] = useState<'25' | '50' | '100' | 'all'>('50')
+  const [usersTotal, setUsersTotal] = useState(0)
+  const [usersTotalPages, setUsersTotalPages] = useState(1)
+  const [isSyncingDb, setIsSyncingDb] = useState(false)
   const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserDetailData | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
   // Modals State
   const [balanceModalUser, setBalanceModalUser] = useState<AdminUser | null>(null)
   const [balanceAmount, setBalanceAmount] = useState('')
-  const [balanceType, setBalanceType] = useState<'credit' | 'debit'>('credit')
+  const [balanceType, setBalanceType] = useState<'credit' | 'debit' | 'set'>('credit')
   const [balanceReason, setBalanceReason] = useState('')
   const [isSubmittingBalance, setIsSubmittingBalance] = useState(false)
 
@@ -247,7 +252,7 @@ export default function AdminDashboard() {
   const [paymentConfig, setPaymentConfig] = useState({
     paydWalletUsername: '',
     paydApiUsername: '',
-    paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments',
+    paydApiBaseUrl: 'https://api.payd.money/api/v2/payments',
     paydCallbackUrl: '',
     companyName: 'RUKA TECH SOLUTIONS',
     whatsappSupport: '254719858034',
@@ -336,6 +341,8 @@ export default function AdminDashboard() {
       setUsersLoading(true)
       try {
         const url = new URL(`${config.apiBaseUrl}/api/admin/users`)
+        url.searchParams.set('page', String(usersPage))
+        url.searchParams.set('limit', usersLimit)
         if (userSearch) url.searchParams.set('search', userSearch)
         if (userStatusFilter !== 'all') url.searchParams.set('status', userStatusFilter)
 
@@ -345,6 +352,8 @@ export default function AdminDashboard() {
         if (res.ok) {
           const data = await res.json()
           setUsersList(data.users || [])
+          setUsersTotal(data.total || 0)
+          setUsersTotalPages(data.totalPages || 1)
         }
       } catch (err) {
         console.error('Failed to load users:', err)
@@ -355,7 +364,7 @@ export default function AdminDashboard() {
 
     const timer = setTimeout(fetchUsers, userSearch ? 300 : 0)
     return () => clearTimeout(timer)
-  }, [adminToken, activeTab, userSearch, userStatusFilter, config.apiBaseUrl, refreshKey])
+  }, [adminToken, activeTab, userSearch, userStatusFilter, usersPage, usersLimit, config.apiBaseUrl, refreshKey])
 
   // Fetch Withdrawals when Withdrawals tab is active
   useEffect(() => {
@@ -538,6 +547,31 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleSyncDatabase = async () => {
+    if (!adminToken) return
+    setIsSyncingDb(true)
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/admin/users/sync-db`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        showNotice('success', data.message || 'Database synced and early user records normalized!')
+        setRefreshKey(k => k + 1)
+      } else {
+        showNotice('error', data.error || 'Failed to sync database')
+      }
+    } catch {
+      showNotice('error', 'Network error during database refresh')
+    } finally {
+      setIsSyncingDb(false)
+    }
+  }
+
   const handleAdjustBalance = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!balanceModalUser || !adminToken) return
@@ -560,6 +594,9 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (res.ok && data.success) {
         showNotice('success', data.message || 'Balance updated successfully')
+        if (data.user) {
+          setUsersList(prev => prev.map(u => u._id === data.user._id ? { ...u, balance: data.user.balance } : u))
+        }
         setBalanceModalUser(null)
         setBalanceAmount('')
         setBalanceReason('')
@@ -1172,41 +1209,84 @@ export default function AdminDashboard() {
             ══════════════════════════════════════════════════════════════ */}
         {activeTab === 'users' && (
           <div className="space-y-3">
-            {/* Search & Filter Bar */}
-            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Search, Filter & DB Refresh Bar */}
+            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-2.5 size-4 text-ink-3" />
                 <input
                   type="text"
                   value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  placeholder="Search user by phone (e.g. 719220220) or username..."
+                  onChange={e => {
+                    setUserSearch(e.target.value)
+                    setUsersPage(1)
+                  }}
+                  placeholder="Search user by phone (e.g. 719220220), username, or ID..."
                   className="h-9 w-full rounded-md border border-line bg-field pl-9 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-ink-3">Filter:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status Filter */}
                 <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
                   <button
-                    onClick={() => setUserStatusFilter('all')}
+                    onClick={() => { setUserStatusFilter('all'); setUsersPage(1); }}
                     className={`rounded px-2.5 py-1 ${userStatusFilter === 'all' ? 'bg-raised font-semibold text-ink' : 'text-ink-3'}`}
                   >
                     All
                   </button>
                   <button
-                    onClick={() => setUserStatusFilter('active')}
+                    onClick={() => { setUserStatusFilter('active'); setUsersPage(1); }}
                     className={`rounded px-2.5 py-1 ${userStatusFilter === 'active' ? 'bg-raised font-semibold text-brand' : 'text-ink-3'}`}
                   >
                     Active
                   </button>
                   <button
-                    onClick={() => setUserStatusFilter('frozen')}
+                    onClick={() => { setUserStatusFilter('frozen'); setUsersPage(1); }}
                     className={`rounded px-2.5 py-1 ${userStatusFilter === 'frozen' ? 'bg-raised font-semibold text-loss' : 'text-ink-3'}`}
                   >
                     Suspended
                   </button>
                 </div>
+
+                {/* Rows per page selector */}
+                <div className="flex items-center gap-1 text-xs text-ink-3">
+                  <span>Show:</span>
+                  <select
+                    value={usersLimit}
+                    onChange={e => {
+                      setUsersLimit(e.target.value as any)
+                      setUsersPage(1)
+                    }}
+                    className="h-7 rounded border border-line bg-field px-1.5 text-xs text-ink focus:border-brand focus:outline-none"
+                  >
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+
+                {/* Database Sync / Refresh button */}
+                <button
+                  type="button"
+                  onClick={handleSyncDatabase}
+                  disabled={isSyncingDb}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-brand/40 bg-brand/10 px-3 text-xs font-semibold text-brand hover:bg-brand/20 disabled:opacity-50"
+                  title="Detect early users, normalize balances, and refresh MongoDB data"
+                >
+                  <RefreshCw className={`size-3.5 ${isSyncingDb ? 'animate-spin' : ''}`} />
+                  {isSyncingDb ? 'Syncing...' : 'Sync & Refresh DB'}
+                </button>
+              </div>
+            </div>
+
+            {/* Total count badge bar */}
+            <div className="flex items-center justify-between px-1 text-xs text-ink-3">
+              <div>
+                Total: <span className="font-semibold text-ink">{usersTotal}</span> registered users detected
+              </div>
+              <div>
+                Showing page <span className="font-semibold text-ink">{usersPage}</span> of <span className="font-semibold text-ink">{usersTotalPages}</span>
               </div>
             </div>
 
@@ -1217,7 +1297,7 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="border-b border-line bg-field/50 text-ink-3">
                       <th className="p-3">User & Phone</th>
-                      <th className="p-3">Real Balance</th>
+                      <th className="p-3">Real Wallet Balance</th>
                       <th className="p-3">Freebet</th>
                       <th className="p-3">Referrals</th>
                       <th className="p-3">Status</th>
@@ -1227,21 +1307,26 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-line/40">
                     {usersLoading ? (
-                      <tr><td colSpan={7} className="py-8 text-center text-ink-3"><RefreshCw className="mx-auto size-5 animate-spin mb-1" />Loading users...</td></tr>
+                      <tr><td colSpan={7} className="py-8 text-center text-ink-3"><RefreshCw className="mx-auto size-5 animate-spin mb-1 text-brand" />Loading users...</td></tr>
                     ) : usersList.length === 0 ? (
                       <tr><td colSpan={7} className="py-8 text-center text-ink-3">No matching users found</td></tr>
                     ) : (
                       usersList.map(u => (
                         <tr key={u._id} className="hover:bg-field/40">
                           <td className="p-3">
-                            <div className="font-semibold text-ink">{u.username}</div>
-                            <div className="text-[11px] text-ink-3">{u.phone}</div>
-                          </td>
-                          <td className="p-3 font-semibold text-brand">
-                            KSH {u.balance.toFixed(2)}
+                            <div className="font-semibold text-ink">{u.username || 'User'}</div>
+                            <div className="font-mono text-[11px] text-ink-3">{u.phone}</div>
                           </td>
                           <td className="p-3">
-                            <div className="font-medium text-bonus">KSH {u.freebet}</div>
+                            <div className="font-bold text-brand">
+                              KSH {Number(u.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-[10px] text-ink-3">
+                              {Number(u.balance || 0) > 0 ? '🟢 Active Funds' : '⚪ Zero Balance'}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium text-bonus">KSH {u.freebet ?? 0}</div>
                             <div className="text-[10px] text-ink-3">{u.freebetLocked ? '🔒 Locked' : '✅ Unlocked'}</div>
                           </td>
                           <td className="p-3 text-ink-2">
@@ -1274,7 +1359,7 @@ export default function AdminDashboard() {
                                   setBalanceType('credit')
                                 }}
                                 className="rounded bg-field px-2 py-1 text-[11px] font-medium text-brand hover:bg-brand/10"
-                                title="Credit or Debit Balance"
+                                title="Credit, Debit or Set Balance"
                               >
                                 💰 Balance
                               </button>
@@ -1322,6 +1407,27 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {usersTotalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-line bg-field/30 px-4 py-2.5 text-xs text-ink-3">
+                  <button
+                    onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                    disabled={usersPage <= 1}
+                    className="rounded border border-line bg-panel px-3 py-1 font-medium text-ink hover:bg-raised disabled:opacity-40"
+                  >
+                    ← Previous
+                  </button>
+                  <span>Page {usersPage} of {usersTotalPages} ({usersTotal} total users)</span>
+                  <button
+                    onClick={() => setUsersPage(p => Math.min(usersTotalPages, p + 1))}
+                    disabled={usersPage >= usersTotalPages}
+                    className="rounded border border-line bg-panel px-3 py-1 font-medium text-ink hover:bg-raised disabled:opacity-40"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2272,26 +2378,35 @@ export default function AdminDashboard() {
                   onClick={() => setBalanceType('credit')}
                   className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'credit' ? 'bg-raised font-bold text-brand' : 'text-ink-3'}`}
                 >
-                  + Credit (Add)
+                  + Credit
                 </button>
                 <button
                   type="button"
                   onClick={() => setBalanceType('debit')}
                   className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'debit' ? 'bg-raised font-bold text-loss' : 'text-ink-3'}`}
                 >
-                  - Debit (Deduct)
+                  - Debit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBalanceType('set')}
+                  className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'set' ? 'bg-raised font-bold text-sky-400' : 'text-ink-3'}`}
+                >
+                  = Set Balance
                 </button>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">Amount (KSH)</label>
+                <label className="mb-1 block text-xs font-medium text-ink-2">
+                  {balanceType === 'set' ? 'Exact New Balance (KSH)' : 'Amount to Adjust (KSH)'}
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min={balanceType === 'set' ? "0" : "0.01"}
                   value={balanceAmount}
                   onChange={e => setBalanceAmount(e.target.value)}
-                  placeholder="e.g. 100"
+                  placeholder={balanceType === 'set' ? "e.g. 500" : "e.g. 100"}
                   required
                   className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm font-semibold text-ink focus:border-brand focus:outline-none"
                 />

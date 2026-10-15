@@ -38,7 +38,7 @@ const SettingsSchema = new Schema<ISettings>({
   },
   paydApiBaseUrl: {
     type: String,
-    default: 'https://api.mypayd.app/api/v2/payments'
+    default: 'https://api.payd.money/api/v2/payments'
   },
   paydCallbackUrl: {
     type: String,

@@ -40,7 +40,7 @@ export async function getSettings(req: Request, res: Response) {
       settings: {
         paydWalletUsername: settings.paydWalletUsername || '',
         paydApiUsername: settings.paydApiUsername || '',
-        paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
+        paydApiBaseUrl: (settings.paydApiBaseUrl || 'https://api.payd.money/api/v2/payments').replace('api.mypayd.app', 'api.payd.money').replace('mypayd.app', 'payd.money'),
         paydCallbackUrl: settings.paydCallbackUrl || '',
         isPasswordConfigured: hasPassword,
         isSecretConfigured: hasSecret,
@@ -111,7 +111,7 @@ export async function updateSettings(req: Request, res: Response) {
       settings: {
         paydWalletUsername: settings.paydWalletUsername || '',
         paydApiUsername: settings.paydApiUsername || '',
-        paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
+        paydApiBaseUrl: (settings.paydApiBaseUrl || 'https://api.payd.money/api/v2/payments').replace('api.mypayd.app', 'api.payd.money').replace('mypayd.app', 'payd.money'),
         paydCallbackUrl: settings.paydCallbackUrl || '',
         isPasswordConfigured: hasPassword,
         isSecretConfigured: hasSecret,

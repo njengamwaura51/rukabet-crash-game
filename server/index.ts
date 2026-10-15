@@ -47,7 +47,8 @@ import {
   updateWithdrawalStatus,
   getOddsEngineConfig,
   setOddsEngineRule,
-  resetOddsEngine
+  resetOddsEngine,
+  syncDatabaseUsers
 } from './controllers/adminController.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
@@ -120,6 +121,7 @@ app.get('/api/admin/overview', adminRateLimit, adminMiddleware, getAdminOverview
 
 // Advanced admin user tracking & operations
 app.get('/api/admin/users', adminRateLimit, adminMiddleware, getAdminUsers)
+app.post('/api/admin/users/sync-db', adminRateLimit, adminMiddleware, syncDatabaseUsers)
 app.get('/api/admin/users/:id', adminRateLimit, adminMiddleware, getAdminUserDetail)
 app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware, adjustUserBalance)
 app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet)
