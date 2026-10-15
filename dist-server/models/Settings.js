@@ -12,6 +12,10 @@ const SettingsSchema = new Schema({
         type: String,
         default: ''
     },
+    paydApiSecret: {
+        type: String,
+        default: ''
+    },
     paydApiBaseUrl: {
         type: String,
         default: 'https://api.mypayd.app/api/v2/payments'

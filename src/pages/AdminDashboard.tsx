@@ -257,6 +257,9 @@ export default function AdminDashboard() {
   const [newApiPassword, setNewApiPassword] = useState('')
   const [showApiPassword, setShowApiPassword] = useState(false)
   const [isPasswordConfigured, setIsPasswordConfigured] = useState(false)
+  const [newApiSecret, setNewApiSecret] = useState('')
+  const [showApiSecret, setShowApiSecret] = useState(false)
+  const [isSecretConfigured, setIsSecretConfigured] = useState(false)
   const [paymentSaved, setPaymentSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentMessage, setPaymentMessage] = useState('')
@@ -308,6 +311,7 @@ export default function AdminDashboard() {
             minWithdrawal: s.minWithdrawal ?? 50,
           })
           setIsPasswordConfigured(Boolean(s.isPasswordConfigured))
+          setIsSecretConfigured(Boolean(s.isSecretConfigured))
         }
 
         if (overviewRes.ok) {
@@ -708,6 +712,9 @@ export default function AdminDashboard() {
       if (newApiPassword.trim()) {
         payload.paydApiPassword = newApiPassword.trim()
       }
+      if (newApiSecret.trim()) {
+        payload.paydApiSecret = newApiSecret.trim()
+      }
 
       const res = await fetch(`${config.apiBaseUrl}/api/settings`, {
         method: 'PUT',
@@ -721,7 +728,9 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (res.ok && data.success) {
         setIsPasswordConfigured(Boolean(data.settings?.isPasswordConfigured))
+        setIsSecretConfigured(Boolean(data.settings?.isSecretConfigured))
         setNewApiPassword('')
+        setNewApiSecret('')
         showNotice('success', 'Payd gateway credentials saved directly to database successfully!')
       } else {
         showNotice('error', data.error || 'Failed to save gateway configuration')
@@ -2024,26 +2033,11 @@ export default function AdminDashboard() {
                   <p className="text-[11px] text-ink-3">app.payd.money REST STK Push & Webhook Gateway</p>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className={`size-2 rounded-full ${isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'bg-brand' : 'bg-amber-500'}`}></span>
-                  <span className={isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'text-brand font-medium' : 'text-amber-500 font-medium'}>
-                    {isPasswordConfigured && paymentConfig.paydWalletUsername && paymentConfig.paydApiUsername ? 'Active & Configured' : 'Setup Required'}
+                  <span className={`size-2 rounded-full ${paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'bg-brand' : 'bg-amber-500'}`}></span>
+                  <span className={paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'text-brand font-medium' : 'text-amber-500 font-medium'}>
+                    {paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'Active & Configured' : 'Setup Required'}
                   </span>
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">
-                  Payd Wallet Username (<span className="font-mono text-brand">username</span>)
-                </label>
-                <input
-                  type="text"
-                  value={paymentConfig.paydWalletUsername}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydWalletUsername: e.target.value }))}
-                  placeholder="e.g. your_wallet_username"
-                  required
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">Your Payd account wallet username registered on app.payd.money.</p>
               </div>
 
               <div>
@@ -2058,12 +2052,12 @@ export default function AdminDashboard() {
                   required
                   className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
                 />
-                <p className="mt-1 text-[11px] text-ink-3">Found under Developer / API Settings in your Payd dashboard.</p>
+                <p className="mt-1 text-[11px] text-ink-3">Found in your Payd account (app.payd.money) under API Credentials.</p>
               </div>
 
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
-                  <span>Payd API Password (<span className="font-mono text-brand">API_PASSWORD</span>)</span>
+                  <span>Payd Password (<span className="font-mono text-brand">PASSWORD</span>)</span>
                   <button
                     type="button"
                     onClick={() => setShowApiPassword(!showApiPassword)}
@@ -2077,12 +2071,50 @@ export default function AdminDashboard() {
                   type={showApiPassword ? 'text' : 'password'}
                   value={newApiPassword}
                   onChange={e => setNewApiPassword(e.target.value)}
-                  placeholder={isPasswordConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing password)' : 'Enter Payd API password...'}
+                  placeholder={isPasswordConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing password)' : 'Enter Payd password...'}
                   className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
                 />
                 <p className="mt-1 text-[11px] text-ink-3">
-                  Used for HTTP Basic authentication. Secured in database and never exposed to public visitors.
+                  Password provided for your Payd API account. Secured in database and never exposed publicly.
                 </p>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
+                  <span>Payd API Secret (<span className="font-mono text-brand">API_SECRET</span>)</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowApiSecret(!showApiSecret)}
+                    className="flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink"
+                  >
+                    {showApiSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    {showApiSecret ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <input
+                  type={showApiSecret ? 'text' : 'password'}
+                  value={newApiSecret}
+                  onChange={e => setNewApiSecret(e.target.value)}
+                  placeholder={isSecretConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing secret)' : 'Enter Payd API secret...'}
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-ink-3">
+                  API Secret provided by Payd (app.payd.money). Kept secure on backend for authenticated requests.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">
+                  Payd Wallet Username / Identifier (<span className="font-mono text-brand">optional</span>)
+                </label>
+                <input
+                  type="text"
+                  value={paymentConfig.paydWalletUsername}
+                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydWalletUsername: e.target.value }))}
+                  placeholder="Leave blank to use API Username"
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-ink-3">Your Payd wallet username if different from API username.</p>
               </div>
 
               <div>
@@ -2117,9 +2149,15 @@ export default function AdminDashboard() {
               </div>
 
               {/* Webhook Endpoint Info */}
-              <div className="rounded-md border border-line bg-field p-3 text-xs">
-                <span className="font-semibold text-ink">Payd Webhook Callback URL:</span>
-                <div className="mt-1 flex items-center justify-between gap-2 rounded bg-raised px-2.5 py-1.5 font-mono text-[11px] text-brand">
+              <div className="rounded-md border border-line bg-field p-3 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-brand">
+                  <Shield className="size-3.5" />
+                  <span>Webhook Callback: Fully Automatic</span>
+                </div>
+                <p className="text-[11px] text-ink-2 leading-relaxed">
+                  You <strong>do not need to configure a webhook URL inside the Payd dashboard</strong>. Payd’s M-Pesa STK Push API accepts the callback URL dynamically with every transaction request. Our system automatically attaches this URL to every STK push so Payd posts payments back directly:
+                </p>
+                <div className="flex items-center justify-between gap-2 rounded bg-raised px-2.5 py-1.5 font-mono text-[11px] text-brand">
                   <span className="truncate">{typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/payd` : '/api/webhooks/payd'}</span>
                   <button
                     type="button"
@@ -2130,8 +2168,8 @@ export default function AdminDashboard() {
                     {copiedWebhook ? <Check className="size-3.5 text-brand" /> : <Copy className="size-3.5" />}
                   </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-ink-3">
-                  Paste this URL into your Payd Dashboard under Settings &gt; Webhooks / Developer API to receive automatic instant M-Pesa payment confirmations.
+                <p className="text-[11px] text-ink-3">
+                  When a customer enters their M-Pesa PIN, Safaricom informs Payd, which immediately delivers confirmation to this endpoint to credit the user balance instantly.
                 </p>
               </div>
 

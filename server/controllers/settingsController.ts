@@ -33,6 +33,7 @@ export async function getSettings(req: Request, res: Response) {
     }
 
     const hasPassword = Boolean(settings.paydApiPassword)
+    const hasSecret = Boolean(settings.paydApiSecret)
 
     return res.json({
       success: true,
@@ -42,15 +43,15 @@ export async function getSettings(req: Request, res: Response) {
         paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
         paydCallbackUrl: settings.paydCallbackUrl || '',
         isPasswordConfigured: hasPassword,
-        isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername),
+        isSecretConfigured: hasSecret,
+        isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername || settings.paydApiSecret),
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,
         minDeposit: settings.minDeposit,
         minWithdrawal: settings.minWithdrawal,
         updatedAt: settings.updatedAt,
         // Legacy compatibility
-        intasendPublicKey: '',
-        isSecretConfigured: false
+        intasendPublicKey: ''
       }
     })
   } catch (error: any) {
@@ -67,6 +68,7 @@ export async function updateSettings(req: Request, res: Response) {
       'paydWalletUsername',
       'paydApiUsername',
       'paydApiPassword',
+      'paydApiSecret',
       'paydApiBaseUrl',
       'paydCallbackUrl',
       'companyName',
@@ -81,8 +83,8 @@ export async function updateSettings(req: Request, res: Response) {
       const val = updates[key] !== undefined ? updates[key] : updates[snakeKey]
       
       if (val !== undefined) {
-        // If updating password, set if valid new password, or clear if explicitly empty
-        if (key === 'paydApiPassword') {
+        // If updating password or secret, set if valid new secret/password, or clear if explicitly empty
+        if (key === 'paydApiPassword' || key === 'paydApiSecret') {
           if (val === '' || val === null) {
             sanitizedUpdates[key] = ''
           } else if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
@@ -101,6 +103,7 @@ export async function updateSettings(req: Request, res: Response) {
     )
 
     const hasPassword = Boolean(settings.paydApiPassword)
+    const hasSecret = Boolean(settings.paydApiSecret)
 
     return res.json({
       success: true,
@@ -111,6 +114,7 @@ export async function updateSettings(req: Request, res: Response) {
         paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
         paydCallbackUrl: settings.paydCallbackUrl || '',
         isPasswordConfigured: hasPassword,
+        isSecretConfigured: hasSecret,
         isManagedViaAdmin: true,
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,

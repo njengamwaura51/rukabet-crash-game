@@ -29,6 +29,7 @@ export async function getSettings(req, res) {
             });
         }
         const hasPassword = Boolean(settings.paydApiPassword);
+        const hasSecret = Boolean(settings.paydApiSecret);
         return res.json({
             success: true,
             settings: {
@@ -37,15 +38,15 @@ export async function getSettings(req, res) {
                 paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
                 paydCallbackUrl: settings.paydCallbackUrl || '',
                 isPasswordConfigured: hasPassword,
-                isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername),
+                isSecretConfigured: hasSecret,
+                isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername || settings.paydApiSecret),
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,
                 minDeposit: settings.minDeposit,
                 minWithdrawal: settings.minWithdrawal,
                 updatedAt: settings.updatedAt,
                 // Legacy compatibility
-                intasendPublicKey: '',
-                isSecretConfigured: false
+                intasendPublicKey: ''
             }
         });
     }
@@ -61,6 +62,7 @@ export async function updateSettings(req, res) {
             'paydWalletUsername',
             'paydApiUsername',
             'paydApiPassword',
+            'paydApiSecret',
             'paydApiBaseUrl',
             'paydCallbackUrl',
             'companyName',
@@ -73,8 +75,8 @@ export async function updateSettings(req, res) {
             const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
             const val = updates[key] !== undefined ? updates[key] : updates[snakeKey];
             if (val !== undefined) {
-                // If updating password, set if valid new password, or clear if explicitly empty
-                if (key === 'paydApiPassword') {
+                // If updating password or secret, set if valid new secret/password, or clear if explicitly empty
+                if (key === 'paydApiPassword' || key === 'paydApiSecret') {
                     if (val === '' || val === null) {
                         sanitizedUpdates[key] = '';
                     }
@@ -89,6 +91,7 @@ export async function updateSettings(req, res) {
         }
         const settings = await Settings.findOneAndUpdate({}, { $set: sanitizedUpdates }, { new: true, upsert: true });
         const hasPassword = Boolean(settings.paydApiPassword);
+        const hasSecret = Boolean(settings.paydApiSecret);
         return res.json({
             success: true,
             message: 'Settings updated successfully',
@@ -98,6 +101,7 @@ export async function updateSettings(req, res) {
                 paydApiBaseUrl: settings.paydApiBaseUrl || 'https://api.mypayd.app/api/v2/payments',
                 paydCallbackUrl: settings.paydCallbackUrl || '',
                 isPasswordConfigured: hasPassword,
+                isSecretConfigured: hasSecret,
                 isManagedViaAdmin: true,
                 companyName: settings.companyName,
                 whatsappSupport: settings.whatsappSupport,

@@ -45,19 +45,20 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     }
 
     // Payd credentials from database Settings (single source of truth) with optional env fallback
-    const paydWalletUsername = sanitizeKey(settings?.paydWalletUsername) || sanitizeKey(process.env.PAYD_WALLET_USERNAME)
+    const paydWalletUsername = sanitizeKey(settings?.paydWalletUsername) || sanitizeKey(settings?.paydApiUsername) || sanitizeKey(process.env.PAYD_WALLET_USERNAME)
     const paydApiUsername = sanitizeKey(settings?.paydApiUsername) || sanitizeKey(process.env.PAYD_API_USERNAME)
     const paydApiPassword = sanitizeKey(settings?.paydApiPassword) || sanitizeKey(process.env.PAYD_API_PASSWORD)
+    const paydApiSecret = sanitizeKey(settings?.paydApiSecret) || sanitizeKey(process.env.PAYD_API_SECRET)
     const paydApiBaseUrl = sanitizeKey(settings?.paydApiBaseUrl) || sanitizeKey(process.env.PAYD_API_BASE_URL) || 'https://api.mypayd.app/api/v2/payments'
 
-    if (!paydWalletUsername || !paydApiUsername || !paydApiPassword) {
+    if (!paydApiUsername || (!paydApiPassword && !paydApiSecret)) {
       console.error('❌ Payd gateway credentials missing in admin settings')
       return res.status(500).json({ 
-        error: 'Payment gateway not configured. Please configure Payd credentials in Admin Dashboard > Gateway.' 
+        error: 'Payment gateway not configured. Please configure Payd credentials (API Username, Password, and API Secret) in Admin Dashboard > Gateway.' 
       })
     }
 
-    // Determine callback URL
+    // Determine callback URL (sent dynamically in every STK push payload)
     const publicDomain = sanitizeKey(process.env.PUBLIC_APP_URL) || `${req.protocol}://${req.get('host')}`
     const callbackUrl = sanitizeKey(settings?.paydCallbackUrl) || sanitizeKey(process.env.PAYD_CALLBACK_URL) || `${publicDomain}/api/webhooks/payd`
 
@@ -73,29 +74,42 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     })
     depositId = deposit._id.toString()
 
-    // Build HTTP Basic Auth header
-    const basicAuth = Buffer.from(`${paydApiUsername}:${paydApiPassword}`).toString('base64')
+    // Build HTTP Basic Auth header (Username : Password or Secret)
+    const authCredential = paydApiPassword || paydApiSecret
+    const basicAuth = Buffer.from(`${paydApiUsername}:${authCredential}`).toString('base64')
+
+    const requestHeaders: Record<string, string> = {
+      Authorization: `Basic ${basicAuth}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    }
+    if (paydApiSecret) {
+      requestHeaders['Api-Secret'] = paydApiSecret
+      requestHeaders['x-api-secret'] = paydApiSecret
+      requestHeaders['x-api-key'] = paydApiSecret
+    }
+
+    const requestBody: any = {
+      username: paydWalletUsername || paydApiUsername,
+      network_code: '63902', // Safaricom M-Pesa Kenya
+      amount: depositAmount,
+      phone_number: cleanPhone,
+      narration: `Deposit ${internalRef}`,
+      currency: 'KES',
+      callback_url: callbackUrl
+    }
+    if (paydApiSecret) {
+      requestBody.api_secret = paydApiSecret
+    }
 
     console.log(`📤 Sending Payd STK Push: amount=${depositAmount}, phone=${cleanPhone}, ref=${internalRef}`)
 
     // Call Payd Collections REST API
     const paydResponse = await axios.post(
       paydApiBaseUrl,
+      requestBody,
       {
-        username: paydWalletUsername,
-        network_code: '63902', // Safaricom M-Pesa Kenya
-        amount: depositAmount,
-        phone_number: cleanPhone,
-        narration: `Deposit ${internalRef}`,
-        currency: 'KES',
-        callback_url: callbackUrl
-      },
-      {
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
+        headers: requestHeaders,
         timeout: 25000
       }
     )

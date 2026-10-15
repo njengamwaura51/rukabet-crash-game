@@ -5,6 +5,7 @@ export interface ISettings extends Document {
   paydWalletUsername: string
   paydApiUsername: string
   paydApiPassword: string
+  paydApiSecret: string
   paydApiBaseUrl: string
   paydCallbackUrl: string
   intasendPublicKey?: string
@@ -28,6 +29,10 @@ const SettingsSchema = new Schema<ISettings>({
     default: ''
   },
   paydApiPassword: {
+    type: String,
+    default: ''
+  },
+  paydApiSecret: {
     type: String,
     default: ''
   },
