@@ -134,7 +134,7 @@ async function startServer() {
                     paydWalletUsername: '',
                     paydApiUsername: '',
                     paydApiPassword: '',
-                    paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments',
+                    paydApiBaseUrl: 'https://api.payd.money/api/v2/payments',
                     companyName: 'RUKA TECH SOLUTIONS'
                 });
                 console.log('✅ Default settings created (configure Payd in admin dashboard)');
