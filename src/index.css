@@ -332,3 +332,298 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Drop this into your global CSS to kill the glassy AI look immediately across whole site but dont touch plane canvas panel borders,only perfom edits on other parts  */
+.glass-panel, .card, .panel, [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: #18191d !important;
+  border-color: #25262b !important;
+  box-shadow: none !important;
+}
+
+body {
+  background-color: #090a0c !important;
+  color: #ffffff;
+}
+
+/* Explicitly preserve plane flight canvas panel borders as instructed */
+.plane-canvas-panel {
+  border-color: var(--color-line) !important;
+  background-color: var(--color-panel) !important;
+}
+
+/* ── Wallet Modal (Clean Solid Charcoal) ─────────────────────────────────── */
+.wallet-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 12px;
+  font-family: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.wallet-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background-color: #16181a;
+  border-radius: 10px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+}
+
+.wallet-header {
+  background-color: #26282c;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wallet-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #a0a6b1;
+  letter-spacing: 0.4px;
+}
+
+.wallet-close {
+  background: none;
+  border: none;
+  color: #ff1e38;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wallet-body {
+  padding: 20px 18px;
+}
+
+.wallet-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.wallet-card {
+  background-color: #282a2e;
+  border-radius: 10px;
+  padding: 22px 14px;
+  text-align: center;
+  position: relative;
+}
+
+.freebet-status {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 13px;
+  color: #1cb955;
+  font-weight: 500;
+}
+
+.card-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e6eb;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+}
+
+.card-amount {
+  font-size: 15px;
+  color: #8c939e;
+  font-weight: 500;
+}
+
+.card-amount span {
+  color: #1cb955;
+  font-weight: 600;
+}
+
+.wallet-tabs-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.wallet-tabs {
+  background-color: #282a2e;
+  border-radius: 8px;
+  display: inline-flex;
+  width: 90%;
+  overflow: hidden;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.tab-btn.active {
+  background-color: #00eb5b;
+  color: #091e0f;
+  font-weight: 600;
+}
+
+.section-label {
+  display: block;
+  font-size: 14px;
+  color: #d8dce2;
+  margin-bottom: 8px;
+  font-weight: 400;
+}
+
+.amount-input-group {
+  display: flex;
+  align-items: center;
+  background-color: #282a2e;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+
+.amount-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+  min-width: 0;
+}
+
+.amount-input::placeholder {
+  color: #6c727f;
+}
+
+.quick-amounts {
+  display: flex;
+  gap: 3px;
+}
+
+.quick-btn {
+  background-color: #1a1c1e;
+  border: 1px solid #32353b;
+  color: #9ba1ab;
+  font-size: 13px;
+  padding: 10px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quick-btn:hover {
+  background-color: #22252a;
+  color: #ffffff;
+}
+
+.btn-deposit {
+  width: 100%;
+  background-color: #0da84b;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: background-color 0.15s;
+}
+
+.btn-deposit:hover {
+  background-color: #0b9441;
+}
+
+.verify-section {
+  margin-top: 4px;
+}
+
+.verify-help-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8c939e;
+  margin: 0 0 12px 0;
+}
+
+.whatsapp-number {
+  color: #00eb5b;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.verify-input {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #282a2e;
+  border: none;
+  border-radius: 8px;
+  padding: 15px 14px;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.verify-input::placeholder {
+  color: #6c727f;
+}
+
+.btn-verify {
+  width: 100%;
+  background-color: #857153;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-verify:hover {
+  background-color: #968160;
+}
+
+.wallet-footer {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #d1d5db;
+}
+
+.mpesa-logo {
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+}
+
+.m-green {
+  color: #2ab54b;
+}

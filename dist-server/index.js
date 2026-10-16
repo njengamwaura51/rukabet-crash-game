@@ -24,7 +24,7 @@ import { initializeSocket } from './socket.js';
 import { Settings } from './models/Settings.js';
 // Controllers
 import { register, login, getMe, changePassword } from './controllers/authController.js';
-import { initiateDeposit } from './controllers/depositController.js';
+import { initiateDeposit, verifyPendingDeposit } from './controllers/depositController.js';
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js';
 import { paydWebhook, intasendWebhook } from './controllers/webhookController.js';
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js';
@@ -69,6 +69,7 @@ app.get('/api/auth/me', authMiddleware, getMe);
 app.post('/api/auth/change-password', authMiddleware, changePassword);
 // Deposit & Withdrawal routes
 app.post('/api/deposit', depositRateLimit, authMiddleware, initiateDeposit);
+app.post('/api/deposit/verify', authMiddleware, verifyPendingDeposit);
 app.post('/api/withdraw', depositRateLimit, authMiddleware, requestWithdrawal);
 app.get('/api/user/transactions', authMiddleware, getUserTransactions);
 // Public configuration

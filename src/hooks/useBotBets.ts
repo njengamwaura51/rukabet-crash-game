@@ -30,10 +30,9 @@ function seededRandom(seed: number): () => number {
 }
 
 function generateMaskedUsername(rng: () => number): string {
-  const prefix = USERNAME_PREFIXES[Math.floor(rng() * USERNAME_PREFIXES.length)]
   const firstDigit = Math.floor(rng() * 9) + 1
-  const lastTwo = String(Math.floor(rng() * 100)).padStart(2, '0')
-  return `${prefix}${firstDigit}**${lastTwo}`
+  const lastDigit = Math.floor(rng() * 10)
+  return `${firstDigit}**${lastDigit}`
 }
 
 // Bet amounts ranging from 10 to 10,000 KSH
@@ -55,11 +54,11 @@ function pickBetAmount(rng: () => number): number {
 
 function pickCashoutTarget(rng: () => number): number {
   const r = rng()
-  if (r < 0.15) return 1.1 + rng() * 0.2                           // 1.10-1.30 (early cashout)
-  if (r < 0.40) return 1.3 + rng() * 0.5                           // 1.30-1.80
-  if (r < 0.65) return 1.8 + rng() * 1.2                           // 1.80-3.00
-  if (r < 0.85) return 3.0 + rng() * 4.0                           // 3.00-7.00
-  return 7.0 + rng() * 13.0                                        // 7.00-20.00 (diamond hands)
+  if (r < 0.35) return 1.12 + rng() * 0.25                         // 1.12-1.37 (early cashouts)
+  if (r < 0.65) return 1.37 + rng() * 0.35                         // 1.37-1.72
+  if (r < 0.85) return 1.72 + rng() * 1.28                         // 1.72-3.00
+  if (r < 0.95) return 3.00 + rng() * 3.50                         // 3.00-6.50
+  return 6.50 + rng() * 13.50                                      // 6.50-20.00
 }
 
 const MIN_BOTS = 15
@@ -89,7 +88,7 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
 
       const bet = pickBetAmount(rng)
       const cashoutTarget = pickCashoutTarget(rng)
-      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
+      const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`
 
       newBots.push({
         id: `bot_${seed}_${i}`,

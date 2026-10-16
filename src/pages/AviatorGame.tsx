@@ -85,7 +85,7 @@ export default function AviatorGame() {
 
             {/* Flight canvas. Dominates the phone viewport; on desktop it grows so the
                 bet terminals bottom-align with the ledger column. */}
-            <div className="relative h-[clamp(200px,32dvh,380px)] w-full shrink-0 overflow-hidden rounded-lg border border-line bg-panel lg:h-[calc(100dvh_-_19.25rem)] lg:min-h-[320px]">
+            <div className="plane-canvas-panel relative h-[clamp(200px,32dvh,380px)] w-full shrink-0 overflow-hidden rounded-lg border border-line bg-panel lg:h-[calc(100dvh_-_19.25rem)] lg:min-h-[320px]">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}

@@ -35,11 +35,11 @@ function getServerClientSeed(): string {
 const SERVER_CLIENT_SEED = getServerClientSeed()
 
 const BOT_NAMES = [
-  'dk**29', 'km**93', 'mp**17', 'ja**41', 'ar**84', 'pt**66', 'su**52', 'ra**78',
-  'bo**35', 'ct**10', 'fx**63', 'gu**97', 'hy**42', 'lm**89', 'nk**34', 'tw**16',
-  'ud**51', 'vn**75', 'ws**88', 'xp**23', 'yo**90', 'zr**67', 'el**22', 'if**94',
-  'qz**46', 'om**79', 'wr**82', 'ni**55', 'yx**48', 'ko**31', 'mu**74', 'pk**27',
-  'jd**60', 're**13', 'st**96', 'az**49', 'bx**72', 'cw**25', 'dm**58', 'eq**81'
+  '2**9', '2**6', '7**1', '2**3', '2**2', '2**5', '2**0', '2**7',
+  '2**4', '7**6', '1**9', '5**2', '8**4', '3**8', '9**1', '6**7',
+  '4**5', '2**8', '7**3', '1**6', '5**8', '8**2', '3**5', '9**4',
+  '6**1', '4**9', '8**7', '5**3', '3**9', '7**2', '1**4', '9**8',
+  '4**2', '6**5', '2**1', '8**9', '5**6', '3**1', '7**8', '1**2'
 ]
 
 interface SharedLiveBet {
@@ -301,9 +301,11 @@ function getRandomBotBetAmount(isHighRoller: boolean): number {
 
 function getRandomBotCashoutTarget(): number {
   const roll = Math.random()
-  if (roll < 0.4) return 1.1 + Math.random() * 0.5
-  if (roll < 0.7) return 1.5 + Math.random() * 1.5
-  return 2.5 + Math.random() * 5
+  if (roll < 0.35) return Math.round((1.12 + Math.random() * 0.25) * 100) / 100
+  if (roll < 0.65) return Math.round((1.37 + Math.random() * 0.35) * 100) / 100
+  if (roll < 0.85) return Math.round((1.72 + Math.random() * 1.28) * 100) / 100
+  if (roll < 0.95) return Math.round((3.00 + Math.random() * 3.50) * 100) / 100
+  return Math.round((6.50 + Math.random() * 13.50) * 100) / 100
 }
 
 function seedRoundBotBets(): void {
@@ -320,7 +322,7 @@ function seedRoundBotBets(): void {
       cashout: null,
       won: null,
       cashoutTarget: getRandomBotCashoutTarget(),
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`,
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${userName}`,
       roundId: gameState.roundId,
       updatedAt: Date.now()
     }

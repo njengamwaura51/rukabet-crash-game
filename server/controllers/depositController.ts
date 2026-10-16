@@ -170,3 +170,44 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     })
   }
 }
+
+export async function verifyPendingDeposit(req: AuthRequest, res: Response) {
+  try {
+    const { code } = req.body
+    const cleanCode = typeof code === 'string' ? code.trim().toUpperCase() : ''
+
+    if (!cleanCode) {
+      return res.status(400).json({ error: 'Please enter a valid M-Pesa transaction code' })
+    }
+
+    // Check if deposit exists with this receipt or ref
+    const existing = await Deposit.findOne({
+      $or: [
+        { mpesaReceipt: cleanCode },
+        { externalRef: cleanCode },
+        { apiRef: cleanCode }
+      ]
+    })
+
+    if (existing && existing.status === 'completed') {
+      return res.json({
+        success: true,
+        amount: existing.amount,
+        message: `Transaction ${cleanCode} confirmed and credited KSH ${existing.amount}!`
+      })
+    }
+
+    if (existing && existing.status === 'pending') {
+      existing.mpesaReceipt = cleanCode
+      await existing.save()
+    }
+
+    return res.json({
+      success: true,
+      message: `Receipt ${cleanCode} logged for verification. Balance will update as soon as M-Pesa settles.`
+    })
+  } catch (error: any) {
+    console.error('Verify deposit error:', error)
+    return res.status(500).json({ error: 'Failed to verify transaction. Please contact support via WhatsApp.' })
+  }
+}
