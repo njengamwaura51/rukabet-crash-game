@@ -195,7 +195,7 @@ function renderFlightAndPlane(
 
   // 2. Responsive jet dimensions
   const planeWidth = Math.min(Math.max(canvasWidth * 0.125, 66), 112)
-  const planeHeight = (planeWidth / JET_ASPECT) * 1.015
+  const planeHeight = (planeWidth / JET_ASPECT) * 1.0302
 
   // 3. Max turbulence coordinate — safe on mobile screen edges
   const rightMargin = 10
@@ -492,7 +492,7 @@ export function GameCanvas({
 
       if (flyX < CW + 160 && flyY > -160) {
         const planeWidth = Math.min(Math.max(CW * 0.125, 66), 112)
-        const planeHeight = (planeWidth / JET_ASPECT) * 1.015
+        const planeHeight = (planeWidth / JET_ASPECT) * 1.0302
         const drawX = flyX - planeWidth * TAIL_ANCHOR_X
         const drawY = flyY - planeHeight * TAIL_ANCHOR_Y
         if (greenJetImg.complete) {

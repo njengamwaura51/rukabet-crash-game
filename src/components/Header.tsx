@@ -32,11 +32,11 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-line bg-page pt-[env(safe-area-inset-top)]">
-        <div className="flex h-14 items-center justify-between gap-2 px-2.5 sm:px-4 lg:px-5">
+        <div className="flex h-14 items-center justify-between gap-2 pl-2 pr-2.5 sm:pl-3 sm:pr-4 lg:pl-3.5 lg:pr-5">
           {/* Brand + support */}
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link to="/" className="flex shrink-0 items-center rounded-md">
-              <img src="/logo.png" alt={config.brandName} className="h-[30px] w-auto object-contain sm:h-8 lg:h-9" />
+              <img src="/logo.png" alt={config.brandName} className="h-[24px] w-auto object-contain sm:h-[26px] lg:h-[28px]" />
               <span className="sr-only">{config.brandName} home</span>
             </Link>
 
