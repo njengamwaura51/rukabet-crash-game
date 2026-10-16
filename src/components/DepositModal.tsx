@@ -51,8 +51,6 @@ export function DepositModal({
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [verifyCode, setVerifyCode] = useState('')
-  const [isVerifying, setIsVerifying] = useState(false)
   const [withdrawPhone, setWithdrawPhone] = useState(userPhone || '')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
@@ -60,8 +58,6 @@ export function DepositModal({
   const [transactions, setTransactions] = useState<Transaction[]>([])
 
   const registeredPhone = normalizeToNineDigitPhone(userPhone)
-  const whatsappNumber = config.whatsappSupportNumber || '254719897373'
-  const whatsappDisplay = whatsappNumber.startsWith('254') ? `0${whatsappNumber.slice(3)}` : whatsappNumber
 
   // Close on Escape key
   useEffect(() => {
@@ -135,7 +131,7 @@ export function DepositModal({
       if (response.ok && data?.success) {
         setStatus({
           type: 'success',
-          message: 'STK push sent! Check your phone and enter your M-Pesa PIN. Balance updates automatically once confirmed.',
+          message: 'STK push sent! Check your phone and enter your M-Pesa PIN.',
         })
       } else {
         throw new Error(data?.error || 'STK push failed. Please try again.')
@@ -147,54 +143,6 @@ export function DepositModal({
       })
     } finally {
       setIsProcessing(false)
-    }
-  }
-
-  const handleVerify = async () => {
-    const code = verifyCode.trim().toUpperCase()
-    if (!code) {
-      setStatus({ type: 'error', message: 'Enter a valid M-Pesa transaction code (e.g. TCQ74RQ4JH)' })
-      return
-    }
-
-    setIsVerifying(true)
-    setStatus({ type: 'info', message: `Verifying M-Pesa code ${code}...` })
-
-    try {
-      const token = readToken()
-      const response = await fetch(`${config.apiBaseUrl}/api/deposit/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ code }),
-      }).catch(() => null)
-
-      const data = response ? await response.json().catch(() => null) : null
-
-      if (response?.ok && data?.success) {
-        setStatus({
-          type: 'success',
-          message: data.message || `Deposit verified and credited successfully!`,
-        })
-        if (data.amount) onDeposit(data.amount)
-        setVerifyCode('')
-      } else {
-        setStatus({
-          type: 'info',
-          message:
-            data?.error ||
-            `Receipt ${code} logged. If balance is not updated shortly, please forward your M-Pesa confirmation SMS to WhatsApp support at ${whatsappDisplay}.`,
-        })
-      }
-    } catch {
-      setStatus({
-        type: 'info',
-        message: `Verification queued. If not reflected within 2 minutes, forward M-Pesa message to WhatsApp support at ${whatsappDisplay}.`,
-      })
-    } finally {
-      setIsVerifying(false)
     }
   }
 
@@ -314,7 +262,7 @@ export function DepositModal({
           {status && (
             <div
               role="alert"
-              className={`mb-3.5 rounded-lg p-3 text-xs font-semibold leading-relaxed ${
+              className={`mb-3 rounded-lg p-2.5 text-xs font-semibold leading-relaxed ${
                 status.type === 'error'
                   ? 'border border-[#5c242d] bg-[#3b1219] text-[#ff5c6c]'
                   : status.type === 'success'
@@ -326,7 +274,7 @@ export function DepositModal({
             </div>
           )}
 
-          {/* Deposit Form Section */}
+          {/* Deposit Form Section (Compact & non-scrollable) */}
           {tab === 'deposit' && (
             <div className="deposit-section">
               <label className="section-label">Amount to Deposit</label>
@@ -367,41 +315,6 @@ export function DepositModal({
               >
                 {isProcessing ? 'SENDING STK PUSH...' : 'DEPOSIT'}
               </button>
-
-              {/* Verify Pending Deposit Section */}
-              <div className="verify-section">
-                <div className="section-label">Verify Pending Deposit</div>
-                <p className="verify-help-text">
-                  If your deposit does not reflect in your account within 2 minutes, forward the mpesa message to support
-                  via whatsapp{' '}
-                  <a
-                    href={`https://wa.me/${whatsappNumber}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="whatsapp-number"
-                  >
-                    {whatsappDisplay}
-                  </a>
-                </p>
-
-                <input
-                  type="text"
-                  placeholder="mpesa code e.g TCQ74RQ4JH"
-                  className="verify-input"
-                  value={verifyCode}
-                  onChange={(e) => setVerifyCode(e.target.value)}
-                  disabled={isVerifying}
-                />
-
-                <button
-                  type="button"
-                  className="btn-verify"
-                  onClick={handleVerify}
-                  disabled={isVerifying || !verifyCode.trim()}
-                >
-                  {isVerifying ? 'VERIFYING...' : 'VERIFY'}
-                </button>
-              </div>
             </div>
           )}
 
@@ -443,18 +356,18 @@ export function DepositModal({
 
           {/* Transactions Section */}
           {tab === 'transactions' && (
-            <div className="transactions-section max-h-64 overflow-y-auto space-y-2">
+            <div className="transactions-section max-h-56 overflow-y-auto space-y-1.5">
               {transactions.length === 0 ? (
-                <p className="text-center text-xs text-[#8c939e] py-8">No recent transactions found.</p>
+                <p className="text-center text-xs text-[#8c939e] py-6">No recent transactions found.</p>
               ) : (
                 transactions.map((tx) => (
                   <div
                     key={tx.id || `${tx.type}-${tx.date}`}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-[#282a2e] text-xs"
+                    className="flex items-center justify-between p-2 rounded-lg bg-[#282a2e] text-xs"
                   >
                     <div>
                       <span className="font-bold text-white uppercase">{tx.type}</span>
-                      <p className="text-[11px] text-[#8c939e]">{tx.date}</p>
+                      <p className="text-[10px] text-[#8c939e]">{tx.date}</p>
                     </div>
                     <div className="text-right">
                       <span className="font-semibold text-[#00eb5b]">KSH {tx.amount.toFixed(2)}</span>
@@ -466,7 +379,7 @@ export function DepositModal({
             </div>
           )}
 
-          {/* Footer */}
+          {/* Footer directly below deposit button */}
           <div className="wallet-footer">
             <span>Powered By</span>
             <div className="mpesa-logo">

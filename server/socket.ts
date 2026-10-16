@@ -322,7 +322,7 @@ function seedRoundBotBets(): void {
       cashout: null,
       won: null,
       cashoutTarget: getRandomBotCashoutTarget(),
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${userName}`,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`,
       roundId: gameState.roundId,
       updatedAt: Date.now()
     }

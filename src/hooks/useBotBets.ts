@@ -88,7 +88,7 @@ export function useBotBets(phase: Phase, multiplier: number): BotBet[] {
 
       const bet = pickBetAmount(rng)
       const cashoutTarget = pickCashoutTarget(rng)
-      const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`
+      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
 
       newBots.push({
         id: `bot_${seed}_${i}`,

@@ -403,29 +403,29 @@ body {
 }
 
 .wallet-body {
-  padding: 20px 18px;
+  padding: 14px 14px;
 }
 
 .wallet-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 22px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .wallet-card {
   background-color: #282a2e;
-  border-radius: 10px;
-  padding: 22px 14px;
+  border-radius: 8px;
+  padding: 14px 10px;
   text-align: center;
   position: relative;
 }
 
 .freebet-status {
   position: absolute;
-  top: 8px;
-  left: 12px;
-  font-size: 13px;
+  top: 6px;
+  left: 10px;
+  font-size: 11px;
   color: #1cb955;
   font-weight: 500;
 }
@@ -452,7 +452,7 @@ body {
 .wallet-tabs-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .wallet-tabs {
@@ -465,11 +465,11 @@ body {
 
 .tab-btn {
   flex: 1;
-  padding: 10px 0;
+  padding: 8px 0;
   border: none;
   background: transparent;
   color: #d1d5db;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   border-radius: 8px;
@@ -484,9 +484,9 @@ body {
 
 .section-label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   color: #d8dce2;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: 400;
 }
 
@@ -495,8 +495,8 @@ body {
   align-items: center;
   background-color: #282a2e;
   border-radius: 8px;
-  padding: 4px;
-  margin-bottom: 14px;
+  padding: 3px;
+  margin-bottom: 12px;
 }
 
 .amount-input {
@@ -504,7 +504,7 @@ body {
   background: transparent;
   border: none;
   color: #ffffff;
-  padding: 12px 14px;
+  padding: 10px 12px;
   font-size: 14px;
   outline: none;
   min-width: 0;
@@ -524,7 +524,7 @@ body {
   border: 1px solid #32353b;
   color: #9ba1ab;
   font-size: 13px;
-  padding: 10px 11px;
+  padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
@@ -541,12 +541,12 @@ body {
   color: #ffffff;
   border: none;
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.5px;
   cursor: pointer;
-  margin-bottom: 24px;
+  margin-bottom: 10px;
   transition: background-color 0.15s;
 }
 
@@ -627,3 +627,33 @@ body {
 .m-green {
   color: #2ab54b;
 }
+
+.aviator-plane {
+  position: absolute;
+  /* Responsive width: ~68px on small mobile, up to 112px on desktop */
+  width: clamp(68px, 13cqw, 112px);
+  aspect-ratio: 120 / 52;
+  pointer-events: none;
+  z-index: 10;
+
+  /* Shifts the plane back slightly so the line tip meets the rear engine/wing 
+     instead of pushing 100% of the plane past the turbulence point */
+  transform: translate(-32%, -66%) rotate(-11deg);
+  transform-origin: 32% 66%;
+  will-change: transform, left, top;
+}
+
+/* Turbulence hover animation when the plane reaches max height */
+.aviator-plane.is-turbulence {
+  animation: planeTurbulence 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes planeTurbulence {
+  0% {
+    transform: translate(-32%, calc(-66% - 3px)) rotate(-9deg);
+  }
+  100% {
+    transform: translate(-32%, calc(-66% + 3px)) rotate(-13.5deg);
+  }
+}
+

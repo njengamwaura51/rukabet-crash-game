@@ -79,7 +79,7 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
       </div>
 
       {/* Column headers matching reference screenshot */}
-      <div className={`${ROW_GRID} px-3 py-2 border-b border-[#1d1f25] text-[11px] font-semibold text-[#8c939e]`}>
+      <div className={`${ROW_GRID} px-2.5 py-1.5 border-b border-[#1d1f25] text-[10px] font-semibold text-[#8c939e]`}>
         <span>User</span>
         <span className="text-right">Bet KSH</span>
         <span className="text-center">Cashout</span>
@@ -87,7 +87,7 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
       </div>
 
       {/* Bets list with avatar DPs and green-capsule cashed out rows */}
-      <div className="live-bets-scroll flex-1 overflow-y-auto overscroll-contain p-2 space-y-1">
+      <div className="live-bets-scroll flex-1 overflow-y-auto overscroll-contain p-1.5 space-y-0.5">
         {displayedBets.length === 0 ? (
           <div className="px-3 py-10 text-center text-xs text-[#8c939e]">{emptyMessage}</div>
         ) : (
@@ -96,34 +96,33 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
             const hasCashed = Boolean(b.cashedOut || (co !== null && co !== undefined && co > 0))
             const rawWon = b.won ?? b.win
             const wonAmount = rawWon && rawWon > 0 ? rawWon : (hasCashed && co ? b.bet * co : 0)
-            const avatarUrl = b.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(b.user)}`
+            const avatarUrl = b.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(b.user)}`
 
             return (
               <div
                 key={b.id || `${b.user}-${b.bet}`}
-                className={`${ROW_GRID} px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                className={`${ROW_GRID} px-2 py-1 rounded-md text-[11px] transition-colors ${
                   hasCashed
                     ? 'border border-[#14a34d] bg-[#0d4624]/85 text-white shadow-sm'
                     : 'border border-[#202228] bg-[#16181b] text-white/90'
                 }`}
               >
                 {/* User avatar + masked username without leading letters */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <img
                     src={avatarUrl}
                     alt=""
-                    className="size-6 shrink-0 rounded-full object-cover bg-black/40 border border-black/40"
+                    className="size-5 shrink-0 rounded-full object-cover bg-black/40 border border-black/40"
                     loading="lazy"
                     onError={(e) => {
-                      // Fallback to simple colored dot if external SVG fails
                       ;(e.currentTarget as HTMLElement).style.display = 'none'
                     }}
                   />
-                  <span className="truncate font-medium text-white text-[12px]">{b.user}</span>
+                  <span className="truncate font-medium text-white text-[11px]">{b.user}</span>
                 </div>
 
                 {/* Bet amount with 2 decimal places */}
-                <span className="text-right tabular-nums text-white/90 font-medium text-[12px]">
+                <span className="text-right tabular-nums text-white/90 font-medium text-[11px]">
                   {formatNumber(b.bet)}
                 </span>
 
@@ -131,7 +130,7 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
                 <div className="flex items-center justify-center">
                   {hasCashed && co ? (
                     <span
-                      className="inline-flex items-center justify-center rounded-md bg-[#0c0d10] px-2 py-0.5 text-[11px] font-bold tabular-nums shadow-sm"
+                      className="inline-flex items-center justify-center rounded-md bg-[#0c0d10] px-1.5 py-0.5 text-[10px] font-bold tabular-nums shadow-sm"
                       style={{ color: getOddsTierColor(co) }}
                     >
                       {co.toFixed(2)}x
@@ -140,7 +139,7 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
                 </div>
 
                 {/* Won amount */}
-                <span className="text-right tabular-nums font-semibold text-white text-[12px]">
+                <span className="text-right tabular-nums font-semibold text-white text-[11px]">
                   {hasCashed && wonAmount > 0 ? formatNumber(wonAmount) : null}
                 </span>
               </div>
