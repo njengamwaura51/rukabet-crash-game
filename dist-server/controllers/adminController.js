@@ -5,6 +5,7 @@ import { Bet } from '../models/Bet.js';
 import { Deposit } from '../models/Deposit.js';
 import { Withdrawal } from '../models/Withdrawal.js';
 import { OddsControl } from '../models/OddsControl.js';
+import { Settings } from '../models/Settings.js';
 import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO } from '../socket.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 function safeCompare(a, b) {
@@ -328,6 +329,8 @@ export async function adjustUserBalance(req, res) {
 // Database refresh & early user synchronization endpoint
 export async function syncDatabaseUsers(req, res) {
     try {
+        const settings = await Settings.getSettings();
+        const defaultFreebet = Number(settings?.initialFreebet ?? 150);
         const allUsers = await User.find({});
         let normalizedCount = 0;
         for (const u of allUsers) {
@@ -337,7 +340,7 @@ export async function syncDatabaseUsers(req, res) {
                 changed = true;
             }
             if (u.freebet === undefined || u.freebet === null || isNaN(u.freebet)) {
-                u.freebet = 150;
+                u.freebet = defaultFreebet;
                 changed = true;
             }
             if (u.freebetLocked === undefined || u.freebetLocked === null) {

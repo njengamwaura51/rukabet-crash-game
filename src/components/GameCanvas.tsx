@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
+import { useConfig } from '@/hooks/useConfig'
 import type { Phase, PlaneTransform } from '../hooks/useGameState'
 
 interface GameCanvasProps {
@@ -288,6 +289,7 @@ function BetModeToggle({
   freebetLocked?: boolean
   freebetAmount?: number
 }) {
+  const { config } = useConfig()
   const base = 'h-7 rounded px-2.5 text-[11px] font-semibold transition-colors'
   return (
     <div
@@ -308,7 +310,7 @@ function BetModeToggle({
         aria-pressed={betMode === 'freebet'}
         onClick={() => betMode !== 'freebet' && onToggle()}
         className={cn(base, betMode === 'freebet' ? 'bg-brand text-brand-ink' : 'text-ink-2 hover:text-ink')}
-        title={freebetLocked ? 'Deposit KSH 20+ to unlock bonus' : `Freebet: KSH ${freebetAmount > 0 ? freebetAmount.toFixed(0) : '0'}`}
+        title={freebetLocked ? `Deposit KSH ${config.freebetUnlockAmount ?? 50}+ to unlock bonus` : `Freebet: KSH ${freebetAmount > 0 ? freebetAmount.toFixed(0) : '0'}`}
       >
         Freebet
         {!freebetLocked && freebetAmount > 0 && (

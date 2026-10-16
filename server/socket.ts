@@ -6,6 +6,7 @@ import { User } from './models/User.js'
 import { Bet } from './models/Bet.js'
 import { Round } from './models/Round.js'
 import { OddsControl } from './models/OddsControl.js'
+import { Settings } from './models/Settings.js'
 
 let io: Server | null = null
 
@@ -648,7 +649,9 @@ export function initializeSocket(httpServer: HttpServer): Server {
           const checkUser = await User.findById(userId)
           if (!checkUser) return socket.emit('BET_ERROR', { error: 'User not found' })
           if (checkUser.freebetLocked) {
-            return socket.emit('BET_ERROR', { error: 'Freebets locked: Deposit KSH 20+ to unlock' })
+            const settings = await (Settings as any).getSettings()
+            const unlockAmount = Number(settings?.freebetUnlockAmount ?? 50)
+            return socket.emit('BET_ERROR', { error: `Freebets locked: Deposit KSH ${unlockAmount}+ to unlock` })
           }
           if ((checkUser.freebet || 0) < amount) {
             return socket.emit('BET_ERROR', { error: 'Insufficient freebet balance' })

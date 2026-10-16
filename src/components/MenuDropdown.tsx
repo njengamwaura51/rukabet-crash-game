@@ -57,7 +57,7 @@ export function MenuDropdown({ username, isLoggedIn, onClose, onLogout }: MenuDr
 
       <nav className="py-1">
         <MenuLink to="/profile" icon={<User className="size-[18px]" />} label="My profile" onClose={onClose} />
-        <MenuLink to="/referrals" icon={<Users className="size-[18px]" />} label="Refer and earn" badge="KSH 20" onClose={onClose} />
+        <MenuLink to="/referrals" icon={<Users className="size-[18px]" />} label="Refer and earn" badge={`KSH ${config.referralReward ?? 20}`} onClose={onClose} />
         <MenuLink to="/bonuses" icon={<Gift className="size-[18px]" />} label="Bonuses" onClose={onClose} />
         <button type="button" role="menuitem" onClick={handleSupportClick} className={`${ROW} text-ink-2 hover:text-ink`}>
           <LifeBuoy className="size-[18px]" aria-hidden="true" />

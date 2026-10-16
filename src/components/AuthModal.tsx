@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Modal } from './Modal'
+import { useConfig } from '@/hooks/useConfig'
 
 interface AuthModalProps {
   mode: 'login' | 'register'
@@ -121,6 +122,7 @@ function SpinnerIcon() {
 }
 
 export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: AuthModalProps) {
+  const { config } = useConfig()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -267,10 +269,10 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
         {!isLogin && (
           <div className="flex items-center justify-between rounded-md border border-line bg-field px-3 py-2 text-xs">
             <span className="font-semibold text-bonus">
-              KSH <span className="tabular-nums">150</span> Freebet
+              KSH <span className="tabular-nums">{config.initialFreebet ?? 150}</span> Freebet
             </span>
             <span className="text-ink-3">
-              Unlocks with KSH <span className="tabular-nums">20</span>+ deposit
+              Unlocks with KSH <span className="tabular-nums">{config.freebetUnlockAmount ?? 50}</span>+ deposit
             </span>
           </div>
         )}

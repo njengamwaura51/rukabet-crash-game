@@ -21,8 +21,6 @@ interface Transaction {
 }
 
 const TOKEN_STORAGE_KEYS = ['rukabet_token', 'token', 'aspirebet_token'] as const
-const MIN_DEPOSIT = 10
-const MIN_WITHDRAW = 50
 
 function readToken(): string | undefined {
   return TOKEN_STORAGE_KEYS
@@ -48,6 +46,8 @@ export function DepositModal({
   onDeposit,
 }: DepositModalProps) {
   const { config } = useConfig()
+  const minDeposit = config.minDeposit ?? 10
+  const minWithdraw = config.minWithdrawal ?? 50
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -93,8 +93,8 @@ export function DepositModal({
 
   const handleDeposit = async () => {
     const depositAmount = parseFloat(amount)
-    if (Number.isNaN(depositAmount) || depositAmount < MIN_DEPOSIT) {
-      setStatus({ type: 'error', message: `Minimum deposit is KSH ${MIN_DEPOSIT}` })
+    if (Number.isNaN(depositAmount) || depositAmount < minDeposit) {
+      setStatus({ type: 'error', message: `Minimum deposit is KSH ${minDeposit}` })
       return
     }
 
@@ -148,8 +148,8 @@ export function DepositModal({
 
   const handleWithdraw = async () => {
     const withdrawAmt = parseFloat(withdrawAmount)
-    if (Number.isNaN(withdrawAmt) || withdrawAmt < MIN_WITHDRAW) {
-      setStatus({ type: 'error', message: `Minimum withdrawal is KSH ${MIN_WITHDRAW}` })
+    if (Number.isNaN(withdrawAmt) || withdrawAmt < minWithdraw) {
+      setStatus({ type: 'error', message: `Minimum withdrawal is KSH ${minWithdraw}` })
       return
     }
 
@@ -289,7 +289,7 @@ export function DepositModal({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   disabled={isProcessing}
-                  min={MIN_DEPOSIT}
+                  min={minDeposit}
                 />
                 <div className="quick-amounts">
                   <button type="button" className="quick-btn" onClick={() => setAmount('10')} disabled={isProcessing}>
@@ -331,7 +331,7 @@ export function DepositModal({
               />
               <p className="mt-1 text-[11px] text-[#8c939e]">Withdrawals are sent directly to your registered number.</p>
 
-              <label className="section-label mt-2">Amount to Withdraw (Min KSH 50)</label>
+              <label className="section-label mt-2">Amount to Withdraw (Min KSH {minWithdraw})</label>
               <input
                 type="number"
                 placeholder="Enter amount to withdraw"
@@ -340,7 +340,7 @@ export function DepositModal({
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 disabled={isWithdrawing}
                 max={balance}
-                min={MIN_WITHDRAW}
+                min={minWithdraw}
               />
 
               <button

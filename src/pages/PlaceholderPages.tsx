@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { Link } from 'wouter'
 import { Check, ChevronLeft, Copy, Gift, KeyRound, Link2, MessageCircle, Ticket } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useConfig } from '@/hooks/useConfig'
 
 /** Shared frame for the account pages: back link, title, single column. */
 function PageShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
@@ -202,7 +203,10 @@ export function ProfilePage() {
 
 export function ReferralsPage() {
   const { user } = useAuth()
+  const { config } = useConfig()
   const [copied, setCopied] = useState(false)
+  const referralReward = config.referralReward ?? 20
+  const unlockDeposit = config.freebetUnlockAmount ?? 50
   
   // Generate referral link pointing to live host
   const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || user?.phone || 'guest'
@@ -222,9 +226,9 @@ export function ReferralsPage() {
   return (
     <PageShell title="Refer and earn" subtitle="Invite friends, earn rewards">
       <section className="rounded-lg border border-brand/30 bg-brand/[0.07] p-5 text-center">
-        <p className="text-3xl font-bold tabular-nums text-brand">KSH 20</p>
+        <p className="text-3xl font-bold tabular-nums text-brand">KSH {referralReward}</p>
         <p className="mt-1 text-sm text-ink">per successful referral</p>
-        <p className="mt-2 text-sm text-ink-2">Paid when your friend makes a first deposit of KSH 10 or more.</p>
+        <p className="mt-2 text-sm text-ink-2">Paid when your friend makes a first deposit of KSH {unlockDeposit} or more.</p>
       </section>
 
       <div className="grid grid-cols-2 gap-3">
@@ -264,8 +268,8 @@ export function ReferralsPage() {
           </button>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink-2">
-          Share your link with friends. When they register and make a first deposit of KSH 10 or more,
-          KSH 20 is credited to your main balance.
+          Share your link with friends. When they register and make a first deposit of KSH {unlockDeposit} or more,
+          KSH {referralReward} is credited to your main balance.
         </p>
       </section>
     </PageShell>
@@ -274,10 +278,13 @@ export function ReferralsPage() {
 
 export function BonusesPage() {
   const { user } = useAuth()
+  const { config } = useConfig()
   const freebetBalance = user?.freebet ?? 0
+  const initialFreebet = config.initialFreebet ?? 150
+  const unlockDeposit = config.freebetUnlockAmount ?? 50
   
   // Real deposit bonus progress
-  const wagerRequired = user?.wagerRequired ?? (user?.hasPlayedWithMoney ? 0 : 20)
+  const wagerRequired = user?.wagerRequired ?? (user?.hasPlayedWithMoney ? 0 : unlockDeposit)
   const wagerProgress = user?.wagerProgress ?? (user?.hasPlayedWithMoney ? wagerRequired : 0)
   const progressPercent = wagerRequired > 0 ? Math.min((wagerProgress / wagerRequired) * 100, 100) : (user?.hasPlayedWithMoney ? 100 : 0)
 
@@ -336,7 +343,7 @@ export function BonusesPage() {
           <Gift className="size-4 text-ink-2" aria-hidden="true" />
           Welcome bonus
         </h2>
-        <p className="text-3xl font-bold tabular-nums text-brand">KSH 150</p>
+        <p className="text-3xl font-bold tabular-nums text-brand">KSH {initialFreebet}</p>
         <p className="mt-1 text-sm text-ink-2">Freebet for new users, credited when you register.</p>
       </section>
     </PageShell>
@@ -345,9 +352,11 @@ export function BonusesPage() {
 
 // Kept for old links: redirects straight to WhatsApp support
 export function SupportPage() {
+  const { config } = useConfig()
+  const phone = config.whatsappSupportNumber || '254713934411'
   useEffect(() => {
-    window.location.href = 'https://wa.me/254713934411'
-  }, [])
+    window.location.href = `https://wa.me/${phone}`
+  }, [phone])
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-page px-6 text-center text-ink">

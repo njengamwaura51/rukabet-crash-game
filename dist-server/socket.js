@@ -5,6 +5,7 @@ import { User } from './models/User.js';
 import { Bet } from './models/Bet.js';
 import { Round } from './models/Round.js';
 import { OddsControl } from './models/OddsControl.js';
+import { Settings } from './models/Settings.js';
 let io = null;
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 const WAIT_MS = 5000;
@@ -524,7 +525,9 @@ export function initializeSocket(httpServer) {
                     if (!checkUser)
                         return socket.emit('BET_ERROR', { error: 'User not found' });
                     if (checkUser.freebetLocked) {
-                        return socket.emit('BET_ERROR', { error: 'Freebets locked: Deposit KSH 20+ to unlock' });
+                        const settings = await Settings.getSettings();
+                        const unlockAmount = Number(settings?.freebetUnlockAmount ?? 50);
+                        return socket.emit('BET_ERROR', { error: `Freebets locked: Deposit KSH ${unlockAmount}+ to unlock` });
                     }
                     if ((checkUser.freebet || 0) < amount) {
                         return socket.emit('BET_ERROR', { error: 'Insufficient freebet balance' });

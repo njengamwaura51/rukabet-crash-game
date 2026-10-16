@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AlertCircle, Minus, Plus } from 'lucide-react'
 import { useBetting } from '@/contexts/BettingContext'
+import { useConfig } from '@/hooks/useConfig'
 import type { Phase } from '@/hooks/useGameState'
 
 interface BetPanelProps {
@@ -90,7 +91,10 @@ export default function BetPanel({
   autoBetEnabled = false,
   onAutoBetToggle,
 }: BetPanelProps) {
+  const { config } = useConfig()
   const betting = useBetting()
+  const freebetUnlockAmount = config.freebetUnlockAmount ?? 50
+  const minAmount = config.minBet ?? MIN_AMOUNT
   const [amount, setAmount] = useState(defaultAmount)
   const [autoCashout, setAutoCashout] = useState('2.00')
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false)
@@ -162,11 +166,11 @@ export default function BetPanel({
       return
     }
 
-    const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
+    const betAmount = Math.max(minAmount, Math.min(amount, maxBalance))
 
     // Check freebet lock upfront across all phases
     if (isFreebet && freebetLocked) {
-      setError('Freebets locked: Deposit KSH 20+ to unlock')
+      setError(`Freebets locked: Deposit KSH ${freebetUnlockAmount}+ to unlock`)
       return
     }
 
@@ -179,7 +183,7 @@ export default function BetPanel({
       if (success) {
         setLastBetAmount(betAmount)
       } else {
-        setError(isFreebet && freebetLocked ? 'Freebets locked: Deposit KSH 20+ to unlock' : 'Insufficient funds')
+        setError(isFreebet && freebetLocked ? `Freebets locked: Deposit KSH ${freebetUnlockAmount}+ to unlock` : 'Insufficient funds')
       }
       return
     }
@@ -193,7 +197,7 @@ export default function BetPanel({
       if (success) {
         setLastBetAmount(betAmount)
       } else {
-        setError(isFreebet && freebetLocked ? 'Freebets locked: Deposit KSH 20+ to unlock' : 'Insufficient funds')
+        setError(isFreebet && freebetLocked ? `Freebets locked: Deposit KSH ${freebetUnlockAmount}+ to unlock` : 'Insufficient funds')
       }
     }
   }

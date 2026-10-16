@@ -1,7 +1,7 @@
 import { User } from '../models/User.js';
 import { Withdrawal } from '../models/Withdrawal.js';
 import { Deposit } from '../models/Deposit.js';
-const MIN_WITHDRAWAL = 50;
+import { Settings } from '../models/Settings.js';
 export async function requestWithdrawal(req, res) {
     try {
         const userId = req.userId;
@@ -9,9 +9,11 @@ export async function requestWithdrawal(req, res) {
         if (!userId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
+        const settings = await Settings.getSettings();
+        const minWithdrawal = Number(settings?.minWithdrawal ?? 50);
         const withdrawAmount = Number(amount);
-        if (!Number.isFinite(withdrawAmount) || withdrawAmount < MIN_WITHDRAWAL) {
-            return res.status(400).json({ error: `Minimum withdrawal is KSH ${MIN_WITHDRAWAL}` });
+        if (!Number.isFinite(withdrawAmount) || withdrawAmount < minWithdrawal) {
+            return res.status(400).json({ error: `Minimum withdrawal is KSH ${minWithdrawal}` });
         }
         // Atomically check balance and deduct
         const user = await User.findOneAndUpdate({ _id: userId, balance: { $gte: withdrawAmount } }, { $inc: { balance: -withdrawAmount } }, { new: true });

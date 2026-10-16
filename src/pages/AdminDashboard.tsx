@@ -58,7 +58,19 @@ type SettingsPayload = {
   whatsappSupport?: string
   whatsapp_support?: string
   minDeposit?: number
+  min_deposit?: number
   minWithdrawal?: number
+  min_withdrawal?: number
+  freebetUnlockAmount?: number
+  freebet_unlock_amount?: number
+  initialFreebet?: number
+  initial_freebet?: number
+  referralReward?: number
+  referral_reward?: number
+  minBet?: number
+  min_bet?: number
+  maxBet?: number
+  max_bet?: number
   intasendPublicKey?: string
   intasend_public_key?: string
 }
@@ -258,6 +270,11 @@ export default function AdminDashboard() {
     whatsappSupport: '254719858034',
     minDeposit: 10,
     minWithdrawal: 50,
+    freebetUnlockAmount: 50,
+    initialFreebet: 150,
+    referralReward: 20,
+    minBet: 10,
+    maxBet: 10000,
   })
   const [newApiPassword, setNewApiPassword] = useState('')
   const [showApiPassword, setShowApiPassword] = useState(false)
@@ -312,8 +329,13 @@ export default function AdminDashboard() {
             paydCallbackUrl: s.paydCallbackUrl || s.payd_callback_url || '',
             companyName: s.companyName || s.company_name || 'RUKA TECH SOLUTIONS',
             whatsappSupport: s.whatsappSupport || s.whatsapp_support || '254719858034',
-            minDeposit: s.minDeposit ?? 10,
-            minWithdrawal: s.minWithdrawal ?? 50,
+            minDeposit: s.minDeposit ?? s.min_deposit ?? 10,
+            minWithdrawal: s.minWithdrawal ?? s.min_withdrawal ?? 50,
+            freebetUnlockAmount: s.freebetUnlockAmount ?? s.freebet_unlock_amount ?? 50,
+            initialFreebet: s.initialFreebet ?? s.initial_freebet ?? 150,
+            referralReward: s.referralReward ?? s.referral_reward ?? 20,
+            minBet: s.minBet ?? s.min_bet ?? 10,
+            maxBet: s.maxBet ?? s.max_bet ?? 10000,
           })
           setIsPasswordConfigured(Boolean(s.isPasswordConfigured))
           setIsSecretConfigured(Boolean(s.isSecretConfigured))
@@ -793,6 +815,11 @@ export default function AdminDashboard() {
         whatsappSupport: paymentConfig.whatsappSupport.trim(),
         minDeposit: Number(paymentConfig.minDeposit),
         minWithdrawal: Number(paymentConfig.minWithdrawal),
+        freebetUnlockAmount: Number(paymentConfig.freebetUnlockAmount),
+        initialFreebet: Number(paymentConfig.initialFreebet),
+        referralReward: Number(paymentConfig.referralReward),
+        minBet: Number(paymentConfig.minBet),
+        maxBet: Number(paymentConfig.maxBet),
       }
 
       const res = await fetch(`${config.apiBaseUrl}/api/settings`, {
@@ -806,7 +833,18 @@ export default function AdminDashboard() {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        updateConfig({ whatsappSupportNumber: payload.whatsappSupport })
+        updateConfig({
+          brandName: payload.companyName,
+          companyName: payload.companyName,
+          whatsappSupportNumber: payload.whatsappSupport,
+          minDeposit: payload.minDeposit,
+          minWithdrawal: payload.minWithdrawal,
+          freebetUnlockAmount: payload.freebetUnlockAmount,
+          initialFreebet: payload.initialFreebet,
+          referralReward: payload.referralReward,
+          minBet: payload.minBet,
+          maxBet: payload.maxBet,
+        })
         showNotice('success', 'System settings saved successfully')
       } else {
         showNotice('error', data.error || 'Failed to save settings')
@@ -2334,6 +2372,7 @@ export default function AdminDashboard() {
                     min={1}
                     className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
                   />
+                  <p className="mt-1 text-[11px] text-ink-3">Lowest allowed deposit amount.</p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Withdrawal (KSH)</label>
@@ -2344,7 +2383,70 @@ export default function AdminDashboard() {
                     min={1}
                     className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
                   />
+                  <p className="mt-1 text-[11px] text-ink-3">Lowest allowed payout amount.</p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 border-t border-line/60 pt-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Freebet Unlock Deposit (KSH)</label>
+                  <input
+                    type="number"
+                    value={paymentConfig.freebetUnlockAmount}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, freebetUnlockAmount: Number(e.target.value) }))}
+                    min={1}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-ink-3">Required deposit to unlock free bets (default: 50).</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Welcome Freebet Bonus (KSH)</label>
+                  <input
+                    type="number"
+                    value={paymentConfig.initialFreebet}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, initialFreebet: Number(e.target.value) }))}
+                    min={0}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-ink-3">Bonus credited on registration (default: 150).</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 border-t border-line/60 pt-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Referral Reward (KSH)</label>
+                  <input
+                    type="number"
+                    value={paymentConfig.referralReward}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, referralReward: Number(e.target.value) }))}
+                    min={0}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-ink-3">Cash credited to referrer when friend deposits.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Bet (KSH)</label>
+                  <input
+                    type="number"
+                    value={paymentConfig.minBet}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, minBet: Number(e.target.value) }))}
+                    min={1}
+                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-ink-3">Lowest single bet allowed (default: 10).</p>
+                </div>
+              </div>
+
+              <div className="border-t border-line/60 pt-3">
+                <label className="mb-1 block text-xs font-medium text-ink-2">Maximum Bet (KSH)</label>
+                <input
+                  type="number"
+                  value={paymentConfig.maxBet}
+                  onChange={e => setPaymentConfig(prev => ({ ...prev, maxBet: Number(e.target.value) }))}
+                  min={100}
+                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-ink-3">Maximum single bet allowed per round (default: 10,000).</p>
               </div>
 
               <div className="flex justify-end pt-2">

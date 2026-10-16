@@ -48,6 +48,26 @@ const SettingsSchema = new Schema({
         type: Number,
         default: 50
     },
+    freebetUnlockAmount: {
+        type: Number,
+        default: 50
+    },
+    initialFreebet: {
+        type: Number,
+        default: 150
+    },
+    referralReward: {
+        type: Number,
+        default: 20
+    },
+    minBet: {
+        type: Number,
+        default: 10
+    },
+    maxBet: {
+        type: Number,
+        default: 10000
+    },
     adminToken: {
         type: String,
         default: ''

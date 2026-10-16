@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { Settings } from '../models/Settings.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 const JWT_EXPIRES_IN = '30d';
 export async function register(req, res) {
@@ -31,11 +32,14 @@ export async function register(req, res) {
             }
             referrerUser = await User.findOne({ $or: queryOr });
         }
+        const settings = await Settings.getSettings();
+        const initialFreebet = Number(settings?.initialFreebet ?? 150);
         // Create user
         const user = await User.create({
             phone: normalizedPhone,
             password,
             username: username.slice(0, 20),
+            freebet: initialFreebet,
             referredBy: referrerUser ? referrerUser._id : null
         });
         if (referrerUser) {

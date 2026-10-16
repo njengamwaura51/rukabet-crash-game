@@ -3,11 +3,20 @@ import { Settings } from '../models/Settings.js'
 
 export async function getPublicConfig(req: Request, res: Response) {
   try {
-    const settings = await Settings.findOne()
+    const settings = await (Settings as any).getSettings()
     return res.json({
       success: true,
       config: {
+        brandName: settings?.companyName || 'RukaBet',
+        companyName: settings?.companyName || 'RukaBet',
         whatsappSupportNumber: settings?.whatsappSupport || '254712345678',
+        minDeposit: Number(settings?.minDeposit ?? 10),
+        minWithdrawal: Number(settings?.minWithdrawal ?? 50),
+        freebetUnlockAmount: Number(settings?.freebetUnlockAmount ?? 50),
+        initialFreebet: Number(settings?.initialFreebet ?? 150),
+        referralReward: Number(settings?.referralReward ?? 20),
+        minBet: Number(settings?.minBet ?? 10),
+        maxBet: Number(settings?.maxBet ?? 10000),
       },
     })
   } catch (error: any) {
@@ -22,15 +31,7 @@ function sanitizeKey(value?: string): string {
 
 export async function getSettings(req: Request, res: Response) {
   try {
-    let settings = await Settings.findOne()
-    
-    if (!settings) {
-      settings = await Settings.create({
-        adminToken: process.env.ADMIN_TOKEN || '117402',
-        jwtSecret: process.env.JWT_SECRET || 'rukabet-jwt-secret-2026',
-        paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments'
-      })
-    }
+    let settings = await (Settings as any).getSettings()
 
     const hasPassword = Boolean(settings.paydApiPassword)
     const hasSecret = Boolean(settings.paydApiSecret)
@@ -47,8 +48,13 @@ export async function getSettings(req: Request, res: Response) {
         isManagedViaAdmin: Boolean(settings.paydWalletUsername || settings.paydApiUsername || settings.paydApiSecret),
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,
-        minDeposit: settings.minDeposit,
-        minWithdrawal: settings.minWithdrawal,
+        minDeposit: settings.minDeposit ?? 10,
+        minWithdrawal: settings.minWithdrawal ?? 50,
+        freebetUnlockAmount: settings.freebetUnlockAmount ?? 50,
+        initialFreebet: settings.initialFreebet ?? 150,
+        referralReward: settings.referralReward ?? 20,
+        minBet: settings.minBet ?? 10,
+        maxBet: settings.maxBet ?? 10000,
         updatedAt: settings.updatedAt,
         // Legacy compatibility
         intasendPublicKey: ''
@@ -74,7 +80,22 @@ export async function updateSettings(req: Request, res: Response) {
       'companyName',
       'whatsappSupport',
       'minDeposit',
-      'minWithdrawal'
+      'minWithdrawal',
+      'freebetUnlockAmount',
+      'initialFreebet',
+      'referralReward',
+      'minBet',
+      'maxBet'
+    ]
+
+    const numericFields = [
+      'minDeposit',
+      'minWithdrawal',
+      'freebetUnlockAmount',
+      'initialFreebet',
+      'referralReward',
+      'minBet',
+      'maxBet'
     ]
 
     const sanitizedUpdates: any = {}
@@ -89,6 +110,11 @@ export async function updateSettings(req: Request, res: Response) {
             sanitizedUpdates[key] = ''
           } else if (typeof val === 'string' && val.trim().length > 0 && !val.includes('•') && !val.includes('*')) {
             sanitizedUpdates[key] = sanitizeKey(val)
+          }
+        } else if (numericFields.includes(key)) {
+          const num = Number(val)
+          if (!Number.isNaN(num) && num >= 0) {
+            sanitizedUpdates[key] = num
           }
         } else {
           sanitizedUpdates[key] = typeof val === 'string' ? sanitizeKey(val) : val
@@ -118,8 +144,13 @@ export async function updateSettings(req: Request, res: Response) {
         isManagedViaAdmin: true,
         companyName: settings.companyName,
         whatsappSupport: settings.whatsappSupport,
-        minDeposit: settings.minDeposit,
-        minWithdrawal: settings.minWithdrawal,
+        minDeposit: settings.minDeposit ?? 10,
+        minWithdrawal: settings.minWithdrawal ?? 50,
+        freebetUnlockAmount: settings.freebetUnlockAmount ?? 50,
+        initialFreebet: settings.initialFreebet ?? 150,
+        referralReward: settings.referralReward ?? 20,
+        minBet: settings.minBet ?? 10,
+        maxBet: settings.maxBet ?? 10000,
         updatedAt: settings.updatedAt
       }
     })

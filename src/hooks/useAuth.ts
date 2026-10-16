@@ -97,7 +97,7 @@ function normalizeUser(apiUser: any): User {
     balance: Number(apiUser?.balance || 0),
     freebet: Number(apiUser?.freebet ?? INITIAL_FREEBET),
     freebetLocked: Boolean(apiUser?.freebetLocked ?? true),
-    hasDeposited: Number(apiUser?.balance || 0) >= 20,
+    hasDeposited: Number(apiUser?.balance || 0) >= 50,
     hasPlayedWithMoney: Boolean(apiUser?.hasPlayedWithMoney ?? false),
     referralsCount: Number(apiUser?.referralsCount || 0),
     referralsEarnings: Number(apiUser?.referralsEarnings || 0),
@@ -464,12 +464,12 @@ export function useAuth() {
   const deposit = useCallback((amount: number) => {
     setUser(prev => {
       if (!prev) return prev
-      const hasMetDepositRequirement = prev.hasDeposited || amount >= 20
+      const hasMetDepositRequirement = prev.hasDeposited || amount >= 50
       const updated = {
         ...prev,
         balance: prev.balance + amount,
         hasDeposited: hasMetDepositRequirement,
-        // Unlock freebet if deposited 20+ and has played
+        // Unlock freebet if deposited 50+ and has played
         freebetLocked: hasMetDepositRequirement && prev.hasPlayedWithMoney ? false : prev.freebetLocked,
       }
       setStoredUserRaw(updated)

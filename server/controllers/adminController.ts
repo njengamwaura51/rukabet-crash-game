@@ -6,6 +6,7 @@ import { Bet } from '../models/Bet.js'
 import { Deposit } from '../models/Deposit.js'
 import { Withdrawal } from '../models/Withdrawal.js'
 import { OddsControl } from '../models/OddsControl.js'
+import { Settings } from '../models/Settings.js'
 import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO } from '../socket.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
@@ -362,6 +363,8 @@ export async function adjustUserBalance(req: Request, res: Response) {
 // Database refresh & early user synchronization endpoint
 export async function syncDatabaseUsers(req: Request, res: Response) {
   try {
+    const settings = await (Settings as any).getSettings()
+    const defaultFreebet = Number(settings?.initialFreebet ?? 150)
     const allUsers = await User.find({})
     let normalizedCount = 0
 
@@ -372,7 +375,7 @@ export async function syncDatabaseUsers(req: Request, res: Response) {
         changed = true
       }
       if (u.freebet === undefined || u.freebet === null || isNaN(u.freebet)) {
-        u.freebet = 150
+        u.freebet = defaultFreebet
         changed = true
       }
       if (u.freebetLocked === undefined || u.freebetLocked === null) {

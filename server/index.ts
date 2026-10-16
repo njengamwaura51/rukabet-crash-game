@@ -105,6 +105,8 @@ app.get('/api/user/transactions', authMiddleware, getUserTransactions)
 
 // Public configuration
 app.get('/api/public-config', getPublicConfig)
+app.get('/api/config', getPublicConfig)
+app.get('/api/settings/public', getPublicConfig)
 
 // Webhook for Payd payments
 app.post(PAYD_WEBHOOK_PATH, webhookRateLimit, paydWebhook)

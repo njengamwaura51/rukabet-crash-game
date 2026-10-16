@@ -1,5 +1,6 @@
 import { Deposit } from '../models/Deposit.js';
 import { User } from '../models/User.js';
+import { Settings } from '../models/Settings.js';
 import { getIO } from '../socket.js';
 const AMOUNT_TOLERANCE = 0.05;
 export async function paydWebhook(req, res) {
@@ -85,9 +86,13 @@ export async function paydWebhook(req, res) {
                 console.log(`⚠️ Deposit ${deposit._id} already transitioned from pending. Skipping balance increment.`);
                 return res.status(200).json({ status: 'ok', message: 'Already processed' });
             }
-            // Credit user balance atomically and unlock freebet if deposit >= 20
+            // Load dynamic settings
+            const settings = await Settings.getSettings();
+            const freebetUnlockAmount = Number(settings?.freebetUnlockAmount ?? 50);
+            const referralReward = Number(settings?.referralReward ?? 20);
+            // Credit user balance atomically and unlock freebet if deposit >= freebetUnlockAmount
             const updateOps = { $inc: { balance: completedDeposit.amount } };
-            if (completedDeposit.amount >= 20) {
+            if (completedDeposit.amount >= freebetUnlockAmount) {
                 updateOps.$set = { freebetLocked: false };
             }
             const user = await User.findByIdAndUpdate(completedDeposit.userId, updateOps, { new: true });
@@ -95,14 +100,14 @@ export async function paydWebhook(req, res) {
                 console.error(`❌ User not found for deposit: ${completedDeposit._id}`);
                 return res.status(200).json({ status: 'ok', message: 'User not found' });
             }
-            // Check referral reward (KSH 20 credited to referrer on qualifying deposit)
-            if (user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= 20) {
+            // Check referral reward (credited to referrer on qualifying deposit)
+            if (user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= freebetUnlockAmount) {
                 try {
-                    const referrer = await User.findByIdAndUpdate(user.referredBy, { $inc: { balance: 20, referralsEarnings: 20 } }, { new: true });
+                    const referrer = await User.findByIdAndUpdate(user.referredBy, { $inc: { balance: referralReward, referralsEarnings: referralReward } }, { new: true });
                     if (referrer) {
                         user.hasReceivedReferralReward = true;
                         await user.save();
-                        console.log(`🎉 Referral reward paid! Referrer ${referrer.phone} credited KSH 20 for deposit by User ${user.phone}`);
+                        console.log(`🎉 Referral reward paid! Referrer ${referrer.phone} credited KSH ${referralReward} for deposit by User ${user.phone}`);
                     }
                 }
                 catch (refErr) {
@@ -171,7 +176,26 @@ export async function intasendWebhook(req, res) {
         if (!completedDeposit) {
             return res.status(200).json({ received: true });
         }
-        const user = await User.findByIdAndUpdate(completedDeposit.userId, { $inc: { balance: completedDeposit.amount } }, { new: true });
+        const settings = await Settings.getSettings();
+        const freebetUnlockAmount = Number(settings?.freebetUnlockAmount ?? 50);
+        const referralReward = Number(settings?.referralReward ?? 20);
+        const updateOps = { $inc: { balance: completedDeposit.amount } };
+        if (completedDeposit.amount >= freebetUnlockAmount) {
+            updateOps.$set = { freebetLocked: false };
+        }
+        const user = await User.findByIdAndUpdate(completedDeposit.userId, updateOps, { new: true });
+        if (user && user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= freebetUnlockAmount) {
+            try {
+                const referrer = await User.findByIdAndUpdate(user.referredBy, { $inc: { balance: referralReward, referralsEarnings: referralReward } }, { new: true });
+                if (referrer) {
+                    user.hasReceivedReferralReward = true;
+                    await user.save();
+                }
+            }
+            catch (refErr) {
+                console.error('⚠️ Could not process referral reward:', refErr.message);
+            }
+        }
         if (user) {
             const io = getIO();
             if (io) {

@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 
 // Global app configuration
-interface AppConfig {
+export interface AppConfig {
   brandName: string
+  companyName?: string
   whatsappSupportNumber: string
   apiBaseUrl: string
+  minDeposit?: number
+  minWithdrawal?: number
+  freebetUnlockAmount?: number
+  initialFreebet?: number
+  referralReward?: number
+  minBet?: number
+  maxBet?: number
 }
 
 const STORAGE_KEY = 'rukabet_config'
@@ -51,8 +59,16 @@ function normalizeApiBaseUrl(value?: string): string {
 
 const DEFAULT_CONFIG: AppConfig = {
   brandName: 'RukaBet',
+  companyName: 'RUKA TECH SOLUTIONS',
   whatsappSupportNumber: '254713934411',
   apiBaseUrl: getDefaultApiBaseUrl(),
+  minDeposit: 10,
+  minWithdrawal: 50,
+  freebetUnlockAmount: 50,
+  initialFreebet: 150,
+  referralReward: 20,
+  minBet: 10,
+  maxBet: 10000,
 }
 
 // Custom hook for config management
@@ -85,9 +101,21 @@ export function useConfigState() {
         const response = await fetch(`${config.apiBaseUrl}/api/public-config`)
         if (!response.ok) return
         const data = await response.json()
-        const whatsappSupportNumber = data?.config?.whatsappSupportNumber
-        if (typeof whatsappSupportNumber === 'string' && whatsappSupportNumber.trim()) {
-          updateConfig({ whatsappSupportNumber: whatsappSupportNumber.trim() })
+        if (data?.config) {
+          const updates: Partial<AppConfig> = {}
+          if (data.config.brandName) updates.brandName = data.config.brandName
+          if (data.config.companyName) updates.companyName = data.config.companyName
+          if (typeof data.config.whatsappSupportNumber === 'string' && data.config.whatsappSupportNumber.trim()) {
+            updates.whatsappSupportNumber = data.config.whatsappSupportNumber.trim()
+          }
+          if (typeof data.config.minDeposit === 'number') updates.minDeposit = data.config.minDeposit
+          if (typeof data.config.minWithdrawal === 'number') updates.minWithdrawal = data.config.minWithdrawal
+          if (typeof data.config.freebetUnlockAmount === 'number') updates.freebetUnlockAmount = data.config.freebetUnlockAmount
+          if (typeof data.config.initialFreebet === 'number') updates.initialFreebet = data.config.initialFreebet
+          if (typeof data.config.referralReward === 'number') updates.referralReward = data.config.referralReward
+          if (typeof data.config.minBet === 'number') updates.minBet = data.config.minBet
+          if (typeof data.config.maxBet === 'number') updates.maxBet = data.config.maxBet
+          updateConfig(updates)
         }
       } catch {
         // keep local config if public config is unavailable

@@ -101,7 +101,7 @@ export function BettingProvider({
     
     // FREEBET LOCK VALIDATION - special error for locked bonus (check before balance)
     if (isFreebet && freebetLocked) {
-      console.warn('Freebet locked: Deposit at least 20 to unlock')
+      console.warn('Freebet locked: Deposit at least 50 to unlock')
       return false
     }
     
@@ -134,7 +134,7 @@ export function BettingProvider({
     
     // FREEBET LOCK VALIDATION - check before balance
     if (isFreebet && freebetLocked) {
-      console.warn('Freebet locked: Deposit at least 20 to unlock')
+      console.warn('Freebet locked: Deposit at least 50 to unlock')
       return false
     }
 
