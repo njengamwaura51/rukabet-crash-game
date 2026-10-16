@@ -810,7 +810,8 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       amount: depositAmount,
       narration: `Deposit ${internalRef}`,
       api_ref: internalRef,
-      currency: 'KES'
+      currency: 'KES',
+      network_code: '63902' // Safaricom M-Pesa Kenya
     }
 
     if (paydWalletUsername) {
@@ -822,16 +823,20 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       requestBody.callback_url = webhookUrl
     }
 
+    const authCredential = paydApiPassword || paydApiSecret
+    const basicAuth = Buffer.from(`${paydApiUsername}:${authCredential}`).toString('base64')
+
     const requestHeaders: any = {
+      Authorization: `Basic ${basicAuth}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      Accept: 'application/json'
     }
 
     if (paydApiSecret) {
-      requestHeaders['Authorization'] = `Bearer ${paydApiSecret}`
-    } else if (paydApiUsername && paydApiPassword) {
-      const basicToken = Buffer.from(`${paydApiUsername}:${paydApiPassword}`).toString('base64')
-      requestHeaders['Authorization'] = `Basic ${basicToken}`
+      requestHeaders['Api-Secret'] = paydApiSecret
+      requestHeaders['x-api-secret'] = paydApiSecret
+      requestHeaders['x-api-key'] = paydApiSecret
+      requestBody.api_secret = paydApiSecret
     }
 
     const paydResponse = await axios.post(paydApiBaseUrl, requestBody, { headers: requestHeaders, timeout: 25000 })
@@ -877,9 +882,13 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
         }
       ).catch(() => {})
     }
+    const paydStatus = error?.response?.status
     const paydData = error?.response?.data
     const paydMessage = paydData?.message || paydData?.error || error?.message || 'STK Push failed'
-    return res.status(error?.response?.status || 500).json({ error: paydMessage, details: paydData, depositId })
+    const responseStatus = Number.isInteger(paydStatus) && paydStatus >= 400 && paydStatus < 600
+      ? (paydStatus === 401 ? 502 : paydStatus)
+      : 500
+    return res.status(responseStatus).json({ error: paydMessage, details: paydData, depositId })
   }
 }
 

@@ -123,11 +123,16 @@ export function DepositModal({
         body: JSON.stringify({ amount: depositAmount, phone: registeredPhone }),
       })
 
+      const data = await response.json().catch(() => null)
+
       if (response.status === 401) {
-        throw new Error('Session expired. Please log in again.')
+        const err = data?.error || ''
+        if (err.toLowerCase().includes('token') || err.toLowerCase().includes('authentication') || err === 'No token provided') {
+          throw new Error('Session expired. Please log in again.')
+        }
+        throw new Error(err || 'Payment service error. Please try again.')
       }
 
-      const data = await response.json().catch(() => null)
       if (response.ok && data?.success) {
         setStatus({
           type: 'success',

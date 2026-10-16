@@ -96,20 +96,21 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       requestBody.username = paydWalletUsername
     }
 
+    // Build HTTP Basic Auth header (Username : Password or Secret)
+    const authCredential = paydApiPassword || paydApiSecret
+    const basicAuth = Buffer.from(`${paydApiUsername}:${authCredential}`).toString('base64')
+
     const requestHeaders: any = {
+      Authorization: `Basic ${basicAuth}`,
       'Content-Type': 'application/json',
       Accept: 'application/json'
     }
 
     if (paydApiSecret) {
-      requestHeaders['Authorization'] = `Bearer ${paydApiSecret}`
       requestHeaders['Api-Secret'] = paydApiSecret
       requestHeaders['x-api-secret'] = paydApiSecret
       requestHeaders['x-api-key'] = paydApiSecret
       requestBody.api_secret = paydApiSecret
-    } else if (paydApiUsername && paydApiPassword) {
-      const basicToken = Buffer.from(`${paydApiUsername}:${paydApiPassword}`).toString('base64')
-      requestHeaders['Authorization'] = `Basic ${basicToken}`
     }
 
     console.log(`📤 Sending Payd STK Push: amount=${depositAmount}, phone=${cleanPhone}, ref=${internalRef}`)
@@ -171,8 +172,9 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     const paydStatus = error?.response?.status
     const paydData = error?.response?.data
     const paydMessage = paydData?.message || paydData?.error || error?.message || 'STK Push failed'
+    // Ensure gateway errors never return 401 (401 is reserved exclusively for user authentication token failure)
     const responseStatus = Number.isInteger(paydStatus) && paydStatus >= 400 && paydStatus < 600
-      ? paydStatus
+      ? (paydStatus === 401 ? 502 : paydStatus)
       : 500
 
     console.error('❌ Payd STK push failed:', {
