@@ -204,9 +204,10 @@ export function ReferralsPage() {
   const { user } = useAuth()
   const [copied, setCopied] = useState(false)
   
-  // Generate referral link (use username or a hash)
-  const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || 'guest'
-  const referralLink = `https://rukabet.live/ref/${referralCode}`
+  // Generate referral link pointing to live host
+  const referralCode = user?.username?.toLowerCase().replace(/\s+/g, '') || user?.phone || 'guest'
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://rukabet.live'
+  const referralLink = `${appOrigin}/?ref=${encodeURIComponent(referralCode)}`
   
   // Real stats from user account
   const totalReferrals = user?.referralsCount ?? 0

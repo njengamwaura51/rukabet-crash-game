@@ -627,14 +627,14 @@ export function initializeSocket(httpServer: HttpServer): Server {
       }
     })
 
-    socket.on('PLACE_BET', async (data: { amount: number; roundId?: string }) => {
+    socket.on('PLACE_BET', async (data: { amount: number; roundId?: string; isFreebet?: boolean }) => {
       try {
         const userId = socket.data.userId
         if (!userId) {
           return socket.emit('BET_ERROR', { error: 'Not authenticated' })
         }
 
-        const { amount } = data
+        const { amount, isFreebet } = data
         if (!amount || amount < 1) {
           return socket.emit('BET_ERROR', { error: 'Invalid bet amount' })
         }
@@ -643,14 +643,31 @@ export function initializeSocket(httpServer: HttpServer): Server {
           return socket.emit('BET_ERROR', { error: 'Betting window is closed for this round' })
         }
 
-        const user = await User.findOneAndUpdate(
-          { _id: userId, balance: { $gte: amount } },
-          { $inc: { balance: -amount } },
-          { new: true }
-        )
+        let user
+        if (isFreebet) {
+          const checkUser = await User.findById(userId)
+          if (!checkUser) return socket.emit('BET_ERROR', { error: 'User not found' })
+          if (checkUser.freebetLocked) {
+            return socket.emit('BET_ERROR', { error: 'Freebets locked: Deposit KSH 20+ to unlock' })
+          }
+          if ((checkUser.freebet || 0) < amount) {
+            return socket.emit('BET_ERROR', { error: 'Insufficient freebet balance' })
+          }
+          user = await User.findOneAndUpdate(
+            { _id: userId, freebet: { $gte: amount } },
+            { $inc: { freebet: -amount } },
+            { new: true }
+          )
+        } else {
+          user = await User.findOneAndUpdate(
+            { _id: userId, balance: { $gte: amount } },
+            { $inc: { balance: -amount } },
+            { new: true }
+          )
+        }
 
         if (!user) {
-          return socket.emit('BET_ERROR', { error: 'Insufficient balance' })
+          return socket.emit('BET_ERROR', { error: isFreebet ? 'Insufficient freebet balance' : 'Insufficient balance' })
         }
 
         const bet = await Bet.create({

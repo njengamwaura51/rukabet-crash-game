@@ -183,15 +183,14 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
 
   return (
     <Modal
-      title={isLogin ? 'Log in' : 'Create account'}
-      description={isLogin ? 'Safaricom M-Pesa number and password' : 'Register with your Safaricom M-Pesa number'}
+      title={isLogin ? 'Sign In' : 'Sign Up'}
       onClose={onClose}
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
         {/* Phone */}
         <div>
           <label htmlFor="auth-phone" className="block text-xs font-medium text-ink-2">
-            Phone number
+            Phone Number
           </label>
           <div
             className={`mt-1 flex h-11 overflow-hidden rounded-md border bg-field ${
@@ -207,33 +206,18 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
               inputMode="numeric"
               autoComplete="tel-national"
               autoFocus
-              placeholder="712 345 678"
+              placeholder="712345678"
               value={phone}
               onChange={handlePhoneChange}
               aria-invalid={phoneInvalid || undefined}
-              aria-describedby="auth-phone-hint"
               className="min-w-0 flex-1 bg-transparent px-3 text-sm font-medium tabular-nums text-ink placeholder:text-ink-3 focus:outline-none"
             />
-            {validation.isComplete && (
-              <span
-                className={`mr-2 flex items-center gap-1 self-center rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                  validation.valid ? 'bg-brand/10 text-brand' : 'bg-loss/10 text-loss'
-                }`}
-              >
-                {validation.valid ? (
-                  <>
-                    <CheckIcon />
-                    Safaricom
-                  </>
-                ) : (
-                  'Not Safaricom'
-                )}
+            {validation.valid && (
+              <span className="mr-2 flex items-center gap-1 self-center rounded px-1.5 py-0.5 text-[11px] font-semibold bg-brand/10 text-brand">
+                <CheckIcon />
               </span>
             )}
           </div>
-          <p id="auth-phone-hint" className="mt-1 text-xs text-ink-3">
-            Safaricom numbers only
-          </p>
         </div>
 
         {/* Password */}
@@ -246,7 +230,7 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
               id="auth-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete={isLogin ? 'current-password' : 'new-password'}
-              placeholder={isLogin ? undefined : `Min ${MIN_PASSWORD_LENGTH} characters`}
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="h-11 w-full rounded-md border border-line bg-field pl-3 pr-11 text-sm font-medium text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
@@ -276,26 +260,26 @@ export function AuthModal({ mode, onClose, onLogin, onRegister, onSwitchMode }: 
           disabled={loading || phoneInvalid}
           className="flex h-11 w-full items-center justify-center rounded-md bg-brand text-sm font-bold text-brand-ink transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {loading ? <SpinnerIcon /> : isLogin ? 'Log in' : 'Create account'}
+          {loading ? <SpinnerIcon /> : isLogin ? 'Sign In' : 'Create Account'}
         </button>
 
         {/* Freebet note */}
         {!isLogin && (
-          <div className="flex items-baseline justify-between rounded-md border border-line bg-field px-3 py-2 text-xs">
+          <div className="flex items-center justify-between rounded-md border border-line bg-field px-3 py-2 text-xs">
             <span className="font-semibold text-bonus">
-              KSH <span className="tabular-nums">150</span> freebet
+              KSH <span className="tabular-nums">150</span> Freebet
             </span>
-            <span className="text-ink-2">
-              Unlocks on a first deposit of KSH <span className="tabular-nums">20</span>+
+            <span className="text-ink-3">
+              Unlocks with KSH <span className="tabular-nums">20</span>+ deposit
             </span>
           </div>
         )}
 
         {/* Switch mode */}
         <p className="border-t border-line pt-3 text-center text-xs text-ink-3">
-          {isLogin ? 'No account?' : 'Have an account?'}{' '}
+          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button type="button" onClick={onSwitchMode} className="font-semibold text-brand hover:underline">
-            {isLogin ? 'Register' : 'Log in'}
+            {isLogin ? 'Sign Up' : 'Sign In'}
           </button>
         </p>
       </form>

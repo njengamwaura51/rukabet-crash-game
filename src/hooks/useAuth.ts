@@ -308,11 +308,13 @@ export function useAuth() {
     const username = autoUsername || `User${cleanPhone.slice(-4)}`
     const apiBaseUrl = getApiBaseUrl()
 
+    const referralCode = typeof window !== 'undefined' ? (localStorage.getItem('rukabet_referral') || undefined) : undefined
+
     try {
       const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, password, username }),
+        body: JSON.stringify({ phone: cleanPhone, password, username, referralCode }),
       })
 
       const data = await response.json().catch(() => null)

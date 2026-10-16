@@ -340,7 +340,8 @@ export default function AdminDashboard() {
     const fetchUsers = async () => {
       setUsersLoading(true)
       try {
-        const url = new URL(`${config.apiBaseUrl}/api/admin/users`)
+        const apiOrigin = config.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        const url = new URL(`${apiOrigin}/api/admin/users`)
         url.searchParams.set('page', String(usersPage))
         url.searchParams.set('limit', usersLimit)
         if (userSearch) url.searchParams.set('search', userSearch)
@@ -373,7 +374,8 @@ export default function AdminDashboard() {
     const fetchWithdrawals = async () => {
       setWithdrawalsLoading(true)
       try {
-        const url = new URL(`${config.apiBaseUrl}/api/admin/withdrawals`)
+        const apiOrigin = config.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        const url = new URL(`${apiOrigin}/api/admin/withdrawals`)
         if (withdrawalFilter !== 'all') url.searchParams.set('status', withdrawalFilter)
 
         const res = await fetch(url.toString(), {
@@ -948,13 +950,13 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Compact Tab Navigation */}
-        <div className="mx-auto flex max-w-7xl overflow-x-auto px-3 sm:px-6 border-t border-line/50">
-          <div className="flex space-x-1 py-1 text-xs font-medium">
+        {/* Navigation Pill Tabs matching Deposit Modal */}
+        <div className="mx-auto flex max-w-7xl overflow-x-auto px-3 sm:px-6 py-2 border-t border-[#25262b]">
+          <div className="flex bg-[#282a2e] p-1 rounded-lg gap-1 text-xs">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'overview' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'overview' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
               <Activity className="size-3.5" />
@@ -962,8 +964,8 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'users' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'users' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
               <Users className="size-3.5" />
@@ -971,34 +973,34 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('withdrawals')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'withdrawals' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'withdrawals' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
               <CreditCard className="size-3.5" />
               Withdrawals
               {overview?.recentWithdrawals?.some(w => w.status === 'pending') && (
-                <span className="size-2 rounded-full bg-amber-500"></span>
+                <span className="size-2 rounded-full bg-amber-400 animate-pulse"></span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('odds')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'odds' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'odds' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
-              <Zap className="size-3.5 text-brand" />
+              <Zap className="size-3.5" />
               Odds Engine
               {oddsEngine?.enabled && (
-                <span className="flex items-center gap-0.5 rounded bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold text-brand animate-pulse">
-                  ACTIVE
+                <span className="flex items-center gap-0.5 rounded bg-black/30 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                  ON
                 </span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('gateway')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'gateway' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'gateway' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
               <Key className="size-3.5" />
@@ -1006,8 +1008,8 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors ${
-                activeTab === 'settings' ? 'bg-raised text-brand font-semibold' : 'text-ink-3 hover:text-ink hover:bg-field'
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'settings' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
               }`}
             >
               <SettingsIcon className="size-3.5" />
@@ -1022,60 +1024,60 @@ export default function AdminDashboard() {
         {/* Compact KPI Metrics Ribbon */}
         {overview && (
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-center justify-between text-xs text-ink-3">
+            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
+              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
                 <span>Total Users</span>
-                <Users className="size-3.5 text-brand" />
+                <Users className="size-3.5 text-[#00eb5b]" />
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-ink">{overview.totals.users}</span>
-                <span className="text-[11px] text-brand">+{overview.totals.newUsers24h} 24h</span>
+                <span className="text-xl font-bold text-white">{overview.totals.users}</span>
+                <span className="text-[11px] text-[#00eb5b]">+{overview.totals.newUsers24h} 24h</span>
               </div>
             </div>
 
-            <div className="rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-center justify-between text-xs text-ink-3">
+            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
+              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
                 <span>Total Deposits</span>
-                <ArrowDownRight className="size-3.5 text-brand" />
+                <ArrowDownRight className="size-3.5 text-[#00eb5b]" />
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-brand">{formatMoney(overview.totals.totalDepositsAmount)}</span>
-                <span className="text-[11px] text-ink-3">{overview.totals.completedDeposits} completed</span>
+                <span className="text-xl font-bold text-[#00eb5b]">{formatMoney(overview.totals.totalDepositsAmount)}</span>
+                <span className="text-[11px] text-[#a0a6b1]">{overview.totals.completedDeposits} completed</span>
               </div>
             </div>
 
-            <div className="rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-center justify-between text-xs text-ink-3">
+            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
+              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
                 <span>House Margin</span>
-                <TrendingUp className="size-3.5 text-bonus" />
+                <TrendingUp className="size-3.5 text-[#00eb5b]" />
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className={`text-xl font-bold ${overview.totals.houseGross >= 0 ? 'text-bonus' : 'text-loss'}`}>
+                <span className={`text-xl font-bold ${overview.totals.houseGross >= 0 ? 'text-[#00eb5b]' : 'text-[#ff5c6c]'}`}>
                   {formatMoney(overview.totals.houseGross)}
                 </span>
-                <span className="text-[11px] text-ink-3">gross</span>
+                <span className="text-[11px] text-[#a0a6b1]">gross</span>
               </div>
             </div>
 
-            <div className="rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-center justify-between text-xs text-ink-3">
+            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
+              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
                 <span>Total Bets</span>
-                <Activity className="size-3.5 text-brand" />
+                <Activity className="size-3.5 text-[#00eb5b]" />
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-ink">{overview.totals.bets}</span>
-                <span className="text-[11px] text-brand">{overview.totals.activeBets} active</span>
+                <span className="text-xl font-bold text-white">{overview.totals.bets}</span>
+                <span className="text-[11px] text-[#00eb5b]">{overview.totals.activeBets} active</span>
               </div>
             </div>
 
-            <div className="col-span-2 sm:col-span-1 rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-center justify-between text-xs text-ink-3">
+            <div className="col-span-2 sm:col-span-1 rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
+              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
                 <span>Withdrawals</span>
-                <CreditCard className="size-3.5 text-amber-500" />
+                <CreditCard className="size-3.5 text-amber-400" />
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-ink">{overview.totals.totalWithdrawals || 0}</span>
-                <span className="text-[11px] text-ink-3">total requests</span>
+                <span className="text-xl font-bold text-white">{overview.totals.totalWithdrawals || 0}</span>
+                <span className="text-[11px] text-[#a0a6b1]">total requests</span>
               </div>
             </div>
           </div>
@@ -2363,83 +2365,95 @@ export default function AdminDashboard() {
           MODAL: ADJUST USER BALANCE
           ══════════════════════════════════════════════════════════════ */}
       {balanceModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-5 shadow-2xl">
-            <h3 className="text-sm font-semibold text-ink">Adjust Real Balance</h3>
-            <p className="mt-1 text-xs text-ink-3">
-              User: <span className="font-semibold text-ink">{balanceModalUser.username}</span> ({balanceModalUser.phone})
-            </p>
-            <p className="text-xs text-ink-3">Current Balance: <span className="font-semibold text-brand">KSH {balanceModalUser.balance.toFixed(2)}</span></p>
-
-            <form onSubmit={handleAdjustBalance} className="mt-4 space-y-3">
-              <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setBalanceType('credit')}
-                  className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'credit' ? 'bg-raised font-bold text-brand' : 'text-ink-3'}`}
-                >
-                  + Credit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBalanceType('debit')}
-                  className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'debit' ? 'bg-raised font-bold text-loss' : 'text-ink-3'}`}
-                >
-                  - Debit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBalanceType('set')}
-                  className={`flex-1 rounded py-1.5 font-medium ${balanceType === 'set' ? 'bg-raised font-bold text-sky-400' : 'text-ink-3'}`}
-                >
-                  = Set Balance
-                </button>
+        <div className="wallet-overlay">
+          <div className="wallet-modal max-w-md">
+            <div className="wallet-header">
+              <span className="wallet-title">ADJUST USER BALANCE</span>
+              <button className="wallet-close" onClick={() => setBalanceModalUser(null)}>&times;</button>
+            </div>
+            <div className="wallet-body">
+              {/* User Financial Cards */}
+              <div className="wallet-cards">
+                <div className="wallet-card">
+                  <div className="card-label">CURRENT BALANCE</div>
+                  <div className="card-amount">KSH <span>{balanceModalUser.balance.toFixed(2)}</span></div>
+                </div>
+                <div className="wallet-card">
+                  <span className="freebet-status">{balanceModalUser.freebetLocked ? '(locked)' : '(unlocked)'}</span>
+                  <div className="card-label">FREEBET BONUS</div>
+                  <div className="card-amount">KSH <span>{balanceModalUser.freebet.toFixed(2)}</span></div>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">
-                  {balanceType === 'set' ? 'Exact New Balance (KSH)' : 'Amount to Adjust (KSH)'}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min={balanceType === 'set' ? "0" : "0.01"}
-                  value={balanceAmount}
-                  onChange={e => setBalanceAmount(e.target.value)}
-                  placeholder={balanceType === 'set' ? "e.g. 500" : "e.g. 100"}
-                  required
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm font-semibold text-ink focus:border-brand focus:outline-none"
-                />
+              <div className="mb-3 px-1 text-xs text-[#a0a6b1]">
+                Player: <span className="font-bold text-white">{balanceModalUser.username}</span> ({balanceModalUser.phone})
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">Reason / Audit Note</label>
-                <input
-                  type="text"
-                  value={balanceReason}
-                  onChange={e => setBalanceReason(e.target.value)}
-                  placeholder="e.g. Manual payment top-up or correction"
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                />
-              </div>
+              <form onSubmit={handleAdjustBalance} className="space-y-3">
+                <div className="wallet-tabs-wrapper">
+                  <div className="wallet-tabs w-full">
+                    <button
+                      type="button"
+                      onClick={() => setBalanceType('credit')}
+                      className={`tab-btn ${balanceType === 'credit' ? 'active' : ''}`}
+                    >
+                      + Credit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBalanceType('debit')}
+                      className={`tab-btn ${balanceType === 'debit' ? 'active' : ''}`}
+                    >
+                      - Debit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBalanceType('set')}
+                      className={`tab-btn ${balanceType === 'set' ? 'active' : ''}`}
+                    >
+                      = Set Balance
+                    </button>
+                  </div>
+                </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setBalanceModalUser(null)}
-                  className="flex-1 rounded-md border border-line bg-field py-2 text-xs font-medium text-ink-2 hover:bg-raised"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingBalance || !balanceAmount}
-                  className="flex-1 rounded-md bg-brand py-2 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
-                >
-                  {isSubmittingBalance ? 'Saving...' : 'Apply Change'}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="section-label">
+                    {balanceType === 'set' ? 'Exact New Balance (KSH)' : 'Amount to Adjust (KSH)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={balanceType === 'set' ? "0" : "0.01"}
+                    value={balanceAmount}
+                    onChange={e => setBalanceAmount(e.target.value)}
+                    placeholder={balanceType === 'set' ? "e.g. 500" : "e.g. 100"}
+                    required
+                    className="verify-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="section-label">Reason / Audit Note</label>
+                  <input
+                    type="text"
+                    value={balanceReason}
+                    onChange={e => setBalanceReason(e.target.value)}
+                    placeholder="e.g. Manual payment top-up or correction"
+                    className="verify-input"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBalance || !balanceAmount}
+                    className="btn-deposit"
+                  >
+                    {isSubmittingBalance ? 'SAVING...' : 'APPLY BALANCE ADJUSTMENT'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -2448,56 +2462,66 @@ export default function AdminDashboard() {
           MODAL: ADJUST USER FREEBET
           ══════════════════════════════════════════════════════════════ */}
       {freebetModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-5 shadow-2xl">
-            <h3 className="text-sm font-semibold text-ink">Adjust Freebet Bonus</h3>
-            <p className="mt-1 text-xs text-ink-3">
-              User: <span className="font-semibold text-ink">{freebetModalUser.username}</span>
-            </p>
-
-            <form onSubmit={handleAdjustFreebet} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">Freebet Amount (KSH)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={freebetAmount}
-                  onChange={e => setFreebetAmount(e.target.value)}
-                  required
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm font-semibold text-ink focus:border-brand focus:outline-none"
-                />
+        <div className="wallet-overlay">
+          <div className="wallet-modal max-w-md">
+            <div className="wallet-header">
+              <span className="wallet-title">ADJUST FREEBET BONUS</span>
+              <button className="wallet-close" onClick={() => setFreebetModalUser(null)}>&times;</button>
+            </div>
+            <div className="wallet-body">
+              <div className="wallet-cards">
+                <div className="wallet-card">
+                  <span className="freebet-status">{freebetModalUser.freebetLocked ? '(locked)' : '(unlocked)'}</span>
+                  <div className="card-label">CURRENT FREEBET</div>
+                  <div className="card-amount">KSH <span>{freebetModalUser.freebet.toFixed(2)}</span></div>
+                </div>
+                <div className="wallet-card">
+                  <div className="card-label">REAL BALANCE</div>
+                  <div className="card-amount">KSH <span>{freebetModalUser.balance.toFixed(2)}</span></div>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="lockCheckbox"
-                  checked={freebetLocked}
-                  onChange={e => setFreebetLocked(e.target.checked)}
-                  className="size-4 accent-brand"
-                />
-                <label htmlFor="lockCheckbox" className="text-xs text-ink-2 cursor-pointer">
-                  Require deposit to unlock (Locked)
-                </label>
+              <div className="mb-3 px-1 text-xs text-[#a0a6b1]">
+                Player: <span className="font-bold text-white">{freebetModalUser.username}</span> ({freebetModalUser.phone})
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setFreebetModalUser(null)}
-                  className="flex-1 rounded-md border border-line bg-field py-2 text-xs font-medium text-ink-2 hover:bg-raised"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingFreebet}
-                  className="flex-1 rounded-md bg-brand py-2 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
-                >
-                  {isSubmittingFreebet ? 'Saving...' : 'Update Freebet'}
-                </button>
-              </div>
-            </form>
+              <form onSubmit={handleAdjustFreebet} className="space-y-3">
+                <div>
+                  <label className="section-label">Freebet Amount (KSH)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={freebetAmount}
+                    onChange={e => setFreebetAmount(e.target.value)}
+                    required
+                    className="verify-input"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="lockCheckbox"
+                    checked={freebetLocked}
+                    onChange={e => setFreebetLocked(e.target.checked)}
+                    className="size-4 accent-[#00eb5b]"
+                  />
+                  <label htmlFor="lockCheckbox" className="text-xs text-[#d8dce2] cursor-pointer">
+                    Require deposit to unlock (Locked)
+                  </label>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingFreebet}
+                    className="btn-deposit"
+                  >
+                    {isSubmittingFreebet ? 'SAVING...' : 'UPDATE FREEBET'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -2506,44 +2530,42 @@ export default function AdminDashboard() {
           MODAL: RESET USER PASSWORD
           ══════════════════════════════════════════════════════════════ */}
       {passwordModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-5 shadow-2xl">
-            <h3 className="text-sm font-semibold text-ink">Reset User Password</h3>
-            <p className="mt-1 text-xs text-ink-3">
-              Set new password for <span className="font-semibold text-ink">{passwordModalUser.username}</span>
-            </p>
+        <div className="wallet-overlay">
+          <div className="wallet-modal max-w-md">
+            <div className="wallet-header">
+              <span className="wallet-title">RESET USER PASSWORD</span>
+              <button className="wallet-close" onClick={() => setPasswordModalUser(null)}>&times;</button>
+            </div>
+            <div className="wallet-body">
+              <p className="mb-3 text-xs text-[#a0a6b1]">
+                Set new password for <span className="font-bold text-white">{passwordModalUser.username}</span> ({passwordModalUser.phone})
+              </p>
 
-            <form onSubmit={handleResetPassword} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">New Password</label>
-                <input
-                  type="text"
-                  value={newPasswordVal}
-                  onChange={e => setNewPasswordVal(e.target.value)}
-                  placeholder="Min 4 characters"
-                  required
-                  minLength={4}
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm text-ink focus:border-brand focus:outline-none"
-                />
-              </div>
+              <form onSubmit={handleResetPassword} className="space-y-3">
+                <div>
+                  <label className="section-label">New Password</label>
+                  <input
+                    type="text"
+                    value={newPasswordVal}
+                    onChange={e => setNewPasswordVal(e.target.value)}
+                    placeholder="Min 4 characters"
+                    required
+                    minLength={4}
+                    className="verify-input"
+                  />
+                </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPasswordModalUser(null)}
-                  className="flex-1 rounded-md border border-line bg-field py-2 text-xs font-medium text-ink-2 hover:bg-raised"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingPassword || !newPasswordVal}
-                  className="flex-1 rounded-md bg-brand py-2 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
-                >
-                  {isSubmittingPassword ? 'Saving...' : 'Reset Password'}
-                </button>
-              </div>
-            </form>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPassword || !newPasswordVal}
+                    className="btn-deposit"
+                  >
+                    {isSubmittingPassword ? 'SAVING...' : 'RESET PASSWORD'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -2552,52 +2574,44 @@ export default function AdminDashboard() {
           MODAL: USER DETAIL DRILLDOWN
           ══════════════════════════════════════════════════════════════ */}
       {selectedUserForDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-line bg-panel shadow-2xl">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3">
-              <div>
-                <h3 className="text-sm font-semibold text-ink">
-                  Player Inspector: {selectedUserForDetail.user.username}
-                </h3>
-                <p className="text-xs text-ink-3">
-                  Phone: {selectedUserForDetail.user.phone} • Joined: {formatDate(selectedUserForDetail.user.createdAt)}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedUserForDetail(null)}
-                className="rounded p-1 text-ink-3 hover:bg-field hover:text-ink"
-              >
-                ✕
-              </button>
+        <div className="wallet-overlay">
+          <div className="wallet-modal max-w-2xl">
+            <div className="wallet-header">
+              <span className="wallet-title">PLAYER INSPECTOR: {selectedUserForDetail.user.username}</span>
+              <button className="wallet-close" onClick={() => setSelectedUserForDetail(null)}>&times;</button>
             </div>
+            <div className="wallet-body space-y-4">
+              <div className="flex justify-between text-xs text-[#a0a6b1] px-1">
+                <span>Phone: <b className="text-white">{selectedUserForDetail.user.phone}</b></span>
+                <span>Joined: {formatDate(selectedUserForDetail.user.createdAt)}</span>
+              </div>
 
-            <div className="space-y-4 overflow-y-auto p-5 text-xs">
-              {/* Financial Summary */}
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="rounded-md border border-line bg-field p-2">
-                  <span className="text-[10px] text-ink-3">Balance</span>
-                  <p className="font-bold text-brand">KSH {selectedUserForDetail.user.balance.toFixed(2)}</p>
+              {/* Financial Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div className="wallet-card">
+                  <div className="card-label">BALANCE</div>
+                  <div className="card-amount">KSH <span>{selectedUserForDetail.user.balance.toFixed(2)}</span></div>
                 </div>
-                <div className="rounded-md border border-line bg-field p-2">
-                  <span className="text-[10px] text-ink-3">Total Bets</span>
-                  <p className="font-bold text-ink">{selectedUserForDetail.stats.totalBets}</p>
+                <div className="wallet-card">
+                  <div className="card-label">TOTAL BETS</div>
+                  <div className="text-sm font-bold text-white">{selectedUserForDetail.stats.totalBets}</div>
                 </div>
-                <div className="rounded-md border border-line bg-field p-2">
-                  <span className="text-[10px] text-ink-3">Total Wagered</span>
-                  <p className="font-bold text-ink">KSH {selectedUserForDetail.stats.totalWagered.toFixed(2)}</p>
+                <div className="wallet-card">
+                  <div className="card-label">WAGERED</div>
+                  <div className="text-sm font-bold text-white">KSH {selectedUserForDetail.stats.totalWagered.toFixed(2)}</div>
                 </div>
-                <div className="rounded-md border border-line bg-field p-2">
-                  <span className="text-[10px] text-ink-3">Total Won</span>
-                  <p className="font-bold text-bonus">KSH {selectedUserForDetail.stats.totalWon.toFixed(2)}</p>
+                <div className="wallet-card">
+                  <div className="card-label">WON</div>
+                  <div className="card-amount">KSH <span>{selectedUserForDetail.stats.totalWon.toFixed(2)}</span></div>
                 </div>
               </div>
 
               {/* Recent Bets */}
               <div>
-                <h4 className="mb-2 font-semibold text-ink">Recent Bets</h4>
-                <div className="max-h-40 overflow-y-auto rounded border border-line">
-                  <table className="w-full text-left">
-                    <thead className="bg-field text-[10px] text-ink-3 sticky top-0">
+                <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Bets</h4>
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#282a2e] text-[10px] text-[#a0a6b1] sticky top-0">
                       <tr>
                         <th className="p-2">Amount</th>
                         <th className="p-2">Status</th>
@@ -2606,23 +2620,23 @@ export default function AdminDashboard() {
                         <th className="p-2">Time</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line/30">
+                    <tbody className="divide-y divide-[#32353b]/50">
                       {selectedUserForDetail.recentBets.length === 0 ? (
-                        <tr><td colSpan={5} className="p-3 text-center text-ink-3">No bets found</td></tr>
+                        <tr><td colSpan={5} className="p-3 text-center text-[#8c939e]">No bets found</td></tr>
                       ) : (
                         selectedUserForDetail.recentBets.map(b => (
                           <tr key={b._id}>
-                            <td className="p-2 font-semibold">KSH {b.amount}</td>
+                            <td className="p-2 font-semibold text-white">KSH {b.amount}</td>
                             <td className="p-2">
-                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
-                                b.status === 'won' ? 'bg-brand/10 text-brand' : 'bg-loss/10 text-loss'
+                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                                b.status === 'won' ? 'bg-[#00eb5b]/15 text-[#00eb5b]' : 'bg-[#ff1e38]/15 text-[#ff5c6c]'
                               }`}>
                                 {b.status}
                               </span>
                             </td>
-                            <td className="p-2">{b.multiplierCaught ? `${b.multiplierCaught}x` : '—'}</td>
-                            <td className="p-2 font-semibold text-brand">KSH {b.winAmount || 0}</td>
-                            <td className="p-2 text-ink-3">{formatDate(b.createdAt)}</td>
+                            <td className="p-2 text-[#a0a6b1]">{b.multiplierCaught ? `${b.multiplierCaught}x` : '—'}</td>
+                            <td className="p-2 font-semibold text-[#00eb5b]">KSH {b.winAmount || 0}</td>
+                            <td className="p-2 text-[#8c939e]">{formatDate(b.createdAt)}</td>
                           </tr>
                         ))
                       )}
@@ -2632,17 +2646,17 @@ export default function AdminDashboard() {
               </div>
 
               {/* Recent Deposits & Withdrawals side by side */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <h4 className="mb-2 font-semibold text-ink">Recent Deposits</h4>
-                  <div className="max-h-32 overflow-y-auto rounded border border-line p-2 space-y-1">
+                  <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Deposits</h4>
+                  <div className="max-h-36 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e] p-2.5 space-y-1.5">
                     {selectedUserForDetail.recentDeposits.length === 0 ? (
-                      <p className="text-center text-ink-3 py-2">No deposits</p>
+                      <p className="text-center text-[#8c939e] py-3 text-xs">No deposits</p>
                     ) : (
                       selectedUserForDetail.recentDeposits.map(d => (
-                        <div key={d._id} className="flex justify-between text-[11px]">
-                          <span className="font-semibold text-brand">+KSH {d.amount}</span>
-                          <span className="text-ink-3">{d.status} • {formatDate(d.createdAt)}</span>
+                        <div key={d._id} className="flex justify-between items-center text-xs p-1.5 rounded bg-[#282a2e]">
+                          <span className="font-bold text-[#00eb5b]">+KSH {d.amount}</span>
+                          <span className="text-[#8c939e] text-[10px]">{d.status} • {formatDate(d.createdAt)}</span>
                         </div>
                       ))
                     )}
@@ -2650,30 +2664,30 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h4 className="mb-2 font-semibold text-ink">Recent Withdrawals</h4>
-                  <div className="max-h-32 overflow-y-auto rounded border border-line p-2 space-y-1">
+                  <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Withdrawals</h4>
+                  <div className="max-h-36 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e] p-2.5 space-y-1.5">
                     {selectedUserForDetail.recentWithdrawals.length === 0 ? (
-                      <p className="text-center text-ink-3 py-2">No withdrawals</p>
+                      <p className="text-center text-[#8c939e] py-3 text-xs">No withdrawals</p>
                     ) : (
                       selectedUserForDetail.recentWithdrawals.map(w => (
-                        <div key={w._id} className="flex justify-between text-[11px]">
-                          <span className="font-semibold text-loss">-KSH {w.amount}</span>
-                          <span className="text-ink-3">{w.status} • {formatDate(w.createdAt)}</span>
+                        <div key={w._id} className="flex justify-between items-center text-xs p-1.5 rounded bg-[#282a2e]">
+                          <span className="font-bold text-[#ff5c6c]">-KSH {w.amount}</span>
+                          <span className="text-[#8c939e] text-[10px]">{w.status} • {formatDate(w.createdAt)}</span>
                         </div>
                       ))
                     )}
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="border-t border-line px-5 py-3 text-right">
-              <button
-                onClick={() => setSelectedUserForDetail(null)}
-                className="rounded-md bg-field px-4 py-1.5 text-xs font-semibold text-ink hover:bg-raised"
-              >
-                Close Inspector
-              </button>
+              <div className="pt-2 text-right">
+                <button
+                  onClick={() => setSelectedUserForDetail(null)}
+                  className="rounded-lg bg-[#282a2e] border border-[#32353b] px-5 py-2 text-xs font-semibold text-white hover:bg-[#32353b]"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ const JWT_EXPIRES_IN = '30d'
 
 export async function register(req: Request, res: Response) {
   try {
-    const { phone, password, username } = req.body
+    const { phone, password, username, referralCode } = req.body
 
     if (!phone || !password || !username) {
       return res.status(400).json({ error: 'Phone, password, and username are required' })
@@ -23,12 +23,37 @@ export async function register(req: Request, res: Response) {
       return res.status(400).json({ error: 'Phone number already registered' })
     }
 
+    let referrerUser = null
+    if (referralCode && typeof referralCode === 'string') {
+      const cleanRef = referralCode.trim()
+      const refDigits = cleanRef.replace(/\D/g, '')
+      const refLast9 = refDigits.length >= 9 ? refDigits.slice(-9) : null
+      
+      const queryOr: any[] = [
+        { username: { $regex: `^${cleanRef}$`, $options: 'i' } }
+      ]
+      if (refLast9) {
+        queryOr.push({ phone: refLast9 })
+      }
+      if (cleanRef.length === 24 && /^[0-9a-fA-F]{24}$/.test(cleanRef)) {
+        queryOr.push({ _id: cleanRef })
+      }
+
+      referrerUser = await User.findOne({ $or: queryOr })
+    }
+
     // Create user
     const user = await User.create({
       phone: normalizedPhone,
       password,
-      username: username.slice(0, 20)
+      username: username.slice(0, 20),
+      referredBy: referrerUser ? referrerUser._id : null
     })
+
+    if (referrerUser) {
+      await User.findByIdAndUpdate(referrerUser._id, { $inc: { referralsCount: 1 } })
+      console.log(`🤝 Referral tracked: User ${normalizedPhone} referred by ${referrerUser.phone} (${referrerUser.username})`)
+    }
 
     // Generate token
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })

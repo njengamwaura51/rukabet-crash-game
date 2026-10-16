@@ -20,7 +20,7 @@ export function Modal({ title, description, onClose, children }: ModalProps) {
         <Dialog.Overlay className="overlay-in fixed inset-0 z-50 bg-black/70" />
         <Dialog.Content
           {...(description ? {} : { 'aria-describedby': undefined })}
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 flex max-h-[85dvh] w-[calc(100%-1.5rem)] max-w-md flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl transition-all"
+          className="fixed left-1/2 top-4 sm:top-1/2 z-50 -translate-x-1/2 sm:-translate-y-1/2 flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-md flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl transition-all"
         >
           <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3">
             <div className="min-w-0">

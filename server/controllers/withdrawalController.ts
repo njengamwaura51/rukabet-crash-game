@@ -20,12 +20,6 @@ export async function requestWithdrawal(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: `Minimum withdrawal is KSH ${MIN_WITHDRAWAL}` })
     }
 
-    const rawPhone = typeof phone === 'string' ? phone.replace(/\D/g, '') : ''
-    const normalizedPhone = rawPhone.replace(/^254/, '').replace(/^0/, '').slice(-9)
-    if (!/^[17]\d{8}$/.test(normalizedPhone)) {
-      return res.status(400).json({ error: 'Valid Kenyan Safaricom phone number required' })
-    }
-
     // Atomically check balance and deduct
     const user = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: withdrawAmount } },
@@ -35,6 +29,15 @@ export async function requestWithdrawal(req: AuthRequest, res: Response) {
 
     if (!user) {
       return res.status(400).json({ error: 'Insufficient account balance' })
+    }
+
+    // Always enforce registered phone number for withdrawal
+    const rawPhone = user.phone ? String(user.phone).replace(/\D/g, '') : ''
+    const normalizedPhone = rawPhone.replace(/^254/, '').replace(/^0/, '').slice(-9)
+    if (!/^[17]\d{8}$/.test(normalizedPhone)) {
+      // Refund balance if user phone is invalid
+      await User.findByIdAndUpdate(userId, { $inc: { balance: withdrawAmount } })
+      return res.status(400).json({ error: 'Valid registered Safaricom phone number required for withdrawal' })
     }
 
     const fullPhone = `254${normalizedPhone}`

@@ -321,15 +321,15 @@ export function DepositModal({
           {/* Withdraw Form Section */}
           {tab === 'withdraw' && (
             <div className="withdraw-section">
-              <label className="section-label">Withdrawal Phone Number</label>
+              <label className="section-label">Registered M-Pesa Number</label>
               <input
                 type="text"
-                placeholder="07XXXXXXXX or 01XXXXXXXX"
-                className="verify-input"
-                value={withdrawPhone}
-                onChange={(e) => setWithdrawPhone(e.target.value)}
-                disabled={isWithdrawing}
+                className="verify-input cursor-not-allowed bg-[#1f2125] text-[#a0a6b1] opacity-90"
+                value={registeredPhone ? `0${registeredPhone}` : (userPhone || '')}
+                readOnly
+                disabled
               />
+              <p className="mt-1 text-[11px] text-[#8c939e]">Withdrawals are sent directly to your registered number.</p>
 
               <label className="section-label mt-2">Amount to Withdraw (Min KSH 50)</label>
               <input

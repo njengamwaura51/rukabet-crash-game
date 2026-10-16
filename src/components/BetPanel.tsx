@@ -164,18 +164,23 @@ export default function BetPanel({
 
     const betAmount = Math.max(MIN_AMOUNT, Math.min(amount, maxBalance))
 
+    // Check freebet lock upfront across all phases
+    if (isFreebet && freebetLocked) {
+      setError('Freebets locked: Deposit KSH 20+ to unlock')
+      return
+    }
+
     if (gamePhase === 'waiting' && !activeBet) {
-      if (isFreebet && freebetLocked) {
-        setError('Deposit at least 20 to activate account')
-        return
-      }
       if (betAmount > maxBalance) {
         setError('Insufficient funds')
         return
       }
       const success = betting.placeBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
-      if (success) setLastBetAmount(betAmount)
-      else setError('Insufficient funds')
+      if (success) {
+        setLastBetAmount(betAmount)
+      } else {
+        setError(isFreebet && freebetLocked ? 'Freebets locked: Deposit KSH 20+ to unlock' : 'Insufficient funds')
+      }
       return
     }
 
@@ -185,8 +190,11 @@ export default function BetPanel({
         return
       }
       const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
-      if (success) setLastBetAmount(betAmount)
-      else setError('Insufficient funds')
+      if (success) {
+        setLastBetAmount(betAmount)
+      } else {
+        setError(isFreebet && freebetLocked ? 'Freebets locked: Deposit KSH 20+ to unlock' : 'Insufficient funds')
+      }
     }
   }
 

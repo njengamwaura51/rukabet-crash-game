@@ -110,16 +110,39 @@ export async function paydWebhook(req: Request, res: Response) {
         return res.status(200).json({ status: 'ok', message: 'Already processed' })
       }
 
-      // Credit user balance atomically
+      // Credit user balance atomically and unlock freebet if deposit >= 20
+      const updateOps: any = { $inc: { balance: completedDeposit.amount } }
+      if (completedDeposit.amount >= 20) {
+        updateOps.$set = { freebetLocked: false }
+      }
+
       const user = await User.findByIdAndUpdate(
         completedDeposit.userId,
-        { $inc: { balance: completedDeposit.amount } },
+        updateOps,
         { new: true }
       )
 
       if (!user) {
         console.error(`❌ User not found for deposit: ${completedDeposit._id}`)
         return res.status(200).json({ status: 'ok', message: 'User not found' })
+      }
+
+      // Check referral reward (KSH 20 credited to referrer on qualifying deposit)
+      if (user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= 20) {
+        try {
+          const referrer = await User.findByIdAndUpdate(
+            user.referredBy,
+            { $inc: { balance: 20, referralsEarnings: 20 } },
+            { new: true }
+          )
+          if (referrer) {
+            user.hasReceivedReferralReward = true
+            await user.save()
+            console.log(`🎉 Referral reward paid! Referrer ${referrer.phone} credited KSH 20 for deposit by User ${user.phone}`)
+          }
+        } catch (refErr: any) {
+          console.error('⚠️ Could not process referral reward:', refErr.message)
+        }
       }
 
       console.log(`✅ Payd Deposit completed! User ${user.phone} credited KSH ${completedDeposit.amount}. New balance: ${user.balance}`)

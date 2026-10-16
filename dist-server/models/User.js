@@ -45,6 +45,15 @@ const UserSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    referredBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    hasReceivedReferralReward: {
+        type: Boolean,
+        default: false
+    },
     wagerProgress: {
         type: Number,
         default: 0
