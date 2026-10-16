@@ -15,7 +15,7 @@ interface GameCanvasProps {
   freebetAmount?: number
 }
 
-const PAD = { left: 28, right: 16, top: 20, bottom: 24 } // Origin (0,0) at (28, CH - 24)
+const PAD = { left: 14, right: 8, top: 10, bottom: 14 } // Origin (0,0) at (14, CH - 14)
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BACKGROUND — dark with rotating sunburst rays from origin
@@ -80,18 +80,18 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
     const pos = 1 - t
     const fade = pos < 0.15 ? pos / 0.15 : 1
     ctx.beginPath()
-    ctx.arc(ox + pos * bLen, oy + 8, 4, 0, Math.PI * 2)
+    ctx.arc(ox + pos * bLen, oy + 7, 3.5, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,120,${0.8 * fade})`
     ctx.fill()
   }
 
-  const dotX = Math.max(6, PAD.left - 10)
+  const dotX = Math.max(5, PAD.left - 8)
   for (let i = 0; i < 6; i++) {
     const t = (time * 0.00010 + i / 6) % 1
     const pos = 1 - t
     const fade = pos < 0.15 ? pos / 0.15 : 1
     ctx.beginPath()
-    ctx.arc(dotX, oy - pos * lLen, 4, 0, Math.PI * 2)
+    ctx.arc(dotX, oy - pos * lLen, 3.5, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,120,${0.8 * fade})`
     ctx.fill()
   }
@@ -195,7 +195,7 @@ function renderFlightAndPlane(
 
   // 2. Responsive jet dimensions
   const planeWidth = Math.min(Math.max(canvasWidth * 0.125, 66), 112)
-  const planeHeight = planeWidth / JET_ASPECT
+  const planeHeight = (planeWidth / JET_ASPECT) * 1.015
 
   // 3. Max turbulence coordinate — safe on mobile screen edges
   const rightMargin = 10
@@ -217,8 +217,8 @@ function renderFlightAndPlane(
   const rawBlend = Math.max(0, Math.min(1, (t - 0.85) / 0.15))
   const turbulenceBlend = rawBlend * rawBlend * (3 - 2 * rawBlend)
 
-  const slowBobY = Math.sin(timeMs * 0.0018) * 3.2 * turbulenceBlend
-  const slowBobX = Math.cos(timeMs * 0.0012) * 0.9 * turbulenceBlend
+  const slowBobY = Math.sin(timeMs * 0.0018) * 3.5 * turbulenceBlend
+  const slowBobX = Math.cos(timeMs * 0.0012) * 0.95 * turbulenceBlend
 
   // 6. SINGLE LOCKED TAIL-TIP COORDINATE used by BOTH the trajectory line AND the plane tail
   const tipX = baseTipX + slowBobX
@@ -492,7 +492,7 @@ export function GameCanvas({
 
       if (flyX < CW + 160 && flyY > -160) {
         const planeWidth = Math.min(Math.max(CW * 0.125, 66), 112)
-        const planeHeight = planeWidth / JET_ASPECT
+        const planeHeight = (planeWidth / JET_ASPECT) * 1.015
         const drawX = flyX - planeWidth * TAIL_ANCHOR_X
         const drawY = flyY - planeHeight * TAIL_ANCHOR_Y
         if (greenJetImg.complete) {
@@ -515,8 +515,8 @@ export function GameCanvas({
     <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ display: 'block' }} />
 
-      {/* Top bar: wallet toggle bordering vertical Y-axis (x=28px) edge-to-edge, with online status below */}
-      <div className="absolute left-[28px] top-2 z-10 flex flex-col items-start gap-1">
+      {/* Top bar: wallet toggle bordering vertical Y-axis (x=14px) edge-to-edge, with online status below */}
+      <div className="absolute left-[14px] top-2 z-10 flex flex-col items-start gap-1">
         <BetModeToggle
           betMode={betMode}
           onToggle={onToggleBetMode}
