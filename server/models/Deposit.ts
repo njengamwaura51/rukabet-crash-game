@@ -7,12 +7,16 @@ export interface IDeposit extends Document {
   amount: number
   apiRef: string
   status: 'pending' | 'completed' | 'failed'
+  credited: boolean
+  creditedAt?: Date | null
   paydReference?: string | null
   externalRef?: string | null
   mpesaReceipt?: string | null
+  submittedReceipt?: string | null
   failureReason?: string | null
   intasendInvoiceId?: string | null
   intasendTrackerId?: string | null
+  rawWebhookPayload?: any
   createdAt: Date
   updatedAt: Date
 }
@@ -26,12 +30,13 @@ const DepositSchema = new Schema<IDeposit>({
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    index: true
   },
   amount: {
     type: Number,
     required: true,
-    min: 10
+    min: 1
   },
   apiRef: {
     type: String,
@@ -42,7 +47,17 @@ const DepositSchema = new Schema<IDeposit>({
   status: {
     type: String,
     enum: ['pending', 'completed', 'failed'],
-    default: 'pending'
+    default: 'pending',
+    index: true
+  },
+  credited: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  creditedAt: {
+    type: Date,
+    default: null
   },
   paydReference: {
     type: String,
@@ -56,7 +71,13 @@ const DepositSchema = new Schema<IDeposit>({
   },
   mpesaReceipt: {
     type: String,
-    default: null
+    default: null,
+    index: true
+  },
+  submittedReceipt: {
+    type: String,
+    default: null,
+    index: true
   },
   failureReason: {
     type: String,
@@ -64,14 +85,23 @@ const DepositSchema = new Schema<IDeposit>({
   },
   intasendInvoiceId: {
     type: String,
-    default: null
+    default: null,
+    index: true
   },
   intasendTrackerId: {
     type: String,
+    default: null,
+    index: true
+  },
+  rawWebhookPayload: {
+    type: Schema.Types.Mixed,
     default: null
   }
 }, {
   timestamps: true
 })
+
+DepositSchema.index({ userId: 1, createdAt: -1 })
+DepositSchema.index({ phone: 1, amount: 1, status: 1, createdAt: -1 })
 
 export const Deposit = mongoose.model<IDeposit>('Deposit', DepositSchema)

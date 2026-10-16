@@ -30,7 +30,7 @@ import { Settings } from './models/Settings.js'
 
 // Controllers
 import { register, login, getMe, changePassword } from './controllers/authController.js'
-import { initiateDeposit, verifyPendingDeposit } from './controllers/depositController.js'
+import { initiateDeposit, verifyPendingDeposit, getDepositStatus } from './controllers/depositController.js'
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js'
 import { paydWebhook, intasendWebhook } from './controllers/webhookController.js'
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js'
@@ -45,11 +45,14 @@ import {
   resetUserPassword,
   getAdminWithdrawals,
   updateWithdrawalStatus,
+  getAdminDeposits,
+  updateAdminDepositStatus,
   getOddsEngineConfig,
   setOddsEngineRule,
   resetOddsEngine,
   syncDatabaseUsers
 } from './controllers/adminController.js'
+import { Deposit } from './models/Deposit.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js'
 
@@ -99,6 +102,7 @@ app.post('/api/auth/change-password', authMiddleware, changePassword)
 
 // Deposit & Withdrawal routes
 app.post('/api/deposit', depositRateLimit, authMiddleware, initiateDeposit)
+app.get('/api/deposit/:id/status', authMiddleware, getDepositStatus)
 app.post('/api/deposit/verify', authMiddleware, verifyPendingDeposit)
 app.post('/api/withdraw', depositRateLimit, authMiddleware, requestWithdrawal)
 app.get('/api/user/transactions', authMiddleware, getUserTransactions)
@@ -130,6 +134,10 @@ app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware,
 app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet)
 app.post('/api/admin/users/:id/toggle-freeze', adminRateLimit, adminMiddleware, toggleUserFreeze)
 app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware, resetUserPassword)
+
+// Admin deposit management
+app.get('/api/admin/deposits', adminRateLimit, adminMiddleware, getAdminDeposits)
+app.post('/api/admin/deposits/:id/status', adminRateLimit, adminMiddleware, updateAdminDepositStatus)
 
 // Admin withdrawal management
 app.get('/api/admin/withdrawals', adminRateLimit, adminMiddleware, getAdminWithdrawals)
@@ -169,6 +177,12 @@ async function startServer() {
     
     // Connect to MongoDB
     await connectDB()
+
+    // Backfill credited: true for historical completed deposits
+    await Deposit.updateMany(
+      { status: 'completed', credited: { $ne: true } },
+      { $set: { credited: true } }
+    ).catch(() => {})
     
     // Ensure settings exist (no payment gateway keys required at startup)
     console.log('🔄 Initializing settings...')

@@ -584,6 +584,26 @@ async function initializeGameLoop(): Promise<void> {
   startWaiting()
 }
 
+export function authenticateSocketRoom(socket: Socket, rawToken?: string): string | null {
+  try {
+    const token =
+      rawToken ||
+      (socket.handshake.auth?.token as string) ||
+      (socket.handshake.query?.token as string) ||
+      (socket.handshake.headers?.authorization?.startsWith('Bearer ')
+        ? socket.handshake.headers.authorization.slice(7)
+        : '')
+    if (!token) return null
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId?: string }
+    if (decoded?.userId) {
+      socket.data.userId = decoded.userId
+      socket.join(`user:${decoded.userId}`)
+      return decoded.userId
+    }
+  } catch {}
+  return null
+}
+
 export function initializeSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: {
@@ -603,8 +623,17 @@ export function initializeSocket(httpServer: HttpServer): Server {
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Client connected: ${socket.id}`)
 
+    authenticateSocketRoom(socket)
     socket.emit('GAME_SNAPSHOT', gameState)
     socket.emit('LIVE_BETS_SNAPSHOT', gameState.liveBets)
+
+    socket.on('AUTHENTICATE', (data: { token?: string; userId?: string }) => {
+      authenticateSocketRoom(socket, data?.token)
+    })
+
+    socket.on('JOIN_USER_ROOM', (data: { token?: string; userId?: string }) => {
+      authenticateSocketRoom(socket, data?.token)
+    })
 
     socket.on('authenticate', async (token: string) => {
       try {
@@ -804,6 +833,14 @@ export function initializeSocket(httpServer: HttpServer): Server {
 
 export function getIO(): Server | null {
   return io
+}
+
+export function emitUserBalanceUpdate(userId: string | any, data: any) {
+  if (!io) return
+  const uid = userId.toString()
+  const eventData = { ...data, userId: uid, timestamp: Date.now() }
+  io.to(`user:${uid}`).emit('DEPOSIT_SUCCESS', eventData)
+  io.to(`user:${uid}`).emit('BALANCE_UPDATE', eventData)
 }
 
 export function getOddsEngineState() {

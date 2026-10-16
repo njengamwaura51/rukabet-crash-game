@@ -8,12 +8,13 @@ const DepositSchema = new Schema({
     },
     phone: {
         type: String,
-        required: true
+        required: true,
+        index: true
     },
     amount: {
         type: Number,
         required: true,
-        min: 10
+        min: 1
     },
     apiRef: {
         type: String,
@@ -24,7 +25,17 @@ const DepositSchema = new Schema({
     status: {
         type: String,
         enum: ['pending', 'completed', 'failed'],
-        default: 'pending'
+        default: 'pending',
+        index: true
+    },
+    credited: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    creditedAt: {
+        type: Date,
+        default: null
     },
     paydReference: {
         type: String,
@@ -38,7 +49,13 @@ const DepositSchema = new Schema({
     },
     mpesaReceipt: {
         type: String,
-        default: null
+        default: null,
+        index: true
+    },
+    submittedReceipt: {
+        type: String,
+        default: null,
+        index: true
     },
     failureReason: {
         type: String,
@@ -46,13 +63,21 @@ const DepositSchema = new Schema({
     },
     intasendInvoiceId: {
         type: String,
-        default: null
+        default: null,
+        index: true
     },
     intasendTrackerId: {
         type: String,
+        default: null,
+        index: true
+    },
+    rawWebhookPayload: {
+        type: Schema.Types.Mixed,
         default: null
     }
 }, {
     timestamps: true
 });
+DepositSchema.index({ userId: 1, createdAt: -1 });
+DepositSchema.index({ phone: 1, amount: 1, status: 1, createdAt: -1 });
 export const Deposit = mongoose.model('Deposit', DepositSchema);

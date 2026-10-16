@@ -7,6 +7,7 @@ import { Withdrawal } from '../models/Withdrawal.js';
 import { OddsControl } from '../models/OddsControl.js';
 import { Settings } from '../models/Settings.js';
 import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO } from '../socket.js';
+import { creditDepositAtomically } from './webhookController.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
 function safeCompare(a, b) {
     if (typeof a !== 'string' || typeof b !== 'string')
@@ -558,5 +559,74 @@ export async function resetOddsEngine(req, res) {
     }
     catch (error) {
         return res.status(500).json({ error: error.message || 'Failed to reset odds engine' });
+    }
+}
+export async function getAdminDeposits(req, res) {
+    try {
+        const { status = 'all', search = '', limit = 100, page = 1 } = req.query;
+        const query = {};
+        if (status && status !== 'all')
+            query.status = status;
+        if (search) {
+            query.$or = [
+                { apiRef: { $regex: search, $options: 'i' } },
+                { externalRef: { $regex: search, $options: 'i' } },
+                { paydReference: { $regex: search, $options: 'i' } },
+                { mpesaReceipt: { $regex: search, $options: 'i' } },
+                { submittedReceipt: { $regex: search, $options: 'i' } },
+                { phone: { $regex: search, $options: 'i' } }
+            ];
+        }
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 100));
+        const skip = (pageNum - 1) * limitNum;
+        const [deposits, total, completedSumAgg] = await Promise.all([
+            Deposit.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).populate('userId', 'username phone balance'),
+            Deposit.countDocuments(query),
+            Deposit.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+        ]);
+        return res.json({
+            success: true,
+            deposits,
+            totalCompletedAmount: completedSumAgg[0]?.total || 0,
+            pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) || 1 }
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+}
+export async function updateAdminDepositStatus(req, res) {
+    try {
+        const { id } = req.params;
+        const { status, mpesaReceipt, failureReason } = req.body;
+        if (!['completed', 'failed'].includes(status)) {
+            return res.status(400).json({ error: 'Status must be completed or failed' });
+        }
+        const deposit = await Deposit.findById(id);
+        if (!deposit)
+            return res.status(404).json({ error: 'Deposit not found' });
+        if (status === 'completed') {
+            const result = await creditDepositAtomically(deposit._id, {
+                mpesaReceipt: mpesaReceipt || deposit.submittedReceipt || deposit.mpesaReceipt || 'ADMIN-VERIFIED',
+                verifiedAmount: deposit.amount
+            });
+            return res.json({
+                success: true,
+                creditedNow: result.creditedNow,
+                deposit: result.deposit,
+                userBalance: result.user?.balance
+            });
+        }
+        if (deposit.credited) {
+            return res.status(400).json({ error: 'Cannot mark an already-credited deposit as failed' });
+        }
+        deposit.status = 'failed';
+        deposit.failureReason = failureReason || 'Rejected by admin';
+        await deposit.save();
+        return res.json({ success: true, deposit });
+    }
+    catch (error) {
+        return res.status(500).json({ error: error.message });
     }
 }

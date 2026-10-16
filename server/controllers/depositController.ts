@@ -1,8 +1,11 @@
 import { Response } from 'express'
 import axios from 'axios'
+import mongoose from 'mongoose'
 import { AuthRequest } from '../middleware/auth.js'
 import { Deposit } from '../models/Deposit.js'
+import { User } from '../models/User.js'
 import { Settings } from '../models/Settings.js'
+import { creditDepositAtomically } from './webhookController.js'
 
 function sanitizeKey(value?: string): string {
   if (typeof value !== 'string') return ''
@@ -10,6 +13,7 @@ function sanitizeKey(value?: string): string {
 }
 
 export function normalizeKenyanPhone(phone: string): string | null {
+  if (!phone || typeof phone !== 'string') return null
   const digits = phone.replace(/\D/g, '')
   if (digits.startsWith('254') && digits.length === 12 && /^254[17]\d{8}$/.test(digits)) {
     return digits
@@ -73,36 +77,39 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       phone: cleanPhone,
       amount: depositAmount,
       apiRef: internalRef,
-      status: 'pending'
+      status: 'pending',
+      credited: false
     })
     depositId = deposit._id.toString()
 
-    // Build HTTP Basic Auth header (Username : Password or Secret)
-    const authCredential = paydApiPassword || paydApiSecret
-    const basicAuth = Buffer.from(`${paydApiUsername}:${authCredential}`).toString('base64')
+    const requestBody: any = {
+      phone_number: cleanPhone,
+      amount: depositAmount,
+      narration: `Deposit ${internalRef}`,
+      api_ref: internalRef,
+      currency: 'KES',
+      network_code: '63902', // Safaricom M-Pesa Kenya
+      callback_url: callbackUrl
+    }
 
-    const requestHeaders: Record<string, string> = {
-      Authorization: `Basic ${basicAuth}`,
+    if (paydWalletUsername) {
+      requestBody.username = paydWalletUsername
+    }
+
+    const requestHeaders: any = {
       'Content-Type': 'application/json',
       Accept: 'application/json'
     }
+
     if (paydApiSecret) {
+      requestHeaders['Authorization'] = `Bearer ${paydApiSecret}`
       requestHeaders['Api-Secret'] = paydApiSecret
       requestHeaders['x-api-secret'] = paydApiSecret
       requestHeaders['x-api-key'] = paydApiSecret
-    }
-
-    const requestBody: any = {
-      username: paydWalletUsername || paydApiUsername,
-      network_code: '63902', // Safaricom M-Pesa Kenya
-      amount: depositAmount,
-      phone_number: cleanPhone,
-      narration: `Deposit ${internalRef}`,
-      currency: 'KES',
-      callback_url: callbackUrl
-    }
-    if (paydApiSecret) {
       requestBody.api_secret = paydApiSecret
+    } else if (paydApiUsername && paydApiPassword) {
+      const basicToken = Buffer.from(`${paydApiUsername}:${paydApiPassword}`).toString('base64')
+      requestHeaders['Authorization'] = `Basic ${basicToken}`
     }
 
     console.log(`📤 Sending Payd STK Push: amount=${depositAmount}, phone=${cleanPhone}, ref=${internalRef}`)
@@ -119,12 +126,15 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
 
     console.log('✅ Payd STK Push response:', paydResponse.data)
 
+    const resData = paydResponse.data || {}
     const externalRef =
-      paydResponse.data?.transaction_reference ||
-      paydResponse.data?.correlator_id ||
-      paydResponse.data?.reference ||
-      paydResponse.data?.data?.transaction_reference ||
-      paydResponse.data?.data?.reference ||
+      resData.transaction_reference ||
+      resData.correlator_id ||
+      resData.reference ||
+      resData.id ||
+      resData.data?.transaction_reference ||
+      resData.data?.correlator_id ||
+      resData.data?.reference ||
       null
 
     if (externalRef) {
@@ -141,14 +151,20 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
       externalRef
     })
   } catch (error: any) {
+    const isTimeout = error?.code === 'ECONNABORTED' || String(error?.message || '').toLowerCase().includes('timeout')
     if (depositId) {
       const errMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Deposit initiation failed'
-      await Deposit.findByIdAndUpdate(
-        depositId,
-        { $set: { status: 'failed', failureReason: errMsg } },
-        { new: false }
+      // If gateway timed out, leave pending so M-Pesa callback can still settle it
+      await Deposit.findOneAndUpdate(
+        { _id: depositId, credited: { $ne: true } },
+        {
+          $set: {
+            status: isTimeout ? 'pending' : 'failed',
+            failureReason: isTimeout ? 'Gateway response timed out; awaiting M-Pesa callback' : errMsg
+          }
+        }
       ).catch((updateError) => {
-        console.error('⚠️ Failed to mark deposit as failed:', updateError?.message || updateError)
+        console.error('⚠️ Failed to update deposit on initiation failure:', updateError?.message || updateError)
       })
     }
 
@@ -166,45 +182,127 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
 
     return res.status(responseStatus).json({
       error: paydMessage,
-      details: paydData
+      details: paydData,
+      depositId
     })
+  }
+}
+
+export async function getDepositStatus(req: AuthRequest, res: Response) {
+  try {
+    const { id } = req.params
+    const userId = req.userId
+    if (!userId) return res.status(401).json({ error: 'Authentication required' })
+
+    const query: any = { userId }
+    if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+      query._id = id
+    } else {
+      query.apiRef = id
+    }
+
+    const deposit = await Deposit.findOne(query).lean()
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' })
+
+    const user = await User.findById(userId).select('balance freebet freebetLocked').lean()
+
+    return res.json({
+      success: true,
+      deposit: {
+        id: deposit._id.toString(),
+        apiRef: deposit.apiRef,
+        amount: deposit.amount,
+        status: deposit.status,
+        credited: deposit.credited,
+        mpesaReceipt: deposit.mpesaReceipt || deposit.submittedReceipt || null,
+        failureReason: deposit.failureReason || null,
+        createdAt: deposit.createdAt
+      },
+      balance: user?.balance ?? 0,
+      freebet: user?.freebet ?? 0,
+      freebetLocked: user?.freebetLocked ?? true
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to check deposit status' })
   }
 }
 
 export async function verifyPendingDeposit(req: AuthRequest, res: Response) {
   try {
-    const { code } = req.body
-    const cleanCode = typeof code === 'string' ? code.trim().toUpperCase() : ''
+    const userId = req.userId
+    if (!userId) return res.status(401).json({ error: 'Authentication required' })
 
-    if (!cleanCode) {
-      return res.status(400).json({ error: 'Please enter a valid M-Pesa transaction code' })
+    const { code } = req.body
+    const rawText = typeof code === 'string' ? code.trim() : ''
+    if (!rawText) {
+      return res.status(400).json({ error: 'Please enter a valid M-Pesa transaction code or message' })
     }
 
-    // Check if deposit exists with this receipt or ref
-    const existing = await Deposit.findOne({
+    // Extract M-Pesa receipt code if the user pasted the full M-Pesa SMS or just the 10-character code
+    const receiptMatch = rawText.toUpperCase().match(/\b([A-Z0-9]{10})\b/)
+    const cleanCode = (receiptMatch ? receiptMatch[1] : rawText.toUpperCase().split(/\s+/)[0]).trim()
+
+    if (cleanCode.length < 6) {
+      return res.status(400).json({ error: 'Please enter a valid M-Pesa code (e.g. TCQ74RQ4JH)' })
+    }
+
+    // 1. Check if a deposit already exists with this receipt or reference
+    const matchedDeposit = await Deposit.findOne({
       $or: [
         { mpesaReceipt: cleanCode },
+        { submittedReceipt: cleanCode },
         { externalRef: cleanCode },
+        { paydReference: cleanCode },
         { apiRef: cleanCode }
       ]
     })
 
-    if (existing && existing.status === 'completed') {
-      return res.json({
-        success: true,
-        amount: existing.amount,
-        message: `Transaction ${cleanCode} confirmed and credited KSH ${existing.amount}!`
-      })
+    if (matchedDeposit) {
+      if (matchedDeposit.userId.toString() !== userId.toString()) {
+        return res.status(403).json({ error: 'This transaction code belongs to another account.' })
+      }
+
+      if (matchedDeposit.status === 'completed' && !matchedDeposit.credited) {
+        const { user } = await creditDepositAtomically(matchedDeposit._id, { mpesaReceipt: cleanCode })
+        return res.json({
+          success: true,
+          status: 'completed',
+          amount: matchedDeposit.amount,
+          newBalance: user?.balance,
+          message: `Transaction ${cleanCode} verified and KSH ${matchedDeposit.amount} credited to your wallet!`
+        })
+      }
+
+      if (matchedDeposit.status === 'completed' && matchedDeposit.credited) {
+        const user = await User.findById(userId).select('balance freebet freebetLocked').lean()
+        return res.json({
+          success: true,
+          status: 'completed',
+          amount: matchedDeposit.amount,
+          newBalance: user?.balance,
+          message: `Transaction ${cleanCode} (KSH ${matchedDeposit.amount}) is already credited to your balance.`
+        })
+      }
     }
 
-    if (existing && existing.status === 'pending') {
-      existing.mpesaReceipt = cleanCode
-      await existing.save()
-    }
+    // 2. Attach the submitted M-Pesa receipt to the user's most recent uncredited deposit
+    const latestPending = await Deposit.findOneAndUpdate(
+      { userId, credited: { $ne: true } },
+      {
+        $set: {
+          submittedReceipt: cleanCode,
+          status: 'pending'
+        }
+      },
+      { sort: { createdAt: -1 }, new: true }
+    )
 
     return res.json({
       success: true,
-      message: `Receipt ${cleanCode} logged for verification. Balance will update as soon as M-Pesa settles.`
+      status: 'pending',
+      depositId: latestPending?._id || null,
+      apiRef: latestPending?.apiRef || null,
+      message: `M-Pesa code ${cleanCode} attached to your deposit for verification. Your balance will update automatically once confirmed.`
     })
   } catch (error: any) {
     console.error('Verify deposit error:', error)

@@ -85,3 +85,5 @@ UserSchema.pre('save', { document: true }, function() {
 
 export const User = mongoose.model('User', UserSchema)
 export type UserDocument = HydratedDocument<mongoose.InferSchemaType<typeof UserSchema>>
+export type IUser = UserDocument
+

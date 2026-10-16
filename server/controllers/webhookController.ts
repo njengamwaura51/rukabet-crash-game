@@ -1,187 +1,310 @@
 import { Request, Response } from 'express'
-import { Deposit } from '../models/Deposit.js'
-import { User } from '../models/User.js'
+import mongoose from 'mongoose'
+import { Deposit, IDeposit } from '../models/Deposit.js'
+import { User, IUser } from '../models/User.js'
 import { Settings } from '../models/Settings.js'
-import { getIO } from '../socket.js'
+import { emitUserBalanceUpdate } from '../socket.js'
+import { normalizeKenyanPhone } from './depositController.js'
 
 const AMOUNT_TOLERANCE = 0.05
+
+/**
+ * Atomically marks a deposit as completed + credited, increments user balance,
+ * unlocks freebet if eligible, credits referrer once, and emits real-time socket events.
+ * Safe against concurrent webhook calls, late callbacks after timeouts, and manual verification.
+ */
+export async function creditDepositAtomically(
+  depositId: mongoose.Types.ObjectId | string,
+  meta: {
+    externalRef?: string | null
+    paydReference?: string | null
+    mpesaReceipt?: string | null
+    rawWebhookPayload?: any
+    verifiedAmount?: number | null
+  } = {}
+): Promise<{ creditedNow: boolean; deposit: IDeposit | null; user: IUser | null }> {
+  const existing = await Deposit.findById(depositId)
+  if (!existing) return { creditedNow: false, deposit: null, user: null }
+
+  const creditAmount =
+    typeof meta.verifiedAmount === 'number' && Number.isFinite(meta.verifiedAmount) && meta.verifiedAmount > 0
+      ? meta.verifiedAmount
+      : existing.amount
+
+  const setFields: any = {
+    status: 'completed',
+    credited: true,
+    creditedAt: new Date(),
+    failureReason: null
+  }
+  if (meta.paydReference) setFields.paydReference = String(meta.paydReference)
+  if (meta.externalRef) setFields.externalRef = String(meta.externalRef)
+  if (meta.mpesaReceipt) setFields.mpesaReceipt = String(meta.mpesaReceipt).toUpperCase()
+  if (meta.rawWebhookPayload !== undefined) setFields.rawWebhookPayload = meta.rawWebhookPayload
+
+  // Atomic guard: only credit if credited !== true
+  const completedDeposit = await Deposit.findOneAndUpdate(
+    { _id: existing._id, credited: { $ne: true } },
+    { $set: setFields },
+    { new: true }
+  )
+
+  if (!completedDeposit) {
+    // Already credited previously; still update any newly arrived receipt metadata
+    if (meta.mpesaReceipt && !existing.mpesaReceipt) {
+      await Deposit.findByIdAndUpdate(existing._id, {
+        $set: { mpesaReceipt: String(meta.mpesaReceipt).toUpperCase() }
+      })
+    }
+    const currentUser = await User.findById(existing.userId)
+    return { creditedNow: false, deposit: existing, user: currentUser }
+  }
+
+  const settings = await (Settings as any).getSettings()
+  const freebetUnlockAmount = Number(settings?.freebetUnlockAmount ?? 50)
+  const referralReward = Number(settings?.referralReward ?? 20)
+
+  const updateOps: any = { $inc: { balance: creditAmount } }
+  if (creditAmount >= freebetUnlockAmount) {
+    updateOps.$set = { freebetLocked: false }
+  }
+
+  const user = await User.findByIdAndUpdate(completedDeposit.userId, updateOps, { new: true })
+  if (!user) {
+    return { creditedNow: true, deposit: completedDeposit, user: null }
+  }
+
+  // Atomic one-time referral reward claim
+  if (user.referredBy && !user.hasReceivedReferralReward && creditAmount >= freebetUnlockAmount && referralReward > 0) {
+    try {
+      const claimedUser = await User.findOneAndUpdate(
+        { _id: user._id, hasReceivedReferralReward: { $ne: true } },
+        { $set: { hasReceivedReferralReward: true } },
+        { new: true }
+      )
+      if (claimedUser) {
+        const referrer = await User.findByIdAndUpdate(
+          user.referredBy,
+          { $inc: { balance: referralReward, referralsEarnings: referralReward } },
+          { new: true }
+        )
+        if (referrer) {
+          emitUserBalanceUpdate(referrer._id, {
+            amount: referralReward,
+            newBalance: referrer.balance,
+            freebet: referrer.freebet,
+            freebetLocked: referrer.freebetLocked,
+            type: 'referral_reward'
+          })
+        }
+      }
+    } catch (refErr: any) {
+      console.error('⚠️ Could not process referral reward:', refErr.message)
+    }
+  }
+
+  emitUserBalanceUpdate(completedDeposit.userId, {
+    amount: creditAmount,
+    newBalance: user.balance,
+    freebet: user.freebet,
+    freebetLocked: user.freebetLocked,
+    depositId: completedDeposit._id.toString(),
+    apiRef: completedDeposit.apiRef,
+    mpesaReceipt: completedDeposit.mpesaReceipt || completedDeposit.submittedReceipt || null,
+    type: 'deposit'
+  })
+
+  return { creditedNow: true, deposit: completedDeposit, user }
+}
 
 export async function paydWebhook(req: Request, res: Response) {
   try {
     const payload = req.body || {}
     console.log('📥 Payd Webhook received:', JSON.stringify(payload, null, 2))
 
-    // 1. Extract external transaction reference
+    const dataObj = payload.data || payload.transaction || {}
+
     const externalRef =
       payload.transaction_reference ||
       payload.correlator_id ||
       payload.reference ||
-      payload.data?.transaction_reference ||
-      payload.data?.reference ||
+      payload.id ||
+      dataObj.transaction_reference ||
+      dataObj.correlator_id ||
+      dataObj.reference ||
       null
 
-    // Extract internal reference from narration or metadata
-    const narrationText = typeof payload.narration === 'string' ? payload.narration : ''
-    const extractedFromNarration = narrationText.replace(/^Deposit\s+/i, '').trim()
+    const narrationText = typeof (payload.narration || dataObj.narration || payload.remarks) === 'string'
+      ? (payload.narration || dataObj.narration || payload.remarks)
+      : ''
+    const refMatchInNarration = narrationText.match(/(DEP[_-]\d+[_-]\w+)/i)
+    const extractedFromNarration = refMatchInNarration
+      ? refMatchInNarration[1]
+      : narrationText.replace(/^Deposit\s+/i, '').trim()
+
     const internalRef =
       payload.api_ref ||
       payload.merchant_reference ||
-      payload.data?.api_ref ||
-      payload.data?.merchant_reference ||
-      (extractedFromNarration.length > 0 ? extractedFromNarration : null)
+      payload.account_reference ||
+      dataObj.api_ref ||
+      dataObj.merchant_reference ||
+      (extractedFromNarration.startsWith('DEP') ? extractedFromNarration : null)
 
-    const rawStatus = (payload.status || payload.state || payload.data?.status || '').toString().toUpperCase()
-    const resultCode = payload.result_code ?? payload.status_code ?? payload.data?.result_code
-    
-    // Status check for Payd
+    const mpesaReceipt = (
+      payload.third_party_trans_id ||
+      payload.mpesa_receipt ||
+      payload.mpesa_reference ||
+      payload.receipt_number ||
+      payload.trans_id ||
+      dataObj.third_party_trans_id ||
+      dataObj.mpesa_receipt ||
+      dataObj.receipt_number ||
+      ''
+    ).toString().trim().toUpperCase() || null
+
+    const rawPhone =
+      payload.phone_number ||
+      payload.msisdn ||
+      payload.phone ||
+      dataObj.phone_number ||
+      dataObj.msisdn ||
+      ''
+    const webhookPhone = normalizeKenyanPhone(String(rawPhone))
+
+    const rawAmount = payload.amount ?? payload.value ?? dataObj.amount ?? dataObj.value
+    const parsedAmount = rawAmount !== undefined && rawAmount !== null ? Number.parseFloat(String(rawAmount)) : null
+
+    const rawStatus = (payload.status || payload.state || dataObj.status || dataObj.state || '').toString().toUpperCase()
+    const resultCode = payload.result_code ?? payload.status_code ?? payload.ResultCode ?? dataObj.result_code
+
     const isSuccess =
       rawStatus === 'SUCCESS' ||
+      rawStatus === 'SUCCESSFUL' ||
       rawStatus === 'COMPLETED' ||
       rawStatus === 'COMPLETE' ||
       rawStatus === 'PAID' ||
+      rawStatus === 'SETTLED' ||
       resultCode === 0 ||
       resultCode === '0' ||
-      resultCode === 200
+      (resultCode === 200 && rawStatus !== 'FAILED' && rawStatus !== 'PENDING' && rawStatus !== 'PROCESSING')
 
-    if (!externalRef && !internalRef) {
-      console.warn('⚠️ Webhook payload missing references')
-      // Always return 200 OK so Payd doesn't infinitely retry malformed payloads
-      return res.status(200).json({ status: 'ok', message: 'No reference found' })
-    }
+    const isPendingOrIntermediate =
+      !isSuccess &&
+      (rawStatus === 'PENDING' ||
+        rawStatus === 'PROCESSING' ||
+        rawStatus === 'INITIATED' ||
+        rawStatus === 'QUEUED' ||
+        rawStatus === 'SENT' ||
+        rawStatus === '')
 
-    // 2. Find matching deposit in database
+    const isExplicitFailure =
+      !isSuccess &&
+      !isPendingOrIntermediate &&
+      (rawStatus === 'FAILED' ||
+        rawStatus === 'CANCELLED' ||
+        rawStatus === 'CANCELED' ||
+        rawStatus === 'REJECTED' ||
+        rawStatus === 'EXPIRED' ||
+        (typeof resultCode === 'number' && resultCode > 0 && resultCode !== 200))
+
+    // 1. Locate the Deposit by direct reference or receipt
     const queryConditions: any[] = []
     if (externalRef) {
-      queryConditions.push({ paydReference: externalRef })
-      queryConditions.push({ externalRef: externalRef })
+      queryConditions.push({ paydReference: String(externalRef) }, { externalRef: String(externalRef) })
     }
     if (internalRef) {
-      queryConditions.push({ apiRef: internalRef })
+      queryConditions.push({ apiRef: String(internalRef) })
+    }
+    if (mpesaReceipt) {
+      queryConditions.push({ mpesaReceipt }, { submittedReceipt: mpesaReceipt })
     }
 
-    let deposit = await Deposit.findOne({ $or: queryConditions })
+    let deposit: IDeposit | null = null
+    if (queryConditions.length > 0) {
+      deposit = await Deposit.findOne({ $or: queryConditions }).sort({ createdAt: -1 })
+    }
+
+    // 2. Fallback: If Payd callback omitted api_ref/correlator_id, match recent uncredited deposit by phone + amount
+    if (!deposit && webhookPhone && parsedAmount && Number.isFinite(parsedAmount)) {
+      const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000)
+      deposit = await Deposit.findOne({
+        phone: webhookPhone,
+        credited: { $ne: true },
+        amount: { $gte: parsedAmount - AMOUNT_TOLERANCE, $lte: parsedAmount + AMOUNT_TOLERANCE },
+        createdAt: { $gte: twentyMinutesAgo }
+      }).sort({ createdAt: -1 })
+    }
 
     if (!deposit) {
-      console.warn('⚠️ Deposit not found for Payd webhook:', { externalRef, internalRef })
-      return res.status(200).json({ status: 'ok', message: 'Deposit not found' })
+      console.warn('⚠️ No matching deposit found for Payd webhook:', { externalRef, internalRef, webhookPhone, parsedAmount })
+      return res.status(200).json({ status: 'ok', message: 'No matching deposit found' })
     }
 
-    // Idempotency check: if already completed, do nothing
-    if (deposit.status === 'completed') {
-      console.log(`⚠️ Deposit ${deposit._id} already marked as completed. Skipping.`)
-      return res.status(200).json({ status: 'ok', message: 'Already completed' })
+    // 3. If already credited, just ensure receipt metadata is saved
+    if (deposit.credited) {
+      if (mpesaReceipt && !deposit.mpesaReceipt) {
+        await Deposit.findByIdAndUpdate(deposit._id, { $set: { mpesaReceipt } })
+      }
+      return res.status(200).json({ status: 'ok', message: 'Already completed and credited' })
     }
 
+    // 4. Handle intermediate/pending webhooks without overwriting status to 'failed'
+    if (isPendingOrIntermediate) {
+      await Deposit.findByIdAndUpdate(deposit._id, {
+        $set: {
+          paydReference: externalRef ? String(externalRef) : deposit.paydReference,
+          externalRef: externalRef ? String(externalRef) : deposit.externalRef,
+          rawWebhookPayload: payload
+        }
+      })
+      return res.status(200).json({ status: 'ok', message: 'Intermediate status recorded' })
+    }
+
+    // 5. Handle successful payment
     if (isSuccess) {
-      // Validate amount if present
-      const rawAmount = payload.amount ?? payload.value ?? payload.data?.amount
-      if (rawAmount !== undefined && rawAmount !== null) {
-        const receivedAmount = Number.parseFloat(String(rawAmount))
-        if (Number.isFinite(receivedAmount) && Math.abs(receivedAmount - deposit.amount) > AMOUNT_TOLERANCE) {
-          console.error(`❌ Amount mismatch for deposit ${deposit._id}. Expected ${deposit.amount}, received ${receivedAmount}`)
-          return res.status(200).json({ status: 'ok', message: 'Amount mismatch' })
+      if (parsedAmount !== null && Number.isFinite(parsedAmount) && parsedAmount > 0) {
+        if (parsedAmount + AMOUNT_TOLERANCE < deposit.amount) {
+          await Deposit.findByIdAndUpdate(deposit._id, {
+            $set: {
+              failureReason: `Amount mismatch: expected ${deposit.amount}, received ${parsedAmount}`,
+              rawWebhookPayload: payload
+            }
+          })
+          return res.status(200).json({ status: 'ok', message: 'Amount underpaid' })
         }
       }
 
-      const mpesaReceipt =
-        payload.third_party_trans_id ||
-        payload.mpesa_receipt ||
-        payload.receipt_number ||
-        payload.data?.third_party_trans_id ||
-        payload.data?.mpesa_receipt ||
-        payload.data?.receipt_number ||
-        null
+      await creditDepositAtomically(deposit._id, {
+        externalRef: externalRef ? String(externalRef) : deposit.externalRef,
+        paydReference: externalRef ? String(externalRef) : deposit.paydReference,
+        mpesaReceipt,
+        rawWebhookPayload: payload,
+        verifiedAmount: deposit.amount
+      })
 
-      // Atomic status update to prevent race conditions
-      const completedDeposit = await Deposit.findOneAndUpdate(
-        { _id: deposit._id, status: 'pending' },
-        {
-          $set: {
-            status: 'completed',
-            paydReference: externalRef || deposit.paydReference,
-            externalRef: externalRef || deposit.externalRef,
-            mpesaReceipt: mpesaReceipt || deposit.mpesaReceipt
-          }
-        },
-        { new: true }
-      )
+      return res.status(200).json({ status: 'ok', message: 'Deposit credited' })
+    }
 
-      if (!completedDeposit) {
-        console.log(`⚠️ Deposit ${deposit._id} already transitioned from pending. Skipping balance increment.`)
-        return res.status(200).json({ status: 'ok', message: 'Already processed' })
-      }
-
-      // Load dynamic settings
-      const settings = await (Settings as any).getSettings()
-      const freebetUnlockAmount = Number(settings?.freebetUnlockAmount ?? 50)
-      const referralReward = Number(settings?.referralReward ?? 20)
-
-      // Credit user balance atomically and unlock freebet if deposit >= freebetUnlockAmount
-      const updateOps: any = { $inc: { balance: completedDeposit.amount } }
-      if (completedDeposit.amount >= freebetUnlockAmount) {
-        updateOps.$set = { freebetLocked: false }
-      }
-
-      const user = await User.findByIdAndUpdate(
-        completedDeposit.userId,
-        updateOps,
-        { new: true }
-      )
-
-      if (!user) {
-        console.error(`❌ User not found for deposit: ${completedDeposit._id}`)
-        return res.status(200).json({ status: 'ok', message: 'User not found' })
-      }
-
-      // Check referral reward (credited to referrer on qualifying deposit)
-      if (user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= freebetUnlockAmount) {
-        try {
-          const referrer = await User.findByIdAndUpdate(
-            user.referredBy,
-            { $inc: { balance: referralReward, referralsEarnings: referralReward } },
-            { new: true }
-          )
-          if (referrer) {
-            user.hasReceivedReferralReward = true
-            await user.save()
-            console.log(`🎉 Referral reward paid! Referrer ${referrer.phone} credited KSH ${referralReward} for deposit by User ${user.phone}`)
-          }
-        } catch (refErr: any) {
-          console.error('⚠️ Could not process referral reward:', refErr.message)
-        }
-      }
-
-      console.log(`✅ Payd Deposit completed! User ${user.phone} credited KSH ${completedDeposit.amount}. New balance: ${user.balance}`)
-
-      // Emit WebSocket event to update user's UI instantly
-      const io = getIO()
-      if (io) {
-        io.to(`user:${completedDeposit.userId}`).emit('DEPOSIT_SUCCESS', {
-          amount: completedDeposit.amount,
-          newBalance: user.balance,
-          depositId: completedDeposit._id.toString(),
-          apiRef: completedDeposit.apiRef,
-          timestamp: new Date().toISOString()
-        })
-        console.log(`📡 WebSocket DEPOSIT_SUCCESS sent to user:${completedDeposit.userId}`)
-      }
-    } else {
-      // Payment failed or was cancelled by user
-      const failureReason =
-        payload.result_desc ||
+    // 6. Handle explicit failure (only if not already credited)
+    if (isExplicitFailure) {
+      const failReason =
+        payload.failed_reason ||
+        payload.reason ||
         payload.message ||
-        payload.error ||
-        payload.data?.result_desc ||
-        'Payment failed or cancelled'
-
-      console.log(`ℹ️ Payd deposit failed/cancelled: ${deposit._id}, reason: ${failureReason}`)
+        payload.result_desc ||
+        dataObj.failed_reason ||
+        dataObj.message ||
+        `Transaction ${rawStatus || 'failed'}`
 
       await Deposit.findOneAndUpdate(
-        { _id: deposit._id, status: 'pending' },
+        { _id: deposit._id, credited: { $ne: true } },
         {
           $set: {
             status: 'failed',
-            failureReason: String(failureReason)
+            failureReason: String(failReason),
+            paydReference: externalRef ? String(externalRef) : deposit.paydReference,
+            externalRef: externalRef ? String(externalRef) : deposit.externalRef,
+            rawWebhookPayload: payload
           }
         }
       )
@@ -190,91 +313,55 @@ export async function paydWebhook(req: Request, res: Response) {
     return res.status(200).json({ status: 'ok' })
   } catch (error: any) {
     console.error('❌ Payd Callback Error:', error)
-    // Always return 200 OK to prevent webhook retry storms
     return res.status(200).json({ status: 'error_logged', error: error.message })
   }
 }
 
-// Keep intasendWebhook as transitional legacy fallback
+// Transitional legacy fallback for IntaSend
 export async function intasendWebhook(req: Request, res: Response) {
   try {
-    console.log('📥 IntaSend Webhook (Legacy) received:', JSON.stringify(req.body, null, 2))
-    const { invoice_id, state, api_ref, value } = req.body || {}
+    const payload = req.body || {}
+    const { invoice_id, state, api_ref, mpesa_reference, failed_reason } = payload
+    const normalizedState = String(state || '').toUpperCase()
 
-    if (state !== 'COMPLETE') {
-      return res.status(200).json({ received: true })
+    const queryOr: any[] = []
+    if (api_ref) queryOr.push({ apiRef: String(api_ref) })
+    if (invoice_id) queryOr.push({ intasendInvoiceId: String(invoice_id) }, { externalRef: String(invoice_id) })
+    if (mpesa_reference) queryOr.push({ submittedReceipt: String(mpesa_reference).toUpperCase() })
+
+    if (queryOr.length === 0) {
+      return res.status(200).json({ received: true, message: 'No reference provided' })
     }
 
-    if (!api_ref) {
-      return res.status(200).json({ received: true })
+    const deposit = await Deposit.findOne({ $or: queryOr }).sort({ createdAt: -1 })
+    if (!deposit) {
+      return res.status(200).json({ received: true, message: 'Deposit not found' })
     }
 
-    const pendingDeposit = await Deposit.findOne({ apiRef: api_ref, status: 'pending' })
-    if (!pendingDeposit) {
-      return res.status(200).json({ received: true, message: 'Deposit not found or already processed' })
+    if (normalizedState === 'COMPLETE' || normalizedState === 'COMPLETED') {
+      await creditDepositAtomically(deposit._id, {
+        externalRef: invoice_id ? String(invoice_id) : deposit.externalRef,
+        mpesaReceipt: mpesa_reference ? String(mpesa_reference).toUpperCase() : null,
+        rawWebhookPayload: payload,
+        verifiedAmount: deposit.amount
+      })
+      return res.status(200).json({ success: true })
     }
 
-    const completedDeposit = await Deposit.findOneAndUpdate(
-      { _id: pendingDeposit._id, status: 'pending' },
-      {
-        $set: {
-          status: 'completed',
-          intasendInvoiceId: invoice_id || pendingDeposit.intasendInvoiceId,
-          intasendTrackerId: req.body?.id || pendingDeposit.intasendTrackerId
+    if (normalizedState === 'FAILED' || normalizedState === 'CANCELLED') {
+      await Deposit.findOneAndUpdate(
+        { _id: deposit._id, credited: { $ne: true } },
+        {
+          $set: {
+            status: 'failed',
+            failureReason: failed_reason || `IntaSend ${normalizedState}`,
+            rawWebhookPayload: payload
+          }
         }
-      },
-      { new: true }
-    )
-
-    if (!completedDeposit) {
-      return res.status(200).json({ received: true })
+      )
     }
 
-    const settings = await (Settings as any).getSettings()
-    const freebetUnlockAmount = Number(settings?.freebetUnlockAmount ?? 50)
-    const referralReward = Number(settings?.referralReward ?? 20)
-
-    const updateOps: any = { $inc: { balance: completedDeposit.amount } }
-    if (completedDeposit.amount >= freebetUnlockAmount) {
-      updateOps.$set = { freebetLocked: false }
-    }
-
-    const user = await User.findByIdAndUpdate(
-      completedDeposit.userId,
-      updateOps,
-      { new: true }
-    )
-
-    if (user && user.referredBy && !user.hasReceivedReferralReward && completedDeposit.amount >= freebetUnlockAmount) {
-      try {
-        const referrer = await User.findByIdAndUpdate(
-          user.referredBy,
-          { $inc: { balance: referralReward, referralsEarnings: referralReward } },
-          { new: true }
-        )
-        if (referrer) {
-          user.hasReceivedReferralReward = true
-          await user.save()
-        }
-      } catch (refErr: any) {
-        console.error('⚠️ Could not process referral reward:', refErr.message)
-      }
-    }
-
-    if (user) {
-      const io = getIO()
-      if (io) {
-        io.to(`user:${completedDeposit.userId}`).emit('DEPOSIT_SUCCESS', {
-          amount: completedDeposit.amount,
-          newBalance: user.balance,
-          depositId: completedDeposit._id.toString(),
-          apiRef: completedDeposit.apiRef,
-          timestamp: new Date().toISOString()
-        })
-      }
-    }
-
-    return res.status(200).json({ success: true })
+    return res.status(200).json({ received: true })
   } catch (err: any) {
     console.error('❌ Legacy IntaSend Webhook error:', err?.message)
     return res.status(200).json({ received: true })

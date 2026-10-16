@@ -147,6 +147,28 @@ type AdminUser = {
   createdAt: string
 }
 
+type AdminDeposit = {
+  _id: string
+  phone: string
+  amount: number
+  apiRef: string
+  status: 'pending' | 'completed' | 'failed'
+  credited: boolean
+  creditedAt?: string | null
+  paydReference?: string | null
+  externalRef?: string | null
+  mpesaReceipt?: string | null
+  submittedReceipt?: string | null
+  failureReason?: string | null
+  createdAt: string
+  userId?: {
+    _id: string
+    username: string
+    phone: string
+    balance?: number
+  }
+}
+
 type AdminWithdrawal = {
   _id: string
   phone: string
@@ -200,7 +222,7 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState('')
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'deposits' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
 
   // Odds Engine State
   const [oddsEngine, setOddsEngine] = useState<OddsEngineLiveState | null>(null)
@@ -253,6 +275,18 @@ export default function AdminDashboard() {
   const [passwordModalUser, setPasswordModalUser] = useState<AdminUser | null>(null)
   const [newPasswordVal, setNewPasswordVal] = useState('')
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false)
+
+  // Deposits Tab State
+  const [depositsList, setDepositsList] = useState<AdminDeposit[]>([])
+  const [depositsLoading, setDepositsLoading] = useState(false)
+  const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('all')
+  const [depositSearch, setDepositSearch] = useState('')
+  const [depositsPage, setDepositsPage] = useState(1)
+  const [depositsTotal, setDepositsTotal] = useState(0)
+  const [depositsTotalPages, setDepositsTotalPages] = useState(1)
+  const [totalCompletedDepositAmount, setTotalCompletedDepositAmount] = useState(0)
+  const [updatingDepositId, setUpdatingDepositId] = useState<string | null>(null)
+  const [manualReceiptInput, setManualReceiptInput] = useState<{ [id: string]: string }>({})
 
   // Withdrawals Tab State
   const [withdrawalsList, setWithdrawalsList] = useState<AdminWithdrawal[]>([])
@@ -416,6 +450,41 @@ export default function AdminDashboard() {
 
     fetchWithdrawals()
   }, [adminToken, activeTab, withdrawalFilter, config.apiBaseUrl, refreshKey])
+
+  // Fetch Deposits when Deposits tab is active
+  useEffect(() => {
+    if (!adminToken || activeTab !== 'deposits') return
+
+    const fetchDeposits = async () => {
+      setDepositsLoading(true)
+      try {
+        const apiOrigin = config.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        const url = new URL(`${apiOrigin}/api/admin/deposits`)
+        if (depositFilter !== 'all') url.searchParams.set('status', depositFilter)
+        if (depositSearch.trim()) url.searchParams.set('search', depositSearch.trim())
+        url.searchParams.set('page', depositsPage.toString())
+        url.searchParams.set('limit', '50')
+
+        const res = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setDepositsList(data.deposits || [])
+          setTotalCompletedDepositAmount(data.totalCompletedAmount || 0)
+          setDepositsTotal(data.pagination?.total || 0)
+          setDepositsTotalPages(data.pagination?.totalPages || 1)
+        }
+      } catch (err) {
+        console.error('Failed to load deposits:', err)
+      } finally {
+        setDepositsLoading(false)
+      }
+    }
+
+    const timer = setTimeout(fetchDeposits, depositSearch ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [adminToken, activeTab, depositFilter, depositSearch, depositsPage, config.apiBaseUrl, refreshKey])
 
   // Fetch Odds Engine Status & Logs
   const fetchOddsEngine = useCallback(async () => {
@@ -756,6 +825,50 @@ export default function AdminDashboard() {
     }
   }
 
+  // Deposit Action Handler (Approve & Credit or Reject)
+  const handleUpdateDepositStatus = async (
+    depositId: string,
+    status: 'completed' | 'failed',
+    amount: number,
+    receiptCode?: string
+  ) => {
+    if (!adminToken) return
+    const receiptToSubmit = receiptCode || manualReceiptInput[depositId] || ''
+    const promptMsg = status === 'completed'
+      ? `Confirm manually APPROVING and CREDITING KSH ${amount} to the player's wallet?${receiptToSubmit ? ` (Receipt: ${receiptToSubmit})` : ''}`
+      : `Confirm REJECTING this pending deposit of KSH ${amount}?`
+
+    if (!confirm(promptMsg)) return
+    setUpdatingDepositId(depositId)
+
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/admin/deposits/${depositId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          status,
+          mpesaReceipt: receiptToSubmit,
+          failureReason: status === 'failed' ? 'Rejected by admin' : undefined
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok && data.success) {
+        showNotice('success', status === 'completed' ? `Deposit of KSH ${amount} approved and credited!` : 'Deposit marked as failed')
+        setRefreshKey(k => k + 1)
+      } else {
+        showNotice('error', data.error || 'Action failed')
+      }
+    } catch {
+      showNotice('error', 'Network error updating deposit')
+    } finally {
+      setUpdatingDepositId(null)
+    }
+  }
+
   // Save Payment Gateway (Payd) Credentials
   const handleSaveGateway = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1001,6 +1114,18 @@ export default function AdminDashboard() {
               Overview
             </button>
             <button
+              onClick={() => setActiveTab('deposits')}
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'deposits' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
+              }`}
+            >
+              <ArrowDownRight className="size-3.5" />
+              Deposits
+              {overview?.recentDeposits?.some(d => d.status === 'pending') && (
+                <span className="size-2 rounded-full bg-amber-400 animate-pulse"></span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('users')}
               className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
                 activeTab === 'users' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
@@ -1131,7 +1256,12 @@ export default function AdminDashboard() {
               <div className="rounded-lg border border-line bg-panel p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-ink">Recent Deposits</h2>
-                  <span className="text-xs text-ink-3">Last 10 transactions</span>
+                  <button 
+                    onClick={() => setActiveTab('deposits')} 
+                    className="text-xs text-brand hover:underline font-medium"
+                  >
+                    View All →
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -1240,6 +1370,256 @@ export default function AdminDashboard() {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            TAB: DEPOSITS MANAGEMENT & DIRECT M-PESA AUDIT
+            ══════════════════════════════════════════════════════════════ */}
+        {activeTab === 'deposits' && (
+          <div className="space-y-4">
+            {/* Top Summary Cards */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg border border-line bg-panel p-3.5">
+                <span className="text-[11px] font-medium text-ink-3">Total Verified Deposits</span>
+                <p className="mt-1 text-lg font-bold text-brand">KSH {totalCompletedDepositAmount.toLocaleString()}</p>
+                <span className="text-[10px] text-ink-3">Settled via M-Pesa / Payd</span>
+              </div>
+              <div className="rounded-lg border border-line bg-panel p-3.5">
+                <span className="text-[11px] font-medium text-ink-3">Total Records</span>
+                <p className="mt-1 text-lg font-bold text-ink">{depositsTotal}</p>
+                <span className="text-[10px] text-ink-3">All recorded attempts</span>
+              </div>
+              <div className="rounded-lg border border-line bg-panel p-3.5">
+                <span className="text-[11px] font-medium text-ink-3">Pending Deposits</span>
+                <p className="mt-1 text-lg font-bold text-amber-400">
+                  {depositsList.filter(d => d.status === 'pending').length}
+                </p>
+                <span className="text-[10px] text-ink-3">Awaiting M-Pesa webhook / audit</span>
+              </div>
+              <div className="rounded-lg border border-line bg-panel p-3.5">
+                <span className="text-[11px] font-medium text-ink-3">Current Filter</span>
+                <p className="mt-1 text-lg font-bold uppercase text-ink">{depositFilter}</p>
+                <span className="text-[10px] text-ink-3">Page {depositsPage} of {depositsTotalPages}</span>
+              </div>
+            </div>
+
+            {/* Search, Filter & Actions Toolbar */}
+            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 size-4 text-ink-3" />
+                <input
+                  type="text"
+                  value={depositSearch}
+                  onChange={e => {
+                    setDepositSearch(e.target.value)
+                    setDepositsPage(1)
+                  }}
+                  placeholder="Search by phone, API ref, Payd ref, M-Pesa receipt code..."
+                  className="h-9 w-full rounded-md border border-line bg-field pl-9 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
+                  {(['all', 'pending', 'completed', 'failed'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => { setDepositFilter(f); setDepositsPage(1); }}
+                      className={`capitalize rounded px-2.5 py-1 ${depositFilter === f ? 'bg-raised font-semibold text-ink' : 'text-ink-3'}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setRefreshKey(k => k + 1)}
+                  disabled={depositsLoading}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-line bg-field px-3 text-xs font-medium text-ink hover:bg-raised disabled:opacity-50"
+                >
+                  <RefreshCw className={`size-3.5 ${depositsLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Deposits Data Table */}
+            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-line bg-field/50 text-ink-3">
+                      <th className="p-3">User / Phone</th>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Receipt / References</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/40">
+                    {depositsLoading ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-ink-3">
+                          <RefreshCw className="mx-auto size-5 animate-spin mb-1 text-brand" />
+                          Loading deposits...
+                        </td>
+                      </tr>
+                    ) : depositsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-ink-3">
+                          No deposits found matching the current search/filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      depositsList.map(d => {
+                        const effectiveReceipt = d.mpesaReceipt || d.submittedReceipt || manualReceiptInput[d._id] || ''
+                        return (
+                          <tr key={d._id} className="hover:bg-field/40 transition-colors">
+                            <td className="p-3">
+                              <div className="font-semibold text-ink">{d.userId?.username || 'User'}</div>
+                              <div className="text-ink-3 text-[11px] font-mono">{d.phone}</div>
+                              {d.userId?.balance !== undefined && (
+                                <div className="text-[10px] text-ink-3">Bal: KSH {d.userId.balance.toFixed(2)}</div>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <span className="font-bold text-sm text-brand">KSH {d.amount.toFixed(2)}</span>
+                            </td>
+                            <td className="p-3 space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-[11px] text-ink-2 bg-field px-1.5 py-0.5 rounded border border-line/60">
+                                  {d.apiRef}
+                                </span>
+                              </div>
+                              {d.mpesaReceipt && (
+                                <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded w-fit">
+                                  <span>M-Pesa: {d.mpesaReceipt}</span>
+                                </div>
+                              )}
+                              {!d.mpesaReceipt && d.submittedReceipt && (
+                                <div className="flex items-center gap-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit">
+                                  <span>SMS Code: {d.submittedReceipt}</span>
+                                </div>
+                              )}
+                              {(d.paydReference || d.externalRef) && (
+                                <div className="text-[10px] text-ink-3 font-mono">
+                                  Gateway Ref: {d.paydReference || d.externalRef}
+                                </div>
+                              )}
+                              {d.failureReason && (
+                                <div className="text-[10px] text-loss">
+                                  {d.failureReason}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex flex-col gap-1">
+                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase w-fit ${
+                                  d.status === 'completed'
+                                    ? 'bg-brand/15 text-brand border border-brand/30'
+                                    : d.status === 'pending'
+                                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                    : 'bg-loss/15 text-loss border border-loss/30'
+                                }`}>
+                                  {d.status === 'completed' && <CheckCircle2 className="size-3" />}
+                                  {d.status === 'pending' && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />}
+                                  {d.status === 'failed' && <XCircle className="size-3" />}
+                                  {d.status}
+                                </span>
+                                {d.credited && (
+                                  <span className="text-[9px] font-semibold text-brand flex items-center gap-0.5">
+                                    ✓ Credited to wallet
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-ink-3 text-[11px] whitespace-nowrap">
+                              {formatDate(d.createdAt)}
+                            </td>
+                            <td className="p-3 text-right">
+                              {d.status === 'pending' ? (
+                                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={manualReceiptInput[d._id] !== undefined ? manualReceiptInput[d._id] : (d.submittedReceipt || '')}
+                                    onChange={e => setManualReceiptInput({ ...manualReceiptInput, [d._id]: e.target.value.toUpperCase() })}
+                                    placeholder="Receipt code"
+                                    className="h-7 w-28 rounded border border-line bg-field px-1.5 text-[11px] font-mono text-ink uppercase placeholder:text-ink-3"
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, effectiveReceipt)}
+                                      disabled={updatingDepositId === d._id}
+                                      className="flex items-center gap-1 rounded bg-brand/15 border border-brand/30 px-2 py-1 text-[11px] font-bold text-brand hover:bg-brand/25 disabled:opacity-50 transition-colors"
+                                      title="Approve and credit balance"
+                                    >
+                                      ✓ Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateDepositStatus(d._id, 'failed', d.amount)}
+                                      disabled={updatingDepositId === d._id}
+                                      className="flex items-center gap-1 rounded bg-loss/15 border border-loss/30 px-2 py-1 text-[11px] font-bold text-loss hover:bg-loss/25 disabled:opacity-50 transition-colors"
+                                      title="Reject deposit"
+                                    >
+                                      ✕ Reject
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : d.status === 'failed' ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, d.mpesaReceipt || d.submittedReceipt || undefined)}
+                                    disabled={updatingDepositId === d._id}
+                                    className="flex items-center gap-1 rounded bg-field border border-line px-2 py-1 text-[10px] font-semibold text-ink-2 hover:text-brand hover:border-brand/40 disabled:opacity-50 transition-colors"
+                                    title="Manual override: credit user wallet anyway"
+                                  >
+                                    Force Credit
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-ink-3 font-mono">
+                                  {d.mpesaReceipt || 'Settled'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Bar */}
+              {depositsTotalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-line bg-field/30 px-3 py-2 text-xs">
+                  <span className="text-ink-3">
+                    Showing {(depositsPage - 1) * 50 + 1} - {Math.min(depositsPage * 50, depositsTotal)} of {depositsTotal} deposits
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setDepositsPage(p => Math.max(1, p - 1))}
+                      disabled={depositsPage <= 1}
+                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="px-2 text-ink-3">
+                      {depositsPage} / {depositsTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setDepositsPage(p => Math.min(depositsTotalPages, p + 1))}
+                      disabled={depositsPage >= depositsTotalPages}
+                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

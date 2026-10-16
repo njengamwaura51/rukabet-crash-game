@@ -468,6 +468,26 @@ async function initializeGameLoop() {
     }
     startWaiting();
 }
+export function authenticateSocketRoom(socket, rawToken) {
+    try {
+        const token = rawToken ||
+            socket.handshake.auth?.token ||
+            socket.handshake.query?.token ||
+            (socket.handshake.headers?.authorization?.startsWith('Bearer ')
+                ? socket.handshake.headers.authorization.slice(7)
+                : '');
+        if (!token)
+            return null;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.userId) {
+            socket.data.userId = decoded.userId;
+            socket.join(`user:${decoded.userId}`);
+            return decoded.userId;
+        }
+    }
+    catch { }
+    return null;
+}
 export function initializeSocket(httpServer) {
     io = new Server(httpServer, {
         cors: {
@@ -484,8 +504,15 @@ export function initializeSocket(httpServer) {
     initializeGameLoop();
     io.on('connection', (socket) => {
         console.log(`🔌 Client connected: ${socket.id}`);
+        authenticateSocketRoom(socket);
         socket.emit('GAME_SNAPSHOT', gameState);
         socket.emit('LIVE_BETS_SNAPSHOT', gameState.liveBets);
+        socket.on('AUTHENTICATE', (data) => {
+            authenticateSocketRoom(socket, data?.token);
+        });
+        socket.on('JOIN_USER_ROOM', (data) => {
+            authenticateSocketRoom(socket, data?.token);
+        });
         socket.on('authenticate', async (token) => {
             try {
                 const decoded = jwt.verify(token, JWT_SECRET);
@@ -645,6 +672,14 @@ export function initializeSocket(httpServer) {
 }
 export function getIO() {
     return io;
+}
+export function emitUserBalanceUpdate(userId, data) {
+    if (!io)
+        return;
+    const uid = userId.toString();
+    const eventData = { ...data, userId: uid, timestamp: Date.now() };
+    io.to(`user:${uid}`).emit('DEPOSIT_SUCCESS', eventData);
+    io.to(`user:${uid}`).emit('BALANCE_UPDATE', eventData);
 }
 export function getOddsEngineState() {
     const now = Date.now();
