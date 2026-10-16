@@ -1,28 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 50" width="110" height="50" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 46" width="120" height="46" fill="none">
   <defs>
-    <linearGradient id="fg" x1="10" y1="18" x2="106" y2="34" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#14c953"/><stop offset="55%" stop-color="#26ef6d"/><stop offset="100%" stop-color="#6effa1"/>
+    <linearGradient id="fg" x1="3" y1="20" x2="116" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#19e660"/>
+      <stop offset="50%" stop-color="#24eb68"/>
+      <stop offset="100%" stop-color="#68ff9c"/>
     </linearGradient>
-    <linearGradient id="sh" x1="28" y1="20" x2="102" y2="28" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#9effbf" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
+    <linearGradient id="sh" x1="24" y1="20" x2="112" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a2ffc2" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
     </linearGradient>
-    <linearGradient id="bs" x1="12" y1="31" x2="92" y2="40" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#055421"/><stop offset="100%" stop-color="#0b8f3a"/>
+    <linearGradient id="bs" x1="3" y1="30" x2="105" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a7830"/>
+      <stop offset="100%" stop-color="#0c943c"/>
     </linearGradient>
   </defs>
-  <path d="M46 26 L34 20 L41 19 L57 25 Z" fill="#08682b"/>
-  <path d="M6 12 L19 12 L28 29 L11 31 Z" fill="url(#fg)"/>
-  <path d="M6 12 L12 12 L23 29 L16 30 Z" fill="#0b963d"/>
-  <path d="M1 12 C5 10, 17 10, 23 13 C17 14.5, 6 14.5, 1 12 Z" fill="#4df989"/>
-  <path d="M12 26 L24 25 L22 31 L11 31 Z" fill="#065c25"/>
-  <path d="M4 34 C22 38, 68 37, 106 28 C88 36, 40 40, 10 35 Z" fill="url(#bs)"/>
-  <path d="M4 34 C16 27, 44 22, 76 21 C90 21, 100 24, 108 27 C96 32, 66 36, 10 35 Z" fill="url(#fg)"/>
-  <path d="M22 25 C46 21, 76 21, 106 27 C86 24, 50 24, 22 26 Z" fill="url(#sh)"/>
-  <path d="M80 22.3 C86 22.3, 92 23.8, 95 25.5 C90 26.2, 83 26.2, 78 25.2 Z" fill="#042911"/>
-  <circle cx="70" cy="26.5" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="62" cy="27.2" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="54" cy="27.8" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="46" cy="28.4" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <path d="M36 33 L64 30 L49 41 L26 42 Z" fill="#064e20"/>
-  <path d="M38 32 L62 30 L46 38 L28 39 Z" fill="#14c352"/>
+
+  <!-- Far-side wing tip -->
+  <path d="M52 25 L40 19 L47 18 L63 24 Z" fill="#08682b"/>
+
+  <!-- Swept Vertical Tail Fin rising directly from the rear tail cone -->
+  <path d="M4 11 L16 11 L26 28 L5 32.3 Z" fill="url(#fg)"/>
+  <path d="M4 11 L10 11 L21 28 L12 30 Z" fill="#0b963d"/>
+
+  <!-- T-Tail Top Horizontal Stabilizer -->
+  <path d="M1 11 C4 9, 15 9, 21 11.5 C15 13, 5 13, 1 11 Z" fill="#4df989"/>
+
+  <!-- Rear Side Engine Pod -->
+  <path d="M18 25 L31 24 L29 29.5 L17 29.5 Z" fill="#065c25"/>
+
+  <!-- Underbelly Shadow Hull (Tapers to exact rear tail tip x=3, y=32.2..33.8) -->
+  <path d="M3 33.8 C22 36, 74 35, 117 26 C96 33, 46 37, 3 33.8 Z" fill="url(#bs)"/>
+
+  <!-- Main Horizontal Fuselage (Tapers to exact rear tail tip x=3, y=32.2..33.8) -->
+  <path d="M3 32.2 C14 27, 46 21, 82 20 C97 20, 109 22.5, 117 26 C103 30.5, 70 34, 3 33.8 Z" fill="url(#fg)"/>
+
+  <!-- Upper Fuselage Highlight -->
+  <path d="M20 25 C48 20.5, 82 20.5, 114 25.5 C92 23, 52 23, 20 26 Z" fill="url(#sh)"/>
+
+  <!-- Dark Cockpit Windshield -->
+  <path d="M87 21 C93 21, 99 22.4, 103 24.2 C97 25, 90 25, 85 24 Z" fill="#042911"/>
+
+  <!-- 4 Circular Cabin Windows (Aspirebet Style) -->
+  <circle cx="76" cy="25.5" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="67" cy="26.2" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="58" cy="26.8" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="49" cy="27.4" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+
+  <!-- Swept Foreground Wing -->
+  <path d="M42 31 L70 28.5 L54 37.5 L31 38 Z" fill="#064e20"/>
+  <path d="M44 30 L68 28.5 L51 35.5 L33 36 Z" fill="#14c352"/>
 </svg>

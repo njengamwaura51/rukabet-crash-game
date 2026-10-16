@@ -15,38 +15,20 @@ interface GameCanvasProps {
   freebetAmount?: number
 }
 
-const PAD = { left: 28, right: 16, top: 20, bottom: 24 }  // Origin at (28, CH - 24) matching flight curve origin
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   SMOOTH INTERPOLATION — lerp values for buttery animation
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function smoothDamp(current: number, target: number, velocity: { v: number }, smoothTime: number, deltaTime: number): number {
-  const omega = 2 / smoothTime
-  const x = omega * deltaTime
-  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
-  const change = current - target
-  const temp = (velocity.v + omega * change) * deltaTime
-  velocity.v = (velocity.v - omega * temp) * exp
-  return target + (change + temp) * exp
-}
+const PAD = { left: 28, right: 16, top: 20, bottom: 24 } // Origin (0,0) at (28, CH - 24)
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BACKGROUND — dark with rotating sunburst rays from origin
-   
-   Rotation is tied to the game loop and accelerates with the multiplier.
-   The bgRotationAngle accumulates each frame for smooth continuous rotation.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function drawBackground(
-  ctx: CanvasRenderingContext2D, 
-  w: number, 
-  h: number, 
-  bgAngle: number,  // accumulated rotation angle in radians
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  bgAngle: number,
   phase: string,
   multiplier: number = 1
 ) {
-  // Dark background
   ctx.fillStyle = '#0e1115'
   ctx.fillRect(0, 0, w, h)
 
@@ -58,20 +40,17 @@ function drawBackground(
   ctx.rect(ox, 0, w - ox, oy)
   ctx.clip()
 
-  // Transform: translate to origin, rotate CLOCKWISE, then draw rays
   ctx.save()
   ctx.translate(ox, oy)
-  ctx.rotate(bgAngle)  // Positive angle = clockwise rotation
-  
-  // Dynamic ray intensity based on multiplier
+  ctx.rotate(bgAngle)
+
   let rayOpacity = 0.04
   if (multiplier >= 15) {
-    rayOpacity = 0.12  // 3x intensity for extreme danger
+    rayOpacity = 0.12
   } else if (multiplier >= 5) {
-    rayOpacity = 0.08  // 2x intensity
+    rayOpacity = 0.08
   }
-  
-  // Draw rays from the rotated origin point - DYNAMIC INTENSITY
+
   for (let i = 0; i < 24; i++) {
     const a1 = (i / 24) * Math.PI * 2
     const a2 = ((i + 0.35) / 24) * Math.PI * 2
@@ -84,10 +63,7 @@ function drawBackground(
     ctx.fill()
   }
   ctx.restore()
-  
   ctx.restore()
-
-  // Removed ambient glow for clean appearance
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -99,24 +75,21 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
   const bLen = w - PAD.left - PAD.right
   const lLen = h - PAD.top - PAD.bottom
 
-  // Bottom axis dots (moving RIGHT to LEFT toward origin) - GREEN
   for (let i = 0; i < 12; i++) {
-    const t = ((time * 0.00012 + i / 12) % 1)
-    const pos = 1 - t  // reverse direction: move toward origin
-    const fade = pos < 0.15 ? pos / 0.15 : 1  // fade as approaching origin
+    const t = (time * 0.00012 + i / 12) % 1
+    const pos = 1 - t
+    const fade = pos < 0.15 ? pos / 0.15 : 1
     ctx.beginPath()
     ctx.arc(ox + pos * bLen, oy + 8, 4, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,120,${0.8 * fade})`
     ctx.fill()
   }
-  
-  // Left axis dots (moving TOP to BOTTOM toward origin) - GREEN
-  // Position dots at PAD.left - 8 to keep them visible within the left margin
-  const dotX = Math.max(6, PAD.left - 10)  // Ensure dots stay visible
+
+  const dotX = Math.max(6, PAD.left - 10)
   for (let i = 0; i < 6; i++) {
-    const t = ((time * 0.00010 + i / 6) % 1)
-    const pos = 1 - t  // reverse direction: move toward origin
-    const fade = pos < 0.15 ? pos / 0.15 : 1  // fade as approaching origin
+    const t = (time * 0.00010 + i / 6) % 1
+    const pos = 1 - t
+    const fade = pos < 0.15 ? pos / 0.15 : 1
     ctx.beginPath()
     ctx.arc(dotX, oy - pos * lLen, 4, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,120,${0.8 * fade})`
@@ -131,7 +104,6 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
 function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const ox = PAD.left, oy = h - PAD.bottom
   ctx.save()
-  // Subtle dark axes
   ctx.strokeStyle = 'rgba(255,255,255,0.15)'
   ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(ox, PAD.top); ctx.lineTo(ox, oy); ctx.stroke()
@@ -140,37 +112,60 @@ function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   GREEN ASPIREBET-STYLE JET SPRITE & TRAJECTORY LINE
+   GREEN ASPIREBET-STYLE JET SPRITE (TAIL-TIP ANCHORED AT x=3.5, y=33)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// 1. Load the Green Aspirebet-style SVG as a ready-to-draw Image
-const PLANE_SVG_STRING = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 50" width="110" height="50" fill="none">
+const PLANE_SVG_STRING = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 46" width="120" height="46" fill="none">
   <defs>
-    <linearGradient id="fg" x1="10" y1="18" x2="106" y2="34" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#14c953"/><stop offset="55%" stop-color="#26ef6d"/><stop offset="100%" stop-color="#6effa1"/>
+    <linearGradient id="fg" x1="3" y1="20" x2="116" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#19e660"/>
+      <stop offset="50%" stop-color="#24eb68"/>
+      <stop offset="100%" stop-color="#68ff9c"/>
     </linearGradient>
-    <linearGradient id="sh" x1="28" y1="20" x2="102" y2="28" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#9effbf" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
+    <linearGradient id="sh" x1="24" y1="20" x2="112" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a2ffc2" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
     </linearGradient>
-    <linearGradient id="bs" x1="12" y1="31" x2="92" y2="40" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#055421"/><stop offset="100%" stop-color="#0b8f3a"/>
+    <linearGradient id="bs" x1="3" y1="30" x2="105" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a7830"/>
+      <stop offset="100%" stop-color="#0c943c"/>
     </linearGradient>
   </defs>
-  <path d="M46 26 L34 20 L41 19 L57 25 Z" fill="#08682b"/>
-  <path d="M6 12 L19 12 L28 29 L11 31 Z" fill="url(#fg)"/>
-  <path d="M6 12 L12 12 L23 29 L16 30 Z" fill="#0b963d"/>
-  <path d="M1 12 C5 10, 17 10, 23 13 C17 14.5, 6 14.5, 1 12 Z" fill="#4df989"/>
-  <path d="M12 26 L24 25 L22 31 L11 31 Z" fill="#065c25"/>
-  <path d="M4 34 C22 38, 68 37, 106 28 C88 36, 40 40, 10 35 Z" fill="url(#bs)"/>
-  <path d="M4 34 C16 27, 44 22, 76 21 C90 21, 100 24, 108 27 C96 32, 66 36, 10 35 Z" fill="url(#fg)"/>
-  <path d="M22 25 C46 21, 76 21, 106 27 C86 24, 50 24, 22 26 Z" fill="url(#sh)"/>
-  <path d="M80 22.3 C86 22.3, 92 23.8, 95 25.5 C90 26.2, 83 26.2, 78 25.2 Z" fill="#042911"/>
-  <circle cx="70" cy="26.5" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="62" cy="27.2" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="54" cy="27.8" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <circle cx="46" cy="28.4" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
-  <path d="M36 33 L64 30 L49 41 L26 42 Z" fill="#064e20"/>
-  <path d="M38 32 L62 30 L46 38 L28 39 Z" fill="#14c352"/>
+
+  <!-- Far-side wing tip -->
+  <path d="M52 25 L40 19 L47 18 L63 24 Z" fill="#08682b"/>
+
+  <!-- Swept Vertical Tail Fin rising directly from the rear tail cone -->
+  <path d="M4 11 L16 11 L26 28 L5 32.3 Z" fill="url(#fg)"/>
+  <path d="M4 11 L10 11 L21 28 L12 30 Z" fill="#0b963d"/>
+
+  <!-- T-Tail Top Horizontal Stabilizer -->
+  <path d="M1 11 C4 9, 15 9, 21 11.5 C15 13, 5 13, 1 11 Z" fill="#4df989"/>
+
+  <!-- Rear Side Engine Pod -->
+  <path d="M18 25 L31 24 L29 29.5 L17 29.5 Z" fill="#065c25"/>
+
+  <!-- Underbelly Shadow Hull (Tapers to exact rear tail tip x=3, y=32.2..33.8) -->
+  <path d="M3 33.8 C22 36, 74 35, 117 26 C96 33, 46 37, 3 33.8 Z" fill="url(#bs)"/>
+
+  <!-- Main Horizontal Fuselage (Tapers to exact rear tail tip x=3, y=32.2..33.8) -->
+  <path d="M3 32.2 C14 27, 46 21, 82 20 C97 20, 109 22.5, 117 26 C103 30.5, 70 34, 3 33.8 Z" fill="url(#fg)"/>
+
+  <!-- Upper Fuselage Highlight -->
+  <path d="M20 25 C48 20.5, 82 20.5, 114 25.5 C92 23, 52 23, 20 26 Z" fill="url(#sh)"/>
+
+  <!-- Dark Cockpit Windshield -->
+  <path d="M87 21 C93 21, 99 22.4, 103 24.2 C97 25, 90 25, 85 24 Z" fill="#042911"/>
+
+  <!-- 4 Circular Cabin Windows (Aspirebet Style) -->
+  <circle cx="76" cy="25.5" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="67" cy="26.2" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="58" cy="26.8" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="49" cy="27.4" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+
+  <!-- Swept Foreground Wing -->
+  <path d="M42 31 L70 28.5 L54 37.5 L31 38 Z" fill="#064e20"/>
+  <path d="M44 30 L68 28.5 L51 35.5 L33 36 Z" fill="#14c352"/>
 </svg>`
 
 const greenJetImg = new Image()
@@ -178,61 +173,63 @@ if (typeof window !== 'undefined') {
   greenJetImg.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLANE_SVG_STRING)
 }
 
-// Exact tail-tip coordinates inside the 110x50 SVG (x=4, y=34)
-const TAIL_ANCHOR_X = 4 / 110 // 0.0363
-const TAIL_ANCHOR_Y = 34 / 50 // 0.6800
-const JET_ASPECT = 110 / 50   // 2.2
+// Exact rear tail-cone tip inside the 120x46 SVG is centered at (x=3.5, y=33)
+const TAIL_ANCHOR_X = 3.5 / 120
+const TAIL_ANCHOR_Y = 33 / 46
+const JET_ASPECT = 120 / 46
 
 /**
- * Call this inside requestAnimationFrame loop to render trajectory curve, shade, and locked jet.
+ * Renders the trajectory curve, rich emerald shade, and horizontal green jet with
+ * a tapered trajectory line synced to the exact pixel thickness of the rear tail tip.
  */
 function renderFlightAndPlane(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
   progress: number,
-  timeMs: number,
-  domPlaneEl: HTMLElement | null = null
+  timeMs: number
 ) {
-  // 1. Origin (0,0) point at bottom-left axis
+  // 1. Origin (0,0) point at bottom-left axis intersection
   const startX = PAD.left
   const startY = canvasHeight - PAD.bottom
 
-  // 2. Responsive plane size (longer than old plane, shorter than Aspirebet, safe on mobile)
-  const planeWidth = Math.min(Math.max(canvasWidth * 0.115, 62), 104)
+  // 2. Responsive jet dimensions
+  const planeWidth = Math.min(Math.max(canvasWidth * 0.125, 66), 112)
   const planeHeight = planeWidth / JET_ASPECT
 
-  // 3. Max turbulence position (keeps turbulence at proper spot while guaranteeing
-  //    the nose tip never crops on mobile edges)
-  const rightMargin = 8
+  // 3. Max turbulence coordinate — safe on mobile screen edges
+  const rightMargin = 10
   const noseExtension = planeWidth * (1 - TAIL_ANCHOR_X)
-  const maxTurbulenceX = Math.min(canvasWidth * 0.86, canvasWidth - noseExtension - rightMargin)
-  const maxTurbulenceY = canvasHeight * 0.22
+  const maxTurbulenceX = Math.min(canvasWidth * 0.84, canvasWidth - noseExtension - rightMargin)
+  const maxTurbulenceY = Math.max(PAD.top + planeHeight * 0.8, canvasHeight * 0.23)
 
-  // Clamp progress between 0 (at 0,0 rest) and 1 (turbulence cruise)
+  // Clamp progress between 0.0 (resting at 0,0) and 1.0 (turbulence cruise)
   const t = Math.max(0, Math.min(1, progress))
 
-  // Smooth ease-out climb from (0,0) to the turbulence point
-  const baseTipX = startX + (maxTurbulenceX - startX) * t
-  const baseTipY = startY - (startY - maxTurbulenceY) * Math.pow(t, 0.85)
+  // 4. Smooth runway takeoff & climb
+  const easeX = 1 - Math.pow(1 - t, 1.15)
+  const easeY = Math.pow(t, 1.35)
 
-  // 4. Smooth, slow, small-height turbulence ONLY when reaching max height (t > 0.85)
-  //    Blends in smoothly from 0 to 1 between t=0.85 and t=1.0 so there is zero sudden jump
-  const turbulenceBlend = Math.max(0, Math.min(1, (t - 0.85) / 0.15))
-  const slowBobY = Math.sin(timeMs * 0.0022) * 3.5 * turbulenceBlend
-  const slowBobX = Math.cos(timeMs * 0.0016) * 1.5 * turbulenceBlend
+  const baseTipX = startX + (maxTurbulenceX - startX) * easeX
+  const baseTipY = startY - (startY - maxTurbulenceY) * easeY
 
-  // 5. LOCKED TAIL TIP COORDINATE: Used by BOTH the trajectory line AND the plane tail
+  // 5. Smooth, slow, small-height turbulence ONLY when reaching the turbulence area (t > 0.85)
+  const rawBlend = Math.max(0, Math.min(1, (t - 0.85) / 0.15))
+  const turbulenceBlend = rawBlend * rawBlend * (3 - 2 * rawBlend)
+
+  const slowBobY = Math.sin(timeMs * 0.0018) * 2.8 * turbulenceBlend
+  const slowBobX = Math.cos(timeMs * 0.0012) * 0.8 * turbulenceBlend
+
+  // 6. SINGLE LOCKED TAIL-TIP COORDINATE used by BOTH the trajectory line AND the plane tail
   const tipX = baseTipX + slowBobX
   const tipY = baseTipY + slowBobY
 
-  // 6. Draw Trajectory Fill & Line (Only when t > 0 so at rest only the plane sits at 0,0)
+  // 7. Draw Rich Green Trajectory Fill & Tapered Line Syncing with Rear Tail Tip Size
   if (t > 0.001) {
-    // Subtle Aspirebet upward curve control point
-    const cpX = startX + (tipX - startX) * 0.54
-    const cpY = startY - (startY - tipY) * 0.22
+    const cpX = startX + (tipX - startX) * 0.52
+    const cpY = startY - (startY - tipY) * 0.20
 
-    // A. Translucent Green Area Under Curve
+    // A. Rich, Deep Emerald Green Area Under Curve (Aspirebet Style)
     ctx.beginPath()
     ctx.moveTo(startX, startY)
     ctx.quadraticCurveTo(cpX, cpY, tipX, tipY)
@@ -240,38 +237,41 @@ function renderFlightAndPlane(
     ctx.closePath()
 
     const grad = ctx.createLinearGradient(0, tipY, 0, startY)
-    grad.addColorStop(0, 'rgba(0, 231, 84, 0.38)')
-    grad.addColorStop(1, 'rgba(0, 231, 84, 0.05)')
+    grad.addColorStop(0, 'rgba(0, 212, 72, 0.82)')
+    grad.addColorStop(0.55, 'rgba(0, 185, 62, 0.62)')
+    grad.addColorStop(1, 'rgba(0, 150, 48, 0.38)')
     ctx.fillStyle = grad
     ctx.fill()
 
-    // B. Bright Green Trajectory Line Ending Exactly at (tipX, tipY)
+    // B. Tapered Trajectory Line — matches the exact pixel thickness of the SVG tail tip (1.6 SVG units)
+    const tailHalfThickness = Math.max(0.65, (planeHeight * (1.6 / 46)) / 2)
+    const midHalfThickness = Math.max(1.1, tailHalfThickness * 1.45)
+    const startHalfThickness = 0.9
+
     ctx.beginPath()
-    ctx.moveTo(startX, startY)
-    ctx.quadraticCurveTo(cpX, cpY, tipX, tipY)
-    ctx.strokeStyle = '#19e660'
-    ctx.lineWidth = 3.5
-    ctx.lineCap = 'round'
-    ctx.stroke()
+    // Top edge of trajectory line from origin to top of tail tip
+    ctx.moveTo(startX, startY - startHalfThickness)
+    ctx.quadraticCurveTo(cpX, cpY - midHalfThickness, tipX, tipY - tailHalfThickness)
+    // Right cap tucked inside the tail tip
+    ctx.lineTo(tipX, tipY + tailHalfThickness)
+    // Bottom edge of trajectory line back to origin
+    ctx.quadraticCurveTo(cpX, cpY + midHalfThickness, startX, startY + startHalfThickness)
+    ctx.closePath()
+
+    ctx.fillStyle = '#19e660'
+    ctx.fill()
   }
 
-  // 7. Draw the Plane with Tail Tip Locked to (tipX, tipY) and ZERO Angle Twisting
+  // 8. Draw the Plane Horizontally with Tail Tip Locked to (tipX, tipY)
   const drawX = tipX - planeWidth * TAIL_ANCHOR_X
   const drawY = tipY - planeHeight * TAIL_ANCHOR_Y
 
-  if (domPlaneEl) {
-    domPlaneEl.style.width = `${planeWidth}px`
-    domPlaneEl.style.height = `${planeHeight}px`
-    domPlaneEl.style.left = `${drawX}px`
-    domPlaneEl.style.top = `${drawY}px`
-    domPlaneEl.style.transform = 'none'
-  } else if (greenJetImg.complete) {
+  if (greenJetImg.complete) {
     ctx.drawImage(greenJetImg, drawX, drawY, planeWidth, planeHeight)
   }
 
   return { tipX, tipY, planeWidth, planeHeight, drawX, drawY }
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    JSX OVERLAYS — bet toggle, network status, spinner
@@ -359,13 +359,7 @@ function NautilusSpinner() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT — the render loop orchestrating all 4 game states
-   
-   WAITING  → plane sits at origin, pitched 30° up. No curve.
-   FLYING   → curve draws, plane rides the tip following the tangent.
-              Subtle turbulence bounce on the plane at high multipliers.
-   CRASHING → curve freezes, plane shoots off along its last tangent.
-   CRASHED  → frozen curve + "Flew away" overlay in red.
+   MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function GameCanvas({
@@ -374,33 +368,29 @@ export function GameCanvas({
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
-  const lastTimeRef = useRef(0)
 
-  // Store props in refs for stable render callback (avoids recreating on every prop change)
   const propsRef = useRef({ phase, elapsedMs, multiplier, plane })
   propsRef.current = { phase, elapsedMs, multiplier, plane }
 
-  // Smooth progress state for buttery plane movement
-  const smoothRef = useRef({
-    progress: 0,
-    initialized: false,
+  // High-precision local flight clock synced with elapsedMs for 60/120fps smoothness
+  const flightClockRef = useRef({
+    active: false,
+    startTime: 0,
   })
 
-  // Persistent flyaway state across frames (survives re-renders)
+  // Persistent flyaway state across frames
   const flyRef = useRef({
     active: false,
-    x: 0, y: 0,         // starting pixel position
-    t0: 0,               // timestamp when crash started
+    x: 0,
+    y: 0,
+    t0: 0,
   })
 
-  // Last valid flight position to start flyaway accurately
   const lastPosRef = useRef({ x: 0, y: 0 })
 
-  // Background rotation state - accumulates angle each frame
-  // Tied to the same RAF loop as the plane for perfect sync
   const bgRotationRef = useRef({
-    angle: 0,           // accumulated rotation angle (radians)
-    lastTime: 0,        // last frame timestamp for delta calculation
+    angle: 0,
+    lastTime: 0,
   })
 
   const render = useCallback((time: number = 0) => {
@@ -409,25 +399,27 @@ export function GameCanvas({
     const ctx = cvs.getContext('2d')
     if (!ctx) return
 
-    // Read current props from ref (stable reference)
     const { phase, elapsedMs, multiplier } = propsRef.current
 
     const CW = cvs.clientWidth, CH = cvs.clientHeight
-    if (!CW || !CH) { rafRef.current = requestAnimationFrame(render); return }
+    if (!CW || !CH) {
+      rafRef.current = requestAnimationFrame(render)
+      return
+    }
 
-    // HiDPI
     const dpr = window.devicePixelRatio || 1
     const pw = Math.round(CW * dpr), ph = Math.round(CH * dpr)
     if (cvs.width !== pw || cvs.height !== ph) {
-      cvs.width = pw; cvs.height = ph
+      cvs.width = pw
+      cvs.height = ph
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
     ctx.clearRect(0, 0, CW, CH)
 
     // ═══════════════ BACKGROUND ROTATION CALCULATION ═══════════════════
-    const bgDeltaTime = bgRotationRef.current.lastTime > 0 
-      ? Math.min((time - bgRotationRef.current.lastTime) / 1000, 0.1) 
+    const bgDeltaTime = bgRotationRef.current.lastTime > 0
+      ? Math.min((time - bgRotationRef.current.lastTime) / 1000, 0.1)
       : 0.016
     bgRotationRef.current.lastTime = time
 
@@ -448,64 +440,58 @@ export function GameCanvas({
       bgRotationRef.current.angle -= Math.PI * 200
     }
 
-    // Draw background with dynamic rotation and multiplier
     drawBackground(ctx, CW, CH, bgRotationRef.current.angle, phase, multiplier)
     drawAxes(ctx, CW, CH)
     drawDots(ctx, CW, CH, time)
 
-    // ═══════════════ WAITING ═══════════════════════════════════════════
+    // ═══════════════ WAITING (Tail touching 0,0 at rest) ═══════════════
     if (phase === 'waiting') {
       flyRef.current.active = false
-      smoothRef.current.initialized = false
-      smoothRef.current.progress = 0
+      flightClockRef.current.active = false
 
-      // Plane sits resting near origin (0,0) on the runway
       const info = renderFlightAndPlane(ctx, CW, CH, 0, time)
       lastPosRef.current = { x: info.tipX, y: info.tipY }
     }
 
-    // ═══════════════ FLYING ════════════════════════════════════════════
+    // ═══════════════ FLYING (Smooth takeoff -> Cruise turbulence) ══════
     if (phase === 'flying') {
       flyRef.current.active = false
 
-      const deltaTime = lastTimeRef.current > 0 ? Math.min((time - lastTimeRef.current) / 1000, 0.1) : 0.016
-      lastTimeRef.current = time
-
-      // Flight progress from 0.0 (takeoff) to 1.0 (max turbulence cruise point)
-      const flightDuration = 8000
-      const targetProgress = Math.min(1, elapsedMs / flightDuration)
-
-      const sm = smoothRef.current
-      if (!sm.initialized || elapsedMs < 50) {
-        sm.progress = targetProgress
-        sm.initialized = true
+      if (!flightClockRef.current.active) {
+        flightClockRef.current.active = true
+        flightClockRef.current.startTime = time - elapsedMs
       } else {
-        const smoothFactor = Math.min(1, deltaTime * 12)
-        sm.progress += (targetProgress - sm.progress) * smoothFactor
+        const expectedStart = time - elapsedMs
+        flightClockRef.current.startTime += (expectedStart - flightClockRef.current.startTime) * 0.08
       }
 
-      const info = renderFlightAndPlane(ctx, CW, CH, sm.progress, time)
+      const smoothElapsedMs = Math.max(0, time - flightClockRef.current.startTime)
+      const flightDuration = 7500
+      const progress = Math.min(1, smoothElapsedMs / flightDuration)
+
+      const info = renderFlightAndPlane(ctx, CW, CH, progress, time)
       lastPosRef.current = { x: info.tipX, y: info.tipY }
     }
 
     // ═══════════════ CRASHING / CRASHED ════════════════════════════════
     if (phase === 'crashing' || phase === 'crashed') {
+      flightClockRef.current.active = false
       const fa = flyRef.current
 
       if (!fa.active) {
         fa.active = true
         fa.x = lastPosRef.current.x || (CW * 0.7)
-        fa.y = lastPosRef.current.y || (CH * 0.22)
+        fa.y = lastPosRef.current.y || (CH * 0.23)
         fa.t0 = time
       }
 
       const dt = (time - fa.t0) / 16.67
-      const speed = 32
-      const flyX = fa.x + speed * dt * 1.5
-      const flyY = fa.y - speed * dt * 0.75
+      const speed = 26
+      const flyX = fa.x + speed * dt * 1.4
+      const flyY = fa.y - speed * dt * 0.55
 
-      if (flyX < CW + 150 && flyY > -150) {
-        const planeWidth = Math.min(Math.max(CW * 0.115, 62), 104)
+      if (flyX < CW + 160 && flyY > -160) {
+        const planeWidth = Math.min(Math.max(CW * 0.125, 66), 112)
         const planeHeight = planeWidth / JET_ASPECT
         const drawX = flyX - planeWidth * TAIL_ANCHOR_X
         const drawY = flyY - planeHeight * TAIL_ANCHOR_Y
@@ -516,7 +502,7 @@ export function GameCanvas({
     }
 
     rafRef.current = requestAnimationFrame(render)
-  }, [])  // Empty deps - render reads from refs, runs continuously
+  }, [])
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(render)
