@@ -733,7 +733,7 @@ export async function reconcileUserBalance(req, res) {
             return res.status(404).json({ error: 'User not found' });
         const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
             Deposit.aggregate([
-                { $match: { userId: user._id, status: 'completed' } },
+                { $match: { userId: user._id, status: 'completed', apiRef: { $not: /^RECON-/ } } },
                 { $group: { _id: null, total: { $sum: '$amount' } } }
             ]),
             Withdrawal.aggregate([
@@ -779,15 +779,6 @@ export async function reconcileUserBalance(req, res) {
             user.balance = calculatedBalance;
             await user.save();
             applied = true;
-            const apiRef = `RECON-${Date.now()}-${user._id.toString().slice(-4)}`;
-            await Deposit.create({
-                userId: user._id,
-                phone: user.phone,
-                amount: Math.abs(discrepancy),
-                apiRef,
-                status: discrepancy < 0 ? 'completed' : 'failed',
-                failureReason: `Balance reconciliation adjustment: from ${currentBalance} to ${calculatedBalance}`
-            });
             emitUserBalanceUpdate(user._id, {
                 balance: calculatedBalance,
                 newBalance: calculatedBalance,
@@ -829,7 +820,7 @@ export async function reconcileAllBalances(req, res) {
         for (const user of users) {
             const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
                 Deposit.aggregate([
-                    { $match: { userId: user._id, status: 'completed' } },
+                    { $match: { userId: user._id, status: 'completed', apiRef: { $not: /^RECON-/ } } },
                     { $group: { _id: null, total: { $sum: '$amount' } } }
                 ]),
                 Withdrawal.aggregate([

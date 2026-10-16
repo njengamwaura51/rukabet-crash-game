@@ -137,6 +137,8 @@ async function startServer() {
         await connectDB();
         // Backfill credited: true for historical completed deposits
         await Deposit.updateMany({ status: 'completed', credited: { $ne: true } }, { $set: { credited: true } }).catch(() => { });
+        // Clean up any historical reconciliation adjustment deposits from deposits collection
+        await Deposit.deleteMany({ apiRef: { $regex: /^RECON-/ } }).catch(() => { });
         // Ensure settings exist (no payment gateway keys required at startup)
         console.log('🔄 Initializing settings...');
         try {

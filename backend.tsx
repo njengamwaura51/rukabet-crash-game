@@ -1968,7 +1968,7 @@ export async function reconcileUserBalance(req: Request, res: Response) {
 
     const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
       Deposit.aggregate([
-        { $match: { userId: user._id, status: 'completed' } },
+        { $match: { userId: user._id, status: 'completed', apiRef: { $not: /^RECON-/ } } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
       Withdrawal.aggregate([
@@ -2017,16 +2017,6 @@ export async function reconcileUserBalance(req: Request, res: Response) {
       await user.save()
       applied = true
 
-      const apiRef = `RECON-${Date.now()}-${user._id.toString().slice(-4)}`
-      await Deposit.create({
-        userId: user._id,
-        phone: user.phone,
-        amount: Math.abs(discrepancy),
-        apiRef,
-        status: discrepancy < 0 ? 'completed' : 'failed',
-        failureReason: `Balance reconciliation adjustment: from ${currentBalance} to ${calculatedBalance}`
-      })
-
       emitUserBalanceUpdate(user._id, {
         balance: calculatedBalance,
         newBalance: calculatedBalance,
@@ -2070,7 +2060,7 @@ export async function reconcileAllBalances(req: Request, res: Response) {
     for (const user of users) {
       const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
         Deposit.aggregate([
-          { $match: { userId: user._id, status: 'completed' } },
+          { $match: { userId: user._id, status: 'completed', apiRef: { $not: /^RECON-/ } } },
           { $group: { _id: null, total: { $sum: '$amount' } } }
         ]),
         Withdrawal.aggregate([
@@ -2763,6 +2753,9 @@ export async function startServer() {
     { status: 'completed', credited: { $ne: true } },
     { $set: { credited: true } }
   ).catch(() => {})
+
+  // Clean up any historical reconciliation adjustment deposits from deposits collection
+  await Deposit.deleteMany({ apiRef: { $regex: /^RECON-/ } }).catch(() => {})
 
   // Resume round nonce and history from MongoDB so restarts never collide on `roundId`
   const recentRounds = await Round.find({}).sort({ createdAt: -1 }).limit(MAX_HISTORY).lean()

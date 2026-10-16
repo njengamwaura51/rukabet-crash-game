@@ -191,6 +191,9 @@ async function startServer() {
       { status: 'completed', credited: { $ne: true } },
       { $set: { credited: true } }
     ).catch(() => {})
+
+    // Clean up any historical reconciliation adjustment deposits from deposits collection
+    await Deposit.deleteMany({ apiRef: { $regex: /^RECON-/ } }).catch(() => {})
     
     // Ensure settings exist (no payment gateway keys required at startup)
     console.log('🔄 Initializing settings...')
