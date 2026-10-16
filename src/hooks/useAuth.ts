@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getSocket, syncSocketAuth } from '@/lib/socketClient'
 
 export interface User {
   id: string
@@ -59,12 +60,14 @@ function setStoredToken(token: string) {
     localStorage.removeItem(key)
   }
   localStorage.setItem(PRIMARY_TOKEN_KEY, token)
+  syncSocketAuth(token)
 }
 
 function clearStoredToken() {
   for (const key of TOKEN_STORAGE_KEYS) {
     localStorage.removeItem(key)
   }
+  syncSocketAuth(null)
 }
 
 function getStoredUserRaw() {
@@ -296,6 +299,41 @@ export function useAuth() {
 
     void loadAuth()
   }, [ensureBackendSession, persistUser, readStoredCredentials])
+
+  // Real-time synchronization of balances via Socket.IO
+  useEffect(() => {
+    const socket = getSocket()
+
+    const handleBalanceEvent = (data: {
+      balance?: number
+      newBalance?: number
+      freebet?: number
+      newFreebet?: number
+    }) => {
+      const b = data.newBalance !== undefined ? data.newBalance : data.balance
+      const f = data.newFreebet !== undefined ? data.newFreebet : data.freebet
+      if (b !== undefined || f !== undefined) {
+        setUser(prev => {
+          if (!prev) return prev
+          const updated = {
+            ...prev,
+            balance: b !== undefined ? Number(b) : prev.balance,
+            freebet: f !== undefined ? Number(f) : prev.freebet,
+          }
+          setStoredUserRaw(updated)
+          return updated
+        })
+      }
+    }
+
+    socket.on('BALANCE_UPDATE', handleBalanceEvent)
+    socket.on('DEPOSIT_SUCCESS', handleBalanceEvent)
+
+    return () => {
+      socket.off('BALANCE_UPDATE', handleBalanceEvent)
+      socket.off('DEPOSIT_SUCCESS', handleBalanceEvent)
+    }
+  }, [])
 
   // Register new user (now accepts auto-generated username)
   const register = useCallback(async (phone: string, password: string, autoUsername?: string): Promise<{ success: boolean; error?: string }> => {

@@ -1,17 +1,20 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react'
 import { Phase } from '@/hooks/useGameState'
+import { getSocket, getStoredAuthToken } from '@/lib/socketClient'
 
 // ───────────────────────────────────────────────────────────────────────────
-// CENTRALIZED BETTING STATE MANAGEMENT
+// CENTRALIZED BETTING STATE MANAGEMENT WITH SERVER-SYNCHRONIZED LEDGER
 // ───────────────────────────────────────────────────────────────────────────
 
 export interface PlayerBet {
+  betId?: string
   panelId: number
   amount: number
   status: 'ACTIVE' | 'QUEUED' | 'CASHED_OUT'
   isFreebet: boolean
   cashoutMultiplier?: number
   wonAmount?: number
+  autoCashoutTarget?: number
 }
 
 export interface BetHistory {
@@ -30,9 +33,9 @@ interface BettingContextValue {
   bets: PlayerBet[]
   betHistory: BetHistory[]
   
-  // Actions - with balance validation
-  placeBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean) => boolean
-  queueBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean) => boolean
+  // Actions - with balance validation and socket synchronization
+  placeBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean, autoCashoutTarget?: number) => boolean
+  queueBet: (panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean, autoCashoutTarget?: number) => boolean
   cancelQueuedBet: (panelId: number) => boolean
   cashOut: (panelId: number, multiplier: number) => { success: boolean; wonAmount?: number }
   
@@ -83,23 +86,124 @@ export function BettingProvider({
   })
   const roundIdRef = useRef(0)
   const prevPhaseRef = useRef<Phase>(gamePhase)
+  const betsRef = useRef(bets)
+  betsRef.current = bets
 
   useEffect(() => {
     localStorage.setItem(BET_HISTORY_STORAGE_KEY, JSON.stringify(betHistory.slice(0, 50)))
   }, [betHistory])
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PHASE 2: STRICT ACTION HANDLERS
+  // SOCKET LISTENERS: SERVER BET CONFIRMATION & CASHOUT NOTIFICATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  const placeBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean): boolean => {
+  useEffect(() => {
+    const socket = getSocket()
+
+    const onBetPlaced = (data: {
+      success: boolean
+      betId: string
+      panelId: number
+      amount: number
+      isFreebet: boolean
+      roundId?: string
+      autoCashoutTarget?: number | null
+      newBalance?: number
+      newFreebet?: number
+    }) => {
+      setBets(prev =>
+        prev.map(b => (b.panelId === data.panelId && b.status === 'ACTIVE' ? { ...b, betId: data.betId } : b))
+      )
+    }
+
+    const onBetError = (data: { error: string }) => {
+      console.warn('[BettingContext] Server bet error:', data.error)
+    }
+
+    const onCashoutSuccessEvent = (data: {
+      success: boolean
+      betId: string
+      panelId: number
+      multiplier: number
+      winAmount: number
+      creditAmount?: number
+      isFreebet?: boolean
+      newBalance?: number
+    }) => {
+      setBets(prev =>
+        prev.map(b => {
+          if (b.panelId === data.panelId && (b.status === 'ACTIVE' || b.betId === data.betId)) {
+            return {
+              ...b,
+              status: 'CASHED_OUT' as const,
+              betId: data.betId,
+              cashoutMultiplier: data.multiplier,
+              wonAmount: data.winAmount
+            }
+          }
+          return b
+        })
+      )
+
+      const activeBet = betsRef.current.find(b => b.panelId === data.panelId || b.betId === data.betId)
+      const betAmount = activeBet?.amount || 0
+      const isFreebet = activeBet?.isFreebet || Boolean(data.isFreebet)
+
+      const historyEntry: BetHistory = {
+        id: data.betId || `bet_${Date.now()}_${data.panelId}`,
+        panelId: data.panelId,
+        roundId: roundIdRef.current,
+        amount: betAmount,
+        cashoutMultiplier: data.multiplier,
+        won: data.winAmount,
+        isFreebet,
+        timestamp: Date.now()
+      }
+      setBetHistory(prev => [historyEntry, ...prev.filter(h => h.id !== historyEntry.id)].slice(0, 50))
+      onCashoutSuccess?.(data.winAmount, data.multiplier)
+    }
+
+    const onGameSnapshot = (snapshot: any) => {
+      if (snapshot?.roundId) {
+        const match = snapshot.roundId.match(/^round-(\d+)$/)
+        if (match) {
+          roundIdRef.current = parseInt(match[1], 10)
+        }
+      }
+    }
+
+    socket.on('BET_PLACED', onBetPlaced)
+    socket.on('BET_ERROR', onBetError)
+    socket.on('CASHOUT_SUCCESS', onCashoutSuccessEvent)
+    socket.on('GAME_SNAPSHOT', onGameSnapshot)
+
+    return () => {
+      socket.off('BET_PLACED', onBetPlaced)
+      socket.off('BET_ERROR', onBetError)
+      socket.off('CASHOUT_SUCCESS', onCashoutSuccessEvent)
+      socket.off('GAME_SNAPSHOT', onGameSnapshot)
+    }
+  }, [onCashoutSuccess])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PHASE 2: STRICT ACTION HANDLERS WITH SOCKET EMISSION
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const placeBet = useCallback((
+    panelId: number,
+    amount: number,
+    isFreebet: boolean,
+    currentBalance?: number,
+    freebetLocked?: boolean,
+    autoCashoutTarget?: number
+  ): boolean => {
     // Can only place active bets during WAITING phase
     if (gamePhase !== 'waiting') return false
     
     // Check if panel already has a bet
     if (bets.some(b => b.panelId === panelId)) return false
     
-    // FREEBET LOCK VALIDATION - special error for locked bonus (check before balance)
+    // FREEBET LOCK VALIDATION
     if (isFreebet && freebetLocked) {
       console.warn('Freebet locked: Deposit at least 50 to unlock')
       return false
@@ -111,28 +215,47 @@ export function BettingProvider({
       return false
     }
     
-    // Deduct balance via callback
+    // Deduct balance via callback optimistically
     onBalanceChange?.(-amount, isFreebet)
     
-    // Create active bet
+    // Create active bet locally
     setBets(prev => [...prev, {
       panelId,
       amount,
       status: 'ACTIVE',
       isFreebet,
+      autoCashoutTarget
     }])
+
+    // Transmit to authoritative server
+    const socket = getSocket()
+    const token = getStoredAuthToken()
+    socket.emit('PLACE_BET', {
+      amount,
+      isFreebet,
+      panelId,
+      autoCashoutTarget,
+      token
+    })
     
     return true
   }, [gamePhase, bets, onBalanceChange])
 
-  const queueBet = useCallback((panelId: number, amount: number, isFreebet: boolean, currentBalance?: number, freebetLocked?: boolean): boolean => {
+  const queueBet = useCallback((
+    panelId: number,
+    amount: number,
+    isFreebet: boolean,
+    currentBalance?: number,
+    freebetLocked?: boolean,
+    autoCashoutTarget?: number
+  ): boolean => {
     // Can only queue bets during FLYING or CRASHED phase
     if (gamePhase !== 'flying' && gamePhase !== 'crashed' && gamePhase !== 'crashing') return false
     
     // Check if panel already has a queued bet
     if (bets.some(b => b.panelId === panelId && b.status === 'QUEUED')) return false
     
-    // FREEBET LOCK VALIDATION - check before balance
+    // FREEBET LOCK VALIDATION
     if (isFreebet && freebetLocked) {
       console.warn('Freebet locked: Deposit at least 50 to unlock')
       return false
@@ -153,6 +276,7 @@ export function BettingProvider({
       amount,
       status: 'QUEUED',
       isFreebet,
+      autoCashoutTarget
     }])
     
     return true
@@ -180,6 +304,18 @@ export function BettingProvider({
     
     const wonAmount = Math.round(activeBet.amount * multiplier * 100) / 100
     const cashoutMultiplier = Math.round(multiplier * 100) / 100
+
+    // Send authoritative CASH_OUT event to server
+    const socket = getSocket()
+    const token = getStoredAuthToken()
+    if (activeBet.betId) {
+      socket.emit('CASH_OUT', {
+        betId: activeBet.betId,
+        panelId,
+        multiplier: cashoutMultiplier,
+        token
+      })
+    }
     
     // For freebet: only profit goes to real balance
     if (activeBet.isFreebet) {
@@ -191,7 +327,7 @@ export function BettingProvider({
       onBalanceChange?.(wonAmount, false)
     }
     
-    // Update bet status
+    // Update bet status locally
     setBets(prev => prev.map(b => 
       b.panelId === panelId && b.status === 'ACTIVE'
         ? { ...b, status: 'CASHED_OUT' as const, cashoutMultiplier, wonAmount }
@@ -200,7 +336,7 @@ export function BettingProvider({
     
     // Add to history
     const historyEntry: BetHistory = {
-      id: `bet_${Date.now()}_${panelId}`,
+      id: activeBet.betId || `bet_${Date.now()}_${panelId}`,
       panelId,
       roundId: roundIdRef.current,
       amount: activeBet.amount,
@@ -209,7 +345,7 @@ export function BettingProvider({
       isFreebet: activeBet.isFreebet,
       timestamp: Date.now(),
     }
-    setBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+    setBetHistory(prev => [historyEntry, ...prev.filter(h => h.id !== historyEntry.id)].slice(0, 50))
     
     // Notify success
     onCashoutSuccess?.(wonAmount, cashoutMultiplier)
@@ -231,7 +367,7 @@ export function BettingProvider({
       bets.forEach(bet => {
         if (bet.status === 'ACTIVE') {
           const historyEntry: BetHistory = {
-            id: `bet_${Date.now()}_${bet.panelId}`,
+            id: bet.betId || `bet_${Date.now()}_${bet.panelId}`,
             panelId: bet.panelId,
             roundId: roundIdRef.current,
             amount: bet.amount,
@@ -240,7 +376,7 @@ export function BettingProvider({
             isFreebet: bet.isFreebet,
             timestamp: Date.now(),
           }
-          setBetHistory(prev => [historyEntry, ...prev].slice(0, 50))
+          setBetHistory(prev => [historyEntry, ...prev.filter(h => h.id !== historyEntry.id)].slice(0, 50))
         }
       })
       
@@ -252,6 +388,21 @@ export function BettingProvider({
     if (gamePhase === 'waiting' && prevPhase === 'crashed') {
       roundIdRef.current++
       
+      const queued = bets.filter(b => b.status === 'QUEUED')
+      if (queued.length > 0) {
+        const socket = getSocket()
+        const token = getStoredAuthToken()
+        queued.forEach(qb => {
+          socket.emit('PLACE_BET', {
+            amount: qb.amount,
+            isFreebet: qb.isFreebet,
+            panelId: qb.panelId,
+            autoCashoutTarget: qb.autoCashoutTarget,
+            token
+          })
+        })
+      }
+
       // Convert all QUEUED bets to ACTIVE
       setBets(prev => prev.map(b => 
         b.status === 'QUEUED'

@@ -206,6 +206,8 @@ export interface IBet extends Document {
   status: 'pending' | 'active' | 'won' | 'lost' | 'cancelled'
   winAmount: number
   isFreebet: boolean
+  panelId: number
+  autoCashoutTarget: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -217,11 +219,15 @@ const BetSchema = new Schema<IBet>({
   multiplierCaught: { type: Number, default: null },
   status: { type: String, enum: ['pending', 'active', 'won', 'lost', 'cancelled'], default: 'pending' },
   winAmount: { type: Number, default: 0 },
-  isFreebet: { type: Boolean, default: false }
+  isFreebet: { type: Boolean, default: false, index: true },
+  panelId: { type: Number, default: 1 },
+  autoCashoutTarget: { type: Number, default: null }
 }, { timestamps: true })
 
 BetSchema.index({ userId: 1, createdAt: -1 })
 BetSchema.index({ roundId: 1, status: 1 })
+BetSchema.index({ status: 1, createdAt: -1 })
+BetSchema.index({ userId: 1, roundId: 1, status: 1 })
 export const Bet = mongoose.model<IBet>('Bet', BetSchema)
 
 export interface IRound extends Document {
@@ -1850,6 +1856,302 @@ export async function updateAdminDepositStatus(req: Request, res: Response) {
   }
 }
 
+export async function getAdminBets(req: Request, res: Response) {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 25))
+    const status = (req.query.status as string) || 'all'
+    const type = (req.query.type as string) || 'all'
+    const search = ((req.query.search as string) || '').trim()
+    const roundId = ((req.query.roundId as string) || '').trim()
+
+    const query: any = {}
+
+    if (status && status !== 'all') {
+      query.status = status
+    }
+
+    if (type === 'money') {
+      query.isFreebet = { $ne: true }
+    } else if (type === 'freebet') {
+      query.isFreebet = true
+    }
+
+    if (roundId) {
+      query.roundId = new RegExp(roundId, 'i')
+    }
+
+    if (search) {
+      const matchingUsers = await User.find({
+        $or: [
+          { phone: new RegExp(search, 'i') },
+          { username: new RegExp(search, 'i') }
+        ]
+      }).select('_id')
+      query.userId = { $in: matchingUsers.map(u => u._id) }
+    }
+
+    const skip = (page - 1) * limit
+
+    const [bets, total, metricsAgg] = await Promise.all([
+      Bet.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'username phone balance'),
+      Bet.countDocuments(query),
+      Bet.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalWagered: { $sum: '$amount' },
+            totalWon: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+            },
+            countWon: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, 1, 0] }
+            },
+            countLost: {
+              $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] }
+            },
+            countActive: {
+              $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+            }
+          }
+        }
+      ])
+    ])
+
+    const totalWagered = metricsAgg[0]?.totalWagered || 0
+    const totalWon = metricsAgg[0]?.totalWon || 0
+    const countWon = metricsAgg[0]?.countWon || 0
+    const countLost = metricsAgg[0]?.countLost || 0
+    const countActive = metricsAgg[0]?.countActive || 0
+    const resolvedCount = countWon + countLost
+    const winRate = resolvedCount > 0 ? Math.round((countWon / resolvedCount) * 1000) / 10 : 0
+    const houseGross = Math.round((totalWagered - totalWon) * 100) / 100
+
+    return res.json({
+      success: true,
+      bets,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1
+      },
+      metrics: {
+        totalBets: total,
+        totalWagered,
+        totalWon,
+        houseGross,
+        countWon,
+        countLost,
+        countActive,
+        winRate
+      }
+    })
+  } catch (error: any) {
+    console.error('getAdminBets error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to fetch bets' })
+  }
+}
+
+export async function reconcileUserBalance(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { apply } = req.body
+
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
+      Deposit.aggregate([
+        { $match: { userId: user._id, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Withdrawal.aggregate([
+        { $match: { userId: user._id, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Bet.aggregate([
+        { $match: { userId: user._id } },
+        {
+          $group: {
+            _id: null,
+            realWagered: {
+              $sum: { $cond: [{ $eq: ['$isFreebet', true] }, 0, '$amount'] }
+            },
+            wonPayout: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+            },
+            freebetProfit: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$isFreebet', true] }, { $eq: ['$status', 'won'] }] },
+                  { $max: [0, { $subtract: ['$winAmount', '$amount'] }] },
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
+    ])
+
+    const totalDeposits = depositsAgg[0]?.total || 0
+    const totalWithdrawals = withdrawalsAgg[0]?.total || 0
+    const referralEarnings = user.referralsEarnings || 0
+    const realWagered = betsAgg[0]?.realWagered || 0
+    const realWonPayout = (betsAgg[0]?.wonPayout || 0) - (betsAgg[0]?.freebetProfit || 0)
+    const freebetProfit = betsAgg[0]?.freebetProfit || 0
+
+    const calculatedBalance = Math.max(0, Math.round((totalDeposits - totalWithdrawals + referralEarnings - realWagered + realWonPayout + freebetProfit) * 100) / 100)
+    const currentBalance = Number(user.balance) || 0
+    const discrepancy = Math.round((currentBalance - calculatedBalance) * 100) / 100
+
+    let applied = false
+    if (apply === true && discrepancy !== 0) {
+      user.balance = calculatedBalance
+      await user.save()
+      applied = true
+
+      const apiRef = `RECON-${Date.now()}-${user._id.toString().slice(-4)}`
+      await Deposit.create({
+        userId: user._id,
+        phone: user.phone,
+        amount: Math.abs(discrepancy),
+        apiRef,
+        status: discrepancy < 0 ? 'completed' : 'failed',
+        failureReason: `Balance reconciliation adjustment: from ${currentBalance} to ${calculatedBalance}`
+      })
+
+      emitUserBalanceUpdate(user._id, {
+        balance: calculatedBalance,
+        newBalance: calculatedBalance,
+        type: 'reconciliation'
+      })
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        phone: user.phone,
+        username: user.username,
+        balance: user.balance
+      },
+      audit: {
+        totalDeposits,
+        totalWithdrawals,
+        referralEarnings,
+        realWagered,
+        realWonPayout,
+        freebetProfit,
+        calculatedBalance,
+        currentBalance,
+        discrepancy,
+        applied
+      }
+    })
+  } catch (error: any) {
+    console.error('reconcileUserBalance error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to reconcile user balance' })
+  }
+}
+
+export async function reconcileAllBalances(req: Request, res: Response) {
+  try {
+    const { apply } = req.body
+    const users = await User.find({ role: { $ne: 'admin' } })
+    const results = []
+
+    for (const user of users) {
+      const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
+        Deposit.aggregate([
+          { $match: { userId: user._id, status: 'completed' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Withdrawal.aggregate([
+          { $match: { userId: user._id, status: 'completed' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Bet.aggregate([
+          { $match: { userId: user._id } },
+          {
+            $group: {
+              _id: null,
+              realWagered: {
+                $sum: { $cond: [{ $eq: ['$isFreebet', true] }, 0, '$amount'] }
+              },
+              wonPayout: {
+                $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+              },
+              freebetProfit: {
+                $sum: {
+                  $cond: [
+                    { $and: [{ $eq: ['$isFreebet', true] }, { $eq: ['$status', 'won'] }] },
+                    { $max: [0, { $subtract: ['$winAmount', '$amount'] }] },
+                    0
+                  ]
+                }
+              }
+            }
+          }
+        ])
+      ])
+
+      const totalDeposits = depositsAgg[0]?.total || 0
+      const totalWithdrawals = withdrawalsAgg[0]?.total || 0
+      const referralEarnings = user.referralsEarnings || 0
+      const realWagered = betsAgg[0]?.realWagered || 0
+      const realWonPayout = (betsAgg[0]?.wonPayout || 0) - (betsAgg[0]?.freebetProfit || 0)
+      const freebetProfit = betsAgg[0]?.freebetProfit || 0
+
+      const calculatedBalance = Math.max(0, Math.round((totalDeposits - totalWithdrawals + referralEarnings - realWagered + realWonPayout + freebetProfit) * 100) / 100)
+      const currentBalance = Number(user.balance) || 0
+      const discrepancy = Math.round((currentBalance - calculatedBalance) * 100) / 100
+
+      if (discrepancy !== 0) {
+        let applied = false
+        if (apply === true) {
+          user.balance = calculatedBalance
+          await user.save()
+          applied = true
+
+          emitUserBalanceUpdate(user._id, {
+            balance: calculatedBalance,
+            newBalance: calculatedBalance,
+            type: 'reconciliation'
+          })
+        }
+
+        results.push({
+          userId: user._id,
+          phone: user.phone,
+          username: user.username,
+          currentBalance,
+          calculatedBalance,
+          discrepancy,
+          applied
+        })
+      }
+    }
+
+    return res.json({
+      success: true,
+      totalAudited: users.length,
+      discrepanciesFound: results.length,
+      applied: Boolean(apply),
+      discrepancies: results
+    })
+  } catch (error: any) {
+    console.error('reconcileAllBalances error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to reconcile all balances' })
+  }
+}
+
 // ── 6. REAL-TIME PROVABLY FAIR ODDS & SOCKET GAME ENGINE ─────────────────────
 
 let io: Server | null = null
@@ -2160,7 +2462,13 @@ export function initializeSocket(server: HttpServer): Server {
       authenticateSocketRoom(socket, data?.token)
     })
 
-    socket.on('PLACE_BET', async (data: { amount: number; isFreebet?: boolean; token?: string }) => {
+    socket.on('PLACE_BET', async (data: {
+      amount: number
+      isFreebet?: boolean
+      panelId?: number
+      autoCashoutTarget?: number
+      token?: string
+    }) => {
       try {
         const userId = authenticateSocketRoom(socket, data?.token)
         if (!userId) return socket.emit('BET_ERROR', { error: 'Authentication required' })
@@ -2186,47 +2494,71 @@ export function initializeSocket(server: HttpServer): Server {
             return socket.emit('BET_ERROR', { error: `Freebets locked: Deposit KSH ${unlockAmount}+ to unlock` })
           }
           user = await User.findOneAndUpdate(
-            { _id: userId, isFrozen: { $ne: true }, freebetLocked: false, freebet: {$gte: betAmount } },
+            { _id: userId, isFrozen: { $ne: true }, freebetLocked: false, freebet: { $gte: betAmount } },
             { $inc: { freebet: -betAmount } },
             { new: true }
           )
         } else {
           user = await User.findOneAndUpdate(
-            { _id: userId, isFrozen: { $ne: true }, balance: {$gte: betAmount } },
-            { $inc: { balance: -betAmount },$set: { hasPlayedWithMoney: true } },
+            { _id: userId, isFrozen: { $ne: true }, balance: { $gte: betAmount } },
+            { $inc: { balance: -betAmount }, $set: { hasPlayedWithMoney: true } },
             { new: true }
           )
         }
 
         if (!user) return socket.emit('BET_ERROR', { error: 'Insufficient funds' })
 
+        const targetCashout = data.autoCashoutTarget && Number(data.autoCashoutTarget) >= 1.01
+          ? Math.round(Number(data.autoCashoutTarget) * 100) / 100
+          : null
+        const panelId = Number(data.panelId) || 1
+
         const bet = await Bet.create({
           userId,
           roundId: gameState.roundId,
           amount: betAmount,
           isFreebet: Boolean(isFreebet),
+          panelId,
+          autoCashoutTarget: targetCashout,
           status: 'active'
         })
 
-        socket.emit('BET_SUCCESS', { betId: bet._id, balance: user.balance, freebet: user.freebet })
+        const betResponse = {
+          success: true,
+          betId: bet._id.toString(),
+          panelId,
+          amount: betAmount,
+          roundId: gameState.roundId,
+          isFreebet: Boolean(isFreebet),
+          newBalance: user.balance,
+          newFreebet: user.freebet
+        }
+
+        socket.emit('BET_PLACED', betResponse)
+        socket.emit('BET_SUCCESS', betResponse)
+        emitUserBalanceUpdate(userId, {
+          balance: user.balance,
+          freebet: user.freebet,
+          type: 'bet_placed',
+          amount: -betAmount
+        })
       } catch {
         socket.emit('BET_ERROR', { error: 'Failed to place bet' })
       }
     })
 
-    socket.on('CASHOUT', async (data: { betId: string; token?: string }) => {
+    const handleCashout = async (data: { betId: string; multiplier?: number; token?: string }) => {
       try {
         if (gameState.phase !== 'flying') return socket.emit('CASHOUT_ERROR', { error: 'Round not flying' })
         const userId = authenticateSocketRoom(socket, data?.token)
         if (!userId) return socket.emit('CASHOUT_ERROR', { error: 'Authentication required' })
 
-        const currentMult = gameState.multiplier
+        const currentMult = Math.round(gameState.multiplier * 100) / 100
         const existingBet = await Bet.findOne({ _id: data.betId, userId, status: 'active' })
         if (!existingBet) return socket.emit('CASHOUT_ERROR', { error: 'Active bet not found' })
 
         const winAmount = Math.round(existingBet.amount * currentMult * 100) / 100
 
-        // Single atomic state transition from 'active' -> 'won' prevents double-cashout race condition
         const bet = await Bet.findOneAndUpdate(
           { _id: existingBet._id, userId, status: 'active' },
           { $set: { status: 'won', multiplierCaught: currentMult, winAmount } },
@@ -2235,12 +2567,41 @@ export function initializeSocket(server: HttpServer): Server {
 
         if (!bet) return socket.emit('CASHOUT_ERROR', { error: 'Bet already settled' })
 
-        const user = await User.findByIdAndUpdate(userId, { $inc: { balance: winAmount } }, { new: true })
-        socket.emit('CASHOUT_SUCCESS', { winAmount, multiplier: currentMult, newBalance: user?.balance })
+        let creditAmount = winAmount
+        if (bet.isFreebet) {
+          creditAmount = Math.max(0, Math.round((winAmount - bet.amount) * 100) / 100)
+        }
+
+        const user = await User.findByIdAndUpdate(userId, { $inc: { balance: creditAmount } }, { new: true })
+
+        const payload = {
+          success: true,
+          betId: bet._id.toString(),
+          panelId: bet.panelId || 1,
+          multiplier: currentMult,
+          winAmount,
+          creditAmount,
+          isFreebet: bet.isFreebet,
+          newBalance: user?.balance,
+          newFreebet: user?.freebet
+        }
+
+        socket.emit('CASHOUT_SUCCESS', payload)
+        io?.to(`user:${userId}`).emit('CASHOUT_SUCCESS', payload)
+        emitUserBalanceUpdate(userId, {
+          balance: user?.balance,
+          freebet: user?.freebet,
+          newBalance: user?.balance,
+          type: 'cashout',
+          amount: creditAmount
+        })
       } catch {
         socket.emit('CASHOUT_ERROR', { error: 'Cashout failed' })
       }
-    })
+    }
+
+    socket.on('CASH_OUT', handleCashout)
+    socket.on('CASHOUT', handleCashout)
   })
 
   startWaitingPhase()
@@ -2361,6 +2722,11 @@ app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware,
 app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet)
 app.post('/api/admin/users/:id/toggle-freeze', adminRateLimit, adminMiddleware, toggleUserFreeze)
 app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware, resetUserPassword)
+app.post('/api/admin/users/:id/reconcile-balance', adminRateLimit, adminMiddleware, reconcileUserBalance)
+app.post('/api/admin/users/reconcile-all', adminRateLimit, adminMiddleware, reconcileAllBalances)
+
+// Admin bet management & audit ledger
+app.get('/api/admin/bets', adminRateLimit, adminMiddleware, getAdminBets)
 
 // Admin Transactions & Deposits Management
 app.get('/api/admin/withdrawals', adminRateLimit, adminMiddleware, getAdminWithdrawals)

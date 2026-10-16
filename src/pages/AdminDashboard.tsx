@@ -5,7 +5,7 @@ import {
   Search, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff, 
   CreditCard, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, 
   Copy, Check, LogOut, ChevronRight, UserCheck, UserX, AlertCircle, ArrowRight,
-  Zap, Sparkles, Timer, Sliders, Flame, Clock
+  Zap, Sparkles, Timer, Sliders, Flame, Clock, Dices, Scale, FileSpreadsheet
 } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
 
@@ -183,6 +183,25 @@ type AdminWithdrawal = {
   }
 }
 
+type AdminBet = {
+  _id: string
+  roundId: string
+  amount: number
+  status: 'pending' | 'active' | 'won' | 'lost' | 'cancelled'
+  multiplierCaught: number | null
+  winAmount: number
+  isFreebet: boolean
+  panelId?: number
+  autoCashoutTarget?: number | null
+  createdAt: string
+  userId?: {
+    _id: string
+    username: string
+    phone: string
+    balance?: number
+  }
+}
+
 type UserDetailData = {
   user: AdminUser
   stats: {
@@ -222,7 +241,7 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState('')
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'deposits' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'deposits' | 'bets' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
 
   // Odds Engine State
   const [oddsEngine, setOddsEngine] = useState<OddsEngineLiveState | null>(null)
@@ -287,6 +306,31 @@ export default function AdminDashboard() {
   const [totalCompletedDepositAmount, setTotalCompletedDepositAmount] = useState(0)
   const [updatingDepositId, setUpdatingDepositId] = useState<string | null>(null)
   const [manualReceiptInput, setManualReceiptInput] = useState<{ [id: string]: string }>({})
+
+  // Bets Tab State
+  const [betsList, setBetsList] = useState<AdminBet[]>([])
+  const [betsLoading, setBetsLoading] = useState(false)
+  const [betStatusFilter, setBetStatusFilter] = useState<'all' | 'won' | 'lost' | 'active'>('all')
+  const [betTypeFilter, setBetTypeFilter] = useState<'all' | 'money' | 'freebet'>('all')
+  const [betSearch, setBetSearch] = useState('')
+  const [betRoundId, setBetRoundId] = useState('')
+  const [betsPage, setBetsPage] = useState(1)
+  const [betsTotal, setBetsTotal] = useState(0)
+  const [betsTotalPages, setBetsTotalPages] = useState(1)
+  const [betsMetrics, setBetsMetrics] = useState<{
+    totalBets: number
+    totalWagered: number
+    totalWon: number
+    houseGross: number
+    countWon: number
+    countLost: number
+    countActive: number
+    winRate: number
+  } | null>(null)
+
+  // Reconciliation State
+  const [reconcileAudit, setReconcileAudit] = useState<any | null>(null)
+  const [isReconciling, setIsReconciling] = useState(false)
 
   // Withdrawals Tab State
   const [withdrawalsList, setWithdrawalsList] = useState<AdminWithdrawal[]>([])
@@ -486,6 +530,77 @@ export default function AdminDashboard() {
     return () => clearTimeout(timer)
   }, [adminToken, activeTab, depositFilter, depositSearch, depositsPage, config.apiBaseUrl, refreshKey])
 
+  // Fetch Bets when Bets tab is active
+  useEffect(() => {
+    if (!adminToken || activeTab !== 'bets') return
+
+    const fetchBets = async () => {
+      setBetsLoading(true)
+      try {
+        const apiOrigin = config.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        const url = new URL(`${apiOrigin}/api/admin/bets`)
+        url.searchParams.set('page', String(betsPage))
+        url.searchParams.set('limit', '25')
+        if (betStatusFilter !== 'all') url.searchParams.set('status', betStatusFilter)
+        if (betTypeFilter !== 'all') url.searchParams.set('type', betTypeFilter)
+        if (betSearch) url.searchParams.set('search', betSearch)
+        if (betRoundId) url.searchParams.set('roundId', betRoundId)
+
+        const res = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setBetsList(data.bets || [])
+          setBetsTotal(data.pagination?.total || 0)
+          setBetsTotalPages(data.pagination?.totalPages || 1)
+          setBetsMetrics(data.metrics || null)
+        }
+      } catch (err) {
+        console.error('Failed to load bets:', err)
+      } finally {
+        setBetsLoading(false)
+      }
+    }
+
+    const timer = setTimeout(fetchBets, (betSearch || betRoundId) ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [adminToken, activeTab, betsPage, betStatusFilter, betTypeFilter, betSearch, betRoundId, config.apiBaseUrl, refreshKey])
+
+  const handleReconcileUser = async (userId: string, apply: boolean = false) => {
+    if (!adminToken) return
+    setIsReconciling(true)
+    try {
+      const apiOrigin = config.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+      const res = await fetch(`${apiOrigin}/api/admin/users/${userId}/reconcile-balance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ apply })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setReconcileAudit(data.audit)
+        if (apply) {
+          setBannerNotice({ type: 'success', message: `Balance successfully reconciled to KSH ${data.user.balance}` })
+          setRefreshKey(prev => prev + 1)
+          if (selectedUserForDetail) {
+            setSelectedUserForDetail(prev => prev ? { ...prev, user: { ...prev.user, balance: data.user.balance } } : null)
+          }
+        }
+      } else {
+        setBannerNotice({ type: 'error', message: data.error || 'Failed to reconcile balance' })
+      }
+    } catch (err: any) {
+      console.error('Reconciliation error:', err)
+      setBannerNotice({ type: 'error', message: err.message || 'Reconciliation failed' })
+    } finally {
+      setIsReconciling(false)
+    }
+  }
+
   // Fetch Odds Engine Status & Logs
   const fetchOddsEngine = useCallback(async () => {
     if (!adminToken) return
@@ -625,6 +740,7 @@ export default function AdminDashboard() {
   // User Operations Handlers
   const handleOpenUserDetail = async (userId: string) => {
     setDetailLoading(true)
+    setReconcileAudit(null)
     try {
       const res = await fetch(`${config.apiBaseUrl}/api/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${adminToken}` }
@@ -1126,6 +1242,15 @@ export default function AdminDashboard() {
               )}
             </button>
             <button
+              onClick={() => setActiveTab('bets')}
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
+                activeTab === 'bets' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
+              }`}
+            >
+              <Dices className="size-3.5" />
+              Bets & Ledger
+            </button>
+            <button
               onClick={() => setActiveTab('users')}
               className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
                 activeTab === 'users' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
@@ -1613,6 +1738,292 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => setDepositsPage(p => Math.min(depositsTotalPages, p + 1))}
                       disabled={depositsPage >= depositsTotalPages}
+                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            TAB: BETS & AUDIT LEDGER
+            ══════════════════════════════════════════════════════════════ */}
+        {activeTab === 'bets' && (
+          <div className="space-y-4">
+            {/* KPI Metrics Strip */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-[11px] font-medium text-ink-3">TOTAL BETS</div>
+                <div className="mt-1 text-lg font-bold text-ink">
+                  {betsMetrics?.totalBets ?? betsTotal}
+                </div>
+                <div className="mt-0.5 text-[10px] text-ink-3">
+                  Won: {betsMetrics?.countWon ?? 0} • Lost: {betsMetrics?.countLost ?? 0}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-[11px] font-medium text-ink-3">TOTAL WAGERED</div>
+                <div className="mt-1 text-lg font-bold text-white">
+                  {formatMoney(betsMetrics?.totalWagered ?? 0)}
+                </div>
+                <div className="mt-0.5 text-[10px] text-ink-3">Total turnover</div>
+              </div>
+
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-[11px] font-medium text-ink-3">TOTAL PAYOUT</div>
+                <div className="mt-1 text-lg font-bold text-brand">
+                  {formatMoney(betsMetrics?.totalWon ?? 0)}
+                </div>
+                <div className="mt-0.5 text-[10px] text-ink-3">Paid out to players</div>
+              </div>
+
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-[11px] font-medium text-ink-3">HOUSE GROSS (GGR)</div>
+                <div className={`mt-1 text-lg font-bold ${(betsMetrics?.houseGross ?? 0) >= 0 ? 'text-brand' : 'text-loss'}`}>
+                  {formatMoney(betsMetrics?.houseGross ?? 0)}
+                </div>
+                <div className="mt-0.5 text-[10px] text-ink-3">Net platform revenue</div>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 rounded-lg border border-line bg-panel p-3">
+                <div className="text-[11px] font-medium text-ink-3">PLAYER WIN RATE</div>
+                <div className="mt-1 text-lg font-bold text-amber-400">
+                  {betsMetrics?.winRate ?? 0}%
+                </div>
+                <div className="mt-0.5 text-[10px] text-ink-3">
+                  Active now: {betsMetrics?.countActive ?? 0}
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 sm:flex-row sm:items-center sm:justify-between">
+              {/* Status & Type Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex rounded-lg bg-field p-0.5 text-xs">
+                  {(['all', 'won', 'lost', 'active'] as const).map(st => (
+                    <button
+                      key={st}
+                      onClick={() => { setBetStatusFilter(st); setBetsPage(1); }}
+                      className={`rounded px-2.5 py-1 font-medium capitalize transition-colors ${
+                        betStatusFilter === st
+                          ? 'bg-brand text-brand-ink font-bold shadow'
+                          : 'text-ink-2 hover:text-ink'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex rounded-lg bg-field p-0.5 text-xs">
+                  <button
+                    onClick={() => { setBetTypeFilter('all'); setBetsPage(1); }}
+                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                      betTypeFilter === 'all' ? 'bg-raised text-ink font-bold' : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    All Types
+                  </button>
+                  <button
+                    onClick={() => { setBetTypeFilter('money'); setBetsPage(1); }}
+                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                      betTypeFilter === 'money' ? 'bg-raised text-brand font-bold' : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    Real Money
+                  </button>
+                  <button
+                    onClick={() => { setBetTypeFilter('freebet'); setBetsPage(1); }}
+                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                      betTypeFilter === 'freebet' ? 'bg-raised text-amber-400 font-bold' : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    Freebet
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Inputs */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
+                  <input
+                    type="text"
+                    value={betSearch}
+                    onChange={e => { setBetSearch(e.target.value); setBetsPage(1); }}
+                    placeholder="Search phone/username..."
+                    className="h-8 w-44 sm:w-52 rounded-lg border border-line bg-field pl-8 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  value={betRoundId}
+                  onChange={e => { setBetRoundId(e.target.value); setBetsPage(1); }}
+                  placeholder="Round ID..."
+                  className="h-8 w-24 sm:w-28 rounded-lg border border-line bg-field px-2.5 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                />
+
+                <button
+                  onClick={() => setRefreshKey(k => k + 1)}
+                  className="flex size-8 items-center justify-center rounded-lg border border-line bg-field text-ink-2 hover:bg-raised hover:text-ink"
+                  title="Refresh bets"
+                >
+                  <RefreshCw className={`size-3.5 ${betsLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Bets Data Table */}
+            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-line bg-field/60 text-[11px] font-semibold uppercase text-ink-3">
+                    <tr>
+                      <th className="p-3">Time</th>
+                      <th className="p-3">Round ID</th>
+                      <th className="p-3">Player</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Stake</th>
+                      <th className="p-3">Target</th>
+                      <th className="p-3">Multiplier</th>
+                      <th className="p-3">Payout</th>
+                      <th className="p-3">Profit / Loss</th>
+                      <th className="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/60">
+                    {betsLoading ? (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-ink-3">
+                          <RefreshCw className="mx-auto size-5 animate-spin text-brand" />
+                          <p className="mt-2 text-xs">Loading bets ledger...</p>
+                        </td>
+                      </tr>
+                    ) : betsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-ink-3">
+                          <Dices className="mx-auto size-8 text-ink-3/40" />
+                          <p className="mt-2 font-medium text-ink">No bets found</p>
+                          <p className="text-xs text-ink-3">Bets placed across rounds will appear here in real time.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      betsList.map(b => {
+                        const isWon = b.status === 'won'
+                        const isLost = b.status === 'lost'
+                        const profit = isWon ? (b.winAmount - b.amount) : -b.amount
+
+                        return (
+                          <tr key={b._id} className="hover:bg-raised/40 transition-colors">
+                            <td className="p-3 font-mono text-[11px] text-ink-3 whitespace-nowrap">
+                              {formatDate(b.createdAt)}
+                            </td>
+                            <td className="p-3 font-mono text-[11px] text-brand whitespace-nowrap">
+                              {b.roundId}
+                            </td>
+                            <td className="p-3">
+                              {b.userId ? (
+                                <button
+                                  onClick={() => handleOpenUserDetail(b.userId?._id || '')}
+                                  className="text-left group"
+                                >
+                                  <div className="font-semibold text-ink group-hover:text-brand flex items-center gap-1">
+                                    {b.userId.username}
+                                    <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                  <div className="text-[10px] text-ink-3 font-mono">{b.userId.phone}</div>
+                                </button>
+                              ) : (
+                                <span className="text-ink-3">—</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                                b.isFreebet ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-brand/10 text-brand border border-brand/20'
+                              }`}>
+                                {b.isFreebet ? 'Freebet' : 'Real Cash'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-semibold text-white whitespace-nowrap">
+                              KSH {b.amount}
+                            </td>
+                            <td className="p-3 text-ink-3 font-mono whitespace-nowrap">
+                              {b.autoCashoutTarget ? `${b.autoCashoutTarget.toFixed(2)}x` : '—'}
+                            </td>
+                            <td className="p-3 font-bold whitespace-nowrap">
+                              {b.multiplierCaught ? (
+                                <span className={isWon ? 'text-brand' : 'text-ink-3'}>
+                                  {b.multiplierCaught}x
+                                </span>
+                              ) : (
+                                <span className="text-ink-3">—</span>
+                              )}
+                            </td>
+                            <td className="p-3 font-semibold whitespace-nowrap">
+                              {isWon ? (
+                                <span className="text-brand">KSH {b.winAmount}</span>
+                              ) : (
+                                <span className="text-ink-3">KSH 0</span>
+                              )}
+                            </td>
+                            <td className="p-3 font-semibold whitespace-nowrap">
+                              {isWon ? (
+                                <span className="text-brand">+{formatMoney(profit)}</span>
+                              ) : isLost ? (
+                                <span className="text-loss">-{formatMoney(Math.abs(profit))}</span>
+                              ) : (
+                                <span className="text-ink-3">—</span>
+                              )}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                isWon
+                                  ? 'bg-brand/15 text-brand border border-brand/30'
+                                  : isLost
+                                  ? 'bg-loss/15 text-loss border border-loss/30'
+                                  : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              }`}>
+                                {isWon && <CheckCircle2 className="size-3" />}
+                                {isLost && <XCircle className="size-3" />}
+                                {b.status === 'active' && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />}
+                                {b.status}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Bar */}
+              {betsTotalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-line bg-field/30 px-3 py-2 text-xs">
+                  <span className="text-ink-3">
+                    Showing {(betsPage - 1) * 25 + 1} - {Math.min(betsPage * 25, betsTotal)} of {betsTotal} bets
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setBetsPage(p => Math.max(1, p - 1))}
+                      disabled={betsPage <= 1}
+                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="px-2 text-ink-3">
+                      {betsPage} / {betsTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setBetsPage(p => Math.min(betsTotalPages, p + 1))}
+                      disabled={betsPage >= betsTotalPages}
                       className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
                     >
                       Next →
@@ -3086,6 +3497,54 @@ export default function AdminDashboard() {
                   <div className="card-label">WON</div>
                   <div className="card-amount">KSH <span>{selectedUserForDetail.stats.totalWon.toFixed(2)}</span></div>
                 </div>
+              </div>
+
+              {/* Ledger Audit & Balance Reconciliation Card */}
+              <div className="rounded-lg border border-[#32353b] bg-[#1a1c1e] p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wide">
+                    <Scale className="size-3.5 text-[#00eb5b]" />
+                    <span>Balance Ledger Audit</span>
+                  </div>
+                  <button
+                    onClick={() => handleReconcileUser(selectedUserForDetail.user._id, false)}
+                    disabled={isReconciling}
+                    className="flex items-center gap-1 rounded bg-[#282a2e] px-2.5 py-1 text-[11px] font-medium text-[#d1d5db] hover:bg-[#32353b] hover:text-white disabled:opacity-50"
+                  >
+                    <RefreshCw className={`size-3 ${isReconciling ? 'animate-spin' : ''}`} />
+                    Audit Ledger
+                  </button>
+                </div>
+
+                {reconcileAudit && (
+                  <div className="rounded bg-[#282a2e] p-2.5 text-xs space-y-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
+                      <div>Deposits: <b className="text-[#00eb5b]">+{formatMoney(reconcileAudit.totalDeposits)}</b></div>
+                      <div>Withdrawals: <b className="text-[#ff5c6c]">-{formatMoney(reconcileAudit.totalWithdrawals)}</b></div>
+                      <div>Wagered: <b className="text-white">-{formatMoney(reconcileAudit.realWagered)}</b></div>
+                      <div>Won Payout: <b className="text-[#00eb5b]">+{formatMoney(reconcileAudit.realWonPayout)}</b></div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-[#32353b] text-xs">
+                      <div>
+                        Expected: <b className="text-white">{formatMoney(reconcileAudit.calculatedBalance)}</b> • Current: <b className="text-[#a0a6b1]">{formatMoney(reconcileAudit.currentBalance)}</b>
+                        {reconcileAudit.discrepancy !== 0 && (
+                          <span className="ml-2 font-bold text-amber-400">
+                            (Diff: {reconcileAudit.discrepancy > 0 ? '+' : ''}{formatMoney(reconcileAudit.discrepancy)})
+                          </span>
+                        )}
+                      </div>
+                      {reconcileAudit.discrepancy !== 0 && (
+                        <button
+                          onClick={() => handleReconcileUser(selectedUserForDetail.user._id, true)}
+                          disabled={isReconciling}
+                          className="rounded bg-[#00eb5b] px-2.5 py-1 text-[11px] font-bold text-[#091e0f] hover:bg-[#00c84d] disabled:opacity-50 shadow"
+                        >
+                          {isReconciling ? 'SYNCING...' : 'APPLY ACCURATE BALANCE'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Recent Bets */}

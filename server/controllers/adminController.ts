@@ -7,7 +7,7 @@ import { Deposit } from '../models/Deposit.js'
 import { Withdrawal } from '../models/Withdrawal.js'
 import { OddsControl } from '../models/OddsControl.js'
 import { Settings } from '../models/Settings.js'
-import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO } from '../socket.js'
+import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO, emitUserBalanceUpdate } from '../socket.js'
 import { creditDepositAtomically } from './webhookController.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026'
@@ -696,4 +696,302 @@ export async function updateAdminDepositStatus(req: Request, res: Response) {
     return res.status(500).json({ error: error.message })
   }
 }
+
+export async function getAdminBets(req: Request, res: Response) {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 25))
+    const status = (req.query.status as string) || 'all'
+    const type = (req.query.type as string) || 'all'
+    const search = ((req.query.search as string) || '').trim()
+    const roundId = ((req.query.roundId as string) || '').trim()
+
+    const query: any = {}
+
+    if (status && status !== 'all') {
+      query.status = status
+    }
+
+    if (type === 'money') {
+      query.isFreebet = { $ne: true }
+    } else if (type === 'freebet') {
+      query.isFreebet = true
+    }
+
+    if (roundId) {
+      query.roundId = new RegExp(roundId, 'i')
+    }
+
+    if (search) {
+      const matchingUsers = await User.find({
+        $or: [
+          { phone: new RegExp(search, 'i') },
+          { username: new RegExp(search, 'i') }
+        ]
+      }).select('_id')
+      query.userId = { $in: matchingUsers.map(u => u._id) }
+    }
+
+    const skip = (page - 1) * limit
+
+    const [bets, total, metricsAgg] = await Promise.all([
+      Bet.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'username phone balance'),
+      Bet.countDocuments(query),
+      Bet.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalWagered: { $sum: '$amount' },
+            totalWon: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+            },
+            countWon: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, 1, 0] }
+            },
+            countLost: {
+              $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] }
+            },
+            countActive: {
+              $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+            }
+          }
+        }
+      ])
+    ])
+
+    const totalWagered = metricsAgg[0]?.totalWagered || 0
+    const totalWon = metricsAgg[0]?.totalWon || 0
+    const countWon = metricsAgg[0]?.countWon || 0
+    const countLost = metricsAgg[0]?.countLost || 0
+    const countActive = metricsAgg[0]?.countActive || 0
+    const resolvedCount = countWon + countLost
+    const winRate = resolvedCount > 0 ? Math.round((countWon / resolvedCount) * 1000) / 10 : 0
+    const houseGross = Math.round((totalWagered - totalWon) * 100) / 100
+
+    return res.json({
+      success: true,
+      bets,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1
+      },
+      metrics: {
+        totalBets: total,
+        totalWagered,
+        totalWon,
+        houseGross,
+        countWon,
+        countLost,
+        countActive,
+        winRate
+      }
+    })
+  } catch (error: any) {
+    console.error('getAdminBets error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to fetch bets' })
+  }
+}
+
+export async function reconcileUserBalance(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { apply } = req.body
+
+    const user = await User.findById(id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
+      Deposit.aggregate([
+        { $match: { userId: user._id, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Withdrawal.aggregate([
+        { $match: { userId: user._id, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Bet.aggregate([
+        { $match: { userId: user._id } },
+        {
+          $group: {
+            _id: null,
+            realWagered: {
+              $sum: { $cond: [{ $eq: ['$isFreebet', true] }, 0, '$amount'] }
+            },
+            wonPayout: {
+              $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+            },
+            freebetProfit: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$isFreebet', true] }, { $eq: ['$status', 'won'] }] },
+                  { $max: [0, { $subtract: ['$winAmount', '$amount'] }] },
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
+    ])
+
+    const totalDeposits = depositsAgg[0]?.total || 0
+    const totalWithdrawals = withdrawalsAgg[0]?.total || 0
+    const referralEarnings = user.referralsEarnings || 0
+    const realWagered = betsAgg[0]?.realWagered || 0
+    const realWonPayout = (betsAgg[0]?.wonPayout || 0) - (betsAgg[0]?.freebetProfit || 0)
+    const freebetProfit = betsAgg[0]?.freebetProfit || 0
+
+    // Expected balance = Deposits - Withdrawals + ReferralEarnings - RealWagered + RealWonPayout + FreebetProfit
+    const calculatedBalance = Math.max(0, Math.round((totalDeposits - totalWithdrawals + referralEarnings - realWagered + realWonPayout + freebetProfit) * 100) / 100)
+    const currentBalance = Number(user.balance) || 0
+    const discrepancy = Math.round((currentBalance - calculatedBalance) * 100) / 100
+
+    let applied = false
+    if (apply === true && discrepancy !== 0) {
+      user.balance = calculatedBalance
+      await user.save()
+      applied = true
+
+      const apiRef = `RECON-${Date.now()}-${user._id.toString().slice(-4)}`
+      await Deposit.create({
+        userId: user._id,
+        phone: user.phone,
+        amount: Math.abs(discrepancy),
+        apiRef,
+        status: discrepancy < 0 ? 'completed' : 'failed',
+        failureReason: `Balance reconciliation adjustment: from ${currentBalance} to ${calculatedBalance}`
+      })
+
+      emitUserBalanceUpdate(user._id, {
+        balance: calculatedBalance,
+        newBalance: calculatedBalance,
+        type: 'reconciliation'
+      })
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        phone: user.phone,
+        username: user.username,
+        balance: user.balance
+      },
+      audit: {
+        totalDeposits,
+        totalWithdrawals,
+        referralEarnings,
+        realWagered,
+        realWonPayout,
+        freebetProfit,
+        calculatedBalance,
+        currentBalance,
+        discrepancy,
+        applied
+      }
+    })
+  } catch (error: any) {
+    console.error('reconcileUserBalance error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to reconcile user balance' })
+  }
+}
+
+export async function reconcileAllBalances(req: Request, res: Response) {
+  try {
+    const { apply } = req.body
+    const users = await User.find({ role: { $ne: 'admin' } })
+    const results = []
+
+    for (const user of users) {
+      const [depositsAgg, withdrawalsAgg, betsAgg] = await Promise.all([
+        Deposit.aggregate([
+          { $match: { userId: user._id, status: 'completed' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Withdrawal.aggregate([
+          { $match: { userId: user._id, status: 'completed' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Bet.aggregate([
+          { $match: { userId: user._id } },
+          {
+            $group: {
+              _id: null,
+              realWagered: {
+                $sum: { $cond: [{ $eq: ['$isFreebet', true] }, 0, '$amount'] }
+              },
+              wonPayout: {
+                $sum: { $cond: [{ $eq: ['$status', 'won'] }, '$winAmount', 0] }
+              },
+              freebetProfit: {
+                $sum: {
+                  $cond: [
+                    { $and: [{ $eq: ['$isFreebet', true] }, { $eq: ['$status', 'won'] }] },
+                    { $max: [0, { $subtract: ['$winAmount', '$amount'] }] },
+                    0
+                  ]
+                }
+              }
+            }
+          }
+        ])
+      ])
+
+      const totalDeposits = depositsAgg[0]?.total || 0
+      const totalWithdrawals = withdrawalsAgg[0]?.total || 0
+      const referralEarnings = user.referralsEarnings || 0
+      const realWagered = betsAgg[0]?.realWagered || 0
+      const realWonPayout = (betsAgg[0]?.wonPayout || 0) - (betsAgg[0]?.freebetProfit || 0)
+      const freebetProfit = betsAgg[0]?.freebetProfit || 0
+
+      const calculatedBalance = Math.max(0, Math.round((totalDeposits - totalWithdrawals + referralEarnings - realWagered + realWonPayout + freebetProfit) * 100) / 100)
+      const currentBalance = Number(user.balance) || 0
+      const discrepancy = Math.round((currentBalance - calculatedBalance) * 100) / 100
+
+      if (discrepancy !== 0) {
+        let applied = false
+        if (apply === true) {
+          user.balance = calculatedBalance
+          await user.save()
+          applied = true
+
+          emitUserBalanceUpdate(user._id, {
+            balance: calculatedBalance,
+            newBalance: calculatedBalance,
+            type: 'reconciliation'
+          })
+        }
+
+        results.push({
+          userId: user._id,
+          phone: user.phone,
+          username: user.username,
+          currentBalance,
+          calculatedBalance,
+          discrepancy,
+          applied
+        })
+      }
+    }
+
+    return res.json({
+      success: true,
+      totalAudited: users.length,
+      discrepanciesFound: results.length,
+      applied: Boolean(apply),
+      discrepancies: results
+    })
+  } catch (error: any) {
+    console.error('reconcileAllBalances error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to reconcile all balances' })
+  }
+}
+
 

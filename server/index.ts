@@ -50,7 +50,10 @@ import {
   getOddsEngineConfig,
   setOddsEngineRule,
   resetOddsEngine,
-  syncDatabaseUsers
+  syncDatabaseUsers,
+  getAdminBets,
+  reconcileUserBalance,
+  reconcileAllBalances
 } from './controllers/adminController.js'
 import { Deposit } from './models/Deposit.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
@@ -134,6 +137,11 @@ app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware,
 app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet)
 app.post('/api/admin/users/:id/toggle-freeze', adminRateLimit, adminMiddleware, toggleUserFreeze)
 app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware, resetUserPassword)
+app.post('/api/admin/users/:id/reconcile-balance', adminRateLimit, adminMiddleware, reconcileUserBalance)
+app.post('/api/admin/users/reconcile-all', adminRateLimit, adminMiddleware, reconcileAllBalances)
+
+// Admin bet management & audit ledger
+app.get('/api/admin/bets', adminRateLimit, adminMiddleware, getAdminBets)
 
 // Admin deposit management
 app.get('/api/admin/deposits', adminRateLimit, adminMiddleware, getAdminDeposits)

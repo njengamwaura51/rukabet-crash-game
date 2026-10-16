@@ -8,6 +8,9 @@ export interface IBet extends Document {
   multiplierCaught: number | null
   status: 'pending' | 'active' | 'won' | 'lost' | 'cancelled'
   winAmount: number
+  isFreebet: boolean
+  panelId: number
+  autoCashoutTarget: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -41,6 +44,19 @@ const BetSchema = new Schema<IBet>({
   winAmount: {
     type: Number,
     default: 0
+  },
+  isFreebet: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  panelId: {
+    type: Number,
+    default: 1
+  },
+  autoCashoutTarget: {
+    type: Number,
+    default: null
   }
 }, {
   timestamps: true
@@ -50,5 +66,9 @@ const BetSchema = new Schema<IBet>({
 BetSchema.index({ userId: 1, createdAt: -1 })
 // Index for round queries
 BetSchema.index({ roundId: 1, status: 1 })
+// Index for status queries
+BetSchema.index({ status: 1, createdAt: -1 })
+// Compound index for user round active bets
+BetSchema.index({ userId: 1, roundId: 1, status: 1 })
 
 export const Bet = mongoose.model<IBet>('Bet', BetSchema)

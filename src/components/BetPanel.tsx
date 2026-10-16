@@ -141,10 +141,12 @@ export default function BetPanel({
   useEffect(() => {
     if (autoBetEnabled && gamePhase === 'waiting' && lastBetAmount >= MIN_AMOUNT && isLoggedIn && !activeBet && !queuedBet) {
       if (lastBetAmount <= maxBalance) {
-        betting.placeBet(panelId, lastBetAmount, isFreebet, maxBalance, freebetLocked)
+        const targetMultiplier = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
+        const validAutoCashout = targetMultiplier && !Number.isNaN(targetMultiplier) && targetMultiplier >= 1.01 ? targetMultiplier : undefined
+        betting.placeBet(panelId, lastBetAmount, isFreebet, maxBalance, freebetLocked, validAutoCashout)
       }
     }
-  }, [gamePhase, autoBetEnabled, lastBetAmount, isLoggedIn, panelId, betting, isFreebet, activeBet, queuedBet, maxBalance, freebetLocked])
+  }, [gamePhase, autoBetEnabled, lastBetAmount, isLoggedIn, panelId, betting, isFreebet, activeBet, queuedBet, maxBalance, freebetLocked, autoCashoutEnabled, autoCashout])
 
   useEffect(() => {
     if (!error) return
@@ -167,6 +169,8 @@ export default function BetPanel({
     }
 
     const betAmount = Math.max(minAmount, Math.min(amount, maxBalance))
+    const targetMultiplier = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
+    const validAutoCashout = targetMultiplier && !Number.isNaN(targetMultiplier) && targetMultiplier >= 1.01 ? targetMultiplier : undefined
 
     // Check freebet lock upfront across all phases
     if (isFreebet && freebetLocked) {
@@ -179,7 +183,7 @@ export default function BetPanel({
         setError('Insufficient funds')
         return
       }
-      const success = betting.placeBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
+      const success = betting.placeBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked, validAutoCashout)
       if (success) {
         setLastBetAmount(betAmount)
       } else {
@@ -193,7 +197,7 @@ export default function BetPanel({
         setError('Insufficient funds')
         return
       }
-      const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked)
+      const success = betting.queueBet(panelId, betAmount, isFreebet, maxBalance, freebetLocked, validAutoCashout)
       if (success) {
         setLastBetAmount(betAmount)
       } else {

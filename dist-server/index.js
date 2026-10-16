@@ -28,7 +28,7 @@ import { initiateDeposit, verifyPendingDeposit, getDepositStatus } from './contr
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js';
 import { paydWebhook, intasendWebhook } from './controllers/webhookController.js';
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js';
-import { getAdminOverview, adminLogin, getAdminUsers, getAdminUserDetail, adjustUserBalance, adjustUserFreebet, toggleUserFreeze, resetUserPassword, getAdminWithdrawals, updateWithdrawalStatus, getAdminDeposits, updateAdminDepositStatus, getOddsEngineConfig, setOddsEngineRule, resetOddsEngine, syncDatabaseUsers } from './controllers/adminController.js';
+import { getAdminOverview, adminLogin, getAdminUsers, getAdminUserDetail, adjustUserBalance, adjustUserFreebet, toggleUserFreeze, resetUserPassword, getAdminWithdrawals, updateWithdrawalStatus, getAdminDeposits, updateAdminDepositStatus, getOddsEngineConfig, setOddsEngineRule, resetOddsEngine, syncDatabaseUsers, getAdminBets, reconcileUserBalance, reconcileAllBalances } from './controllers/adminController.js';
 import { Deposit } from './models/Deposit.js';
 import { authMiddleware, adminMiddleware } from './middleware/auth.js';
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js';
@@ -98,6 +98,10 @@ app.post('/api/admin/users/:id/adjust-balance', adminRateLimit, adminMiddleware,
 app.post('/api/admin/users/:id/adjust-freebet', adminRateLimit, adminMiddleware, adjustUserFreebet);
 app.post('/api/admin/users/:id/toggle-freeze', adminRateLimit, adminMiddleware, toggleUserFreeze);
 app.post('/api/admin/users/:id/reset-password', adminRateLimit, adminMiddleware, resetUserPassword);
+app.post('/api/admin/users/:id/reconcile-balance', adminRateLimit, adminMiddleware, reconcileUserBalance);
+app.post('/api/admin/users/reconcile-all', adminRateLimit, adminMiddleware, reconcileAllBalances);
+// Admin bet management & audit ledger
+app.get('/api/admin/bets', adminRateLimit, adminMiddleware, getAdminBets);
 // Admin deposit management
 app.get('/api/admin/deposits', adminRateLimit, adminMiddleware, getAdminDeposits);
 app.post('/api/admin/deposits/:id/status', adminRateLimit, adminMiddleware, updateAdminDepositStatus);
