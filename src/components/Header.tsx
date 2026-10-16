@@ -36,7 +36,7 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
           {/* Brand + support */}
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link to="/" className="flex shrink-0 items-center rounded-md">
-              <img src="/logo.png" alt="" className="h-8 w-auto sm:h-9" />
+              <img src="/logo.png" alt={config.brandName} className="h-[30px] w-auto object-contain sm:h-8 lg:h-9" />
               <span className="sr-only">{config.brandName} home</span>
             </Link>
 

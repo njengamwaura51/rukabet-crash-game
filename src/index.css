@@ -65,13 +65,13 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* ── 4-tier solid matte surface scale (zero alpha anywhere) ──────────── */
-  --color-page: #0b0e14;        /* page canvas */
-  --color-panel: #121620;       /* structural cards & panels */
-  --color-field: #181e2b;       /* recessed inputs & segmented fields */
-  --color-raised: #222a3a;      /* raised & active interactive states */
-  --color-line: #262f40;        /* 1px structural dividers */
-  --color-line-strong: #344156; /* emphasised dividers, scrollbar thumbs */
+  /* ── 4-tier solid matte surface scale (neutral dark charcoal, no grey-blue sheen) ──────────── */
+  --color-page: #0b0c0e;        /* pitch canvas */
+  --color-panel: #121316;       /* solid matte charcoal panels */
+  --color-field: #18191d;       /* solid recessed inputs & steppers */
+  --color-raised: #212328;      /* solid raised buttons & chips */
+  --color-line: #1d1f25;        /* subtle 1px divider */
+  --color-line-strong: #2c2f38; /* active/focus borders */
 
   /* ── Text hierarchy ──────────────────────────────────────────────────── */
   --color-ink: #f8fafc;   /* primary numbers & CTAs */
@@ -114,13 +114,13 @@
   --badge-outline: #0e1118;
   --opaque-button-border-intensity: -8;
 
-  /* Surfaces (exact hsl of the matte scale above) */
-  --background: 220 29% 6%;
+  /* Surfaces (exact hsl of the matte charcoal scale above) */
+  --background: 220 12% 5%;
   --foreground: 210 40% 98%;
-  --border: 219 25% 20%;
-  --card: 223 28% 10%;
+  --border: 225 10% 13%;
+  --card: 225 8% 8%;
   --card-foreground: 210 40% 98%;
-  --card-border: 219 25% 20%;
+  --card-border: 225 10% 13%;
 
   /* Primary */
   --primary: 143 100% 39%;
@@ -128,19 +128,19 @@
   --primary-border: hsl(143 100% 32%);
 
   /* Secondary (recessed field) */
-  --secondary: 221 28% 13%;
+  --secondary: 225 9% 10%;
   --secondary-foreground: 210 40% 98%;
-  --secondary-border: hsl(219 25% 20%);
+  --secondary-border: hsl(225 10% 13%);
 
   /* Muted (raised) */
-  --muted: 220 26% 18%;
+  --muted: 223 9% 14%;
   --muted-foreground: 215 20% 65%;
-  --muted-border: hsl(219 25% 20%);
+  --muted-border: hsl(225 10% 13%);
 
   /* Accent (hover surfaces, not brand) */
-  --accent: 220 26% 18%;
+  --accent: 223 9% 14%;
   --accent-foreground: 210 40% 98%;
-  --accent-border: hsl(219 25% 20%);
+  --accent-border: hsl(225 10% 13%);
 
   /* Destructive */
   --destructive: 354 100% 68%;
@@ -148,7 +148,7 @@
   --destructive-border: hsl(354 80% 55%);
 
   /* Input / ring */
-  --input: 219 25% 20%;
+  --input: 225 10% 13%;
   --ring: 143 100% 39%;
 
   /* Charts */
@@ -159,21 +159,21 @@
   --chart-5: 270 95% 75%;
 
   /* Sidebar */
-  --sidebar: 223 28% 10%;
+  --sidebar: 225 8% 8%;
   --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 219 25% 20%;
+  --sidebar-border: 225 10% 13%;
   --sidebar-primary: 143 100% 39%;
   --sidebar-primary-foreground: 140 83% 7%;
   --sidebar-primary-border: hsl(143 100% 32%);
-  --sidebar-accent: 220 26% 18%;
+  --sidebar-accent: 223 9% 14%;
   --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-accent-border: hsl(219 25% 20%);
+  --sidebar-accent-border: hsl(225 10% 13%);
   --sidebar-ring: 143 100% 39%;
 
   /* Popover */
-  --popover: 223 28% 10%;
+  --popover: 225 8% 8%;
   --popover-foreground: 210 40% 98%;
-  --popover-border: 219 25% 20%;
+  --popover-border: 225 10% 13%;
 
   /* Fonts */
   --app-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

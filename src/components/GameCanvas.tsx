@@ -510,7 +510,7 @@ function BetModeToggle({
     <div
       role="group"
       aria-label="Bet wallet"
-      className="flex origin-top-left scale-[0.833] rounded-md border border-line bg-page/90 p-0.5 shadow-sm backdrop-blur"
+      className="flex origin-top-left scale-[0.833] rounded-md border border-line bg-page p-0.5 shadow-sm"
     >
       <button
         type="button"

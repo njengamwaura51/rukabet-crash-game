@@ -33,7 +33,7 @@ function generateMaskedUsername(rng: () => number): string {
   const prefix = USERNAME_PREFIXES[Math.floor(rng() * USERNAME_PREFIXES.length)]
   const firstDigit = Math.floor(rng() * 9) + 1
   const lastTwo = String(Math.floor(rng() * 100)).padStart(2, '0')
-  return `${prefix}${firstDigit}****${lastTwo}`
+  return `${prefix}${firstDigit}**${lastTwo}`
 }
 
 // Bet amounts ranging from 10 to 10,000 KSH

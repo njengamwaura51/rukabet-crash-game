@@ -39,8 +39,16 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
   const topBets = useMemo(
     () =>
       [...sharedBets]
-        .filter((b) => (b.cashedOut && b.win && b.win > 0) || b.bet >= 500)
-        .sort((a, b) => (b.win || b.bet) - (a.win || a.bet))
+        .filter((b) => {
+          const co = b.cashout ?? b.cashOut
+          const w = b.won ?? b.win
+          return (co !== null && co !== undefined && co > 0) || (w !== null && w !== undefined && w > 0) || b.bet >= 500
+        })
+        .sort((a, b) => {
+          const aVal = a.won ?? a.win ?? a.bet
+          const bVal = b.won ?? b.win ?? b.bet
+          return bVal - aVal
+        })
         .slice(0, 30),
     [sharedBets]
   )
@@ -107,25 +115,27 @@ export function LiveBetsSidebar({ username, sharedBets = [], variant = 'sidebar'
       </div>
 
       {/* Rows */}
-      <div className="live-bets-scroll flex-1 divide-y divide-line/30 overflow-y-auto overscroll-contain">
+      <div className="live-bets-scroll flex-1 divide-y divide-line overflow-y-auto overscroll-contain">
         {displayedBets.length === 0 ? (
           <div className="px-3 py-8 text-center text-xs text-ink-3">{emptyMessage}</div>
         ) : (
           displayedBets.map((b) => {
-            const hasCashed = b.cashedOut
-            const wonAmount = b.win || (hasCashed && b.cashOut ? b.bet * b.cashOut : 0)
+            const co = b.cashout ?? b.cashOut
+            const hasCashed = Boolean(b.cashedOut || (co !== null && co !== undefined && co > 0))
+            const rawWon = b.won ?? b.win
+            const wonAmount = rawWon && rawWon > 0 ? rawWon : (hasCashed && co ? b.bet * co : 0)
 
             return (
               <div
                 key={b.id || `${b.user}-${b.bet}`}
-                className={`${ROW_GRID} items-center text-xs ${hasCashed ? 'bg-brand/5' : ''}`}
+                className={`${ROW_GRID} items-center text-xs ${hasCashed ? 'bg-brand-tint' : ''}`}
               >
                 <span className="truncate font-medium text-ink">{b.user}</span>
                 <span className="text-right tabular-nums text-ink">{formatAmount(b.bet)}</span>
                 <span className="text-right tabular-nums">
-                  {hasCashed && b.cashOut ? (
-                    <span className="inline-block rounded bg-brand/10 px-1.5 py-0.5 text-[11px] font-bold leading-none text-brand">
-                      {b.cashOut.toFixed(2)}x
+                  {hasCashed && co ? (
+                    <span className="inline-block rounded border border-brand-line bg-brand-tint px-1.5 py-0.5 text-[11px] font-bold leading-none text-brand">
+                      {co.toFixed(2)}x
                     </span>
                   ) : (
                     <span className="text-ink-3">—</span>
