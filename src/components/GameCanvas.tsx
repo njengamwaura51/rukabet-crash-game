@@ -15,7 +15,7 @@ interface GameCanvasProps {
   freebetAmount?: number
 }
 
-const PAD = { left: 18, right: 16, top: 20, bottom: 20 }  // Increased left padding to 18 for Y-axis visibility
+const PAD = { left: 28, right: 16, top: 20, bottom: 24 }  // Origin at (28, CH - 24) matching flight curve origin
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SMOOTH INTERPOLATION — lerp values for buttery animation
@@ -140,105 +140,136 @@ function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   JET SPRITE & TRAJECTORY CURVE
-   Anchored at rear engine (32% from tail, 66% from top) wired to neon curve
+   GREEN ASPIREBET-STYLE JET SPRITE & TRAJECTORY LINE
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const jetImg = new Image()
+// 1. Load the Green Aspirebet-style SVG as a ready-to-draw Image
+const PLANE_SVG_STRING = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 50" width="110" height="50" fill="none">
+  <defs>
+    <linearGradient id="fg" x1="10" y1="18" x2="106" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14c953"/><stop offset="55%" stop-color="#26ef6d"/><stop offset="100%" stop-color="#6effa1"/>
+    </linearGradient>
+    <linearGradient id="sh" x1="28" y1="20" x2="102" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9effbf" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="bs" x1="12" y1="31" x2="92" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#055421"/><stop offset="100%" stop-color="#0b8f3a"/>
+    </linearGradient>
+  </defs>
+  <path d="M46 26 L34 20 L41 19 L57 25 Z" fill="#08682b"/>
+  <path d="M6 12 L19 12 L28 29 L11 31 Z" fill="url(#fg)"/>
+  <path d="M6 12 L12 12 L23 29 L16 30 Z" fill="#0b963d"/>
+  <path d="M1 12 C5 10, 17 10, 23 13 C17 14.5, 6 14.5, 1 12 Z" fill="#4df989"/>
+  <path d="M12 26 L24 25 L22 31 L11 31 Z" fill="#065c25"/>
+  <path d="M4 34 C22 38, 68 37, 106 28 C88 36, 40 40, 10 35 Z" fill="url(#bs)"/>
+  <path d="M4 34 C16 27, 44 22, 76 21 C90 21, 100 24, 108 27 C96 32, 66 36, 10 35 Z" fill="url(#fg)"/>
+  <path d="M22 25 C46 21, 76 21, 106 27 C86 24, 50 24, 22 26 Z" fill="url(#sh)"/>
+  <path d="M80 22.3 C86 22.3, 92 23.8, 95 25.5 C90 26.2, 83 26.2, 78 25.2 Z" fill="#042911"/>
+  <circle cx="70" cy="26.5" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="62" cy="27.2" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="54" cy="27.8" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <circle cx="46" cy="28.4" r="2" fill="#042911" stroke="#63ff9c" stroke-width="0.6"/>
+  <path d="M36 33 L64 30 L49 41 L26 42 Z" fill="#064e20"/>
+  <path d="M38 32 L62 30 L46 38 L28 39 Z" fill="#14c352"/>
+</svg>`
+
+const greenJetImg = new Image()
 if (typeof window !== 'undefined') {
-  jetImg.src = '/assets/jet.svg'
+  greenJetImg.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLANE_SVG_STRING)
 }
 
-/**
- * Draws the quadratic flight curve and translucent green shade under it.
- * Directly wired to the rear tip of the jet.
- */
-function drawFlightCurve(
-  ctx: CanvasRenderingContext2D,
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number
-) {
-  // Control point pulls the middle of the line slightly downward and right
-  const cpX = startX + (endX - startX) * 0.55
-  const cpY = startY - (startY - endY) * 0.18
-
-  // 1. Draw the translucent green fill area under the curve
-  ctx.beginPath()
-  ctx.moveTo(startX, startY)
-  ctx.quadraticCurveTo(cpX, cpY, endX, endY)
-  ctx.lineTo(endX, startY)
-  ctx.closePath()
-
-  const fillGrad = ctx.createLinearGradient(0, endY, 0, startY)
-  fillGrad.addColorStop(0, 'rgba(0, 231, 84, 0.42)')
-  fillGrad.addColorStop(1, 'rgba(0, 231, 84, 0.08)')
-  ctx.fillStyle = fillGrad
-  ctx.fill()
-
-  // 2. Draw the bright neon top stroke
-  ctx.beginPath()
-  ctx.moveTo(startX, startY)
-  ctx.quadraticCurveTo(cpX, cpY, endX, endY)
-  ctx.strokeStyle = '#00ff5e'
-  ctx.lineWidth = 3.5
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.stroke()
-}
+// Exact tail-tip coordinates inside the 110x50 SVG (x=4, y=34)
+const TAIL_ANCHOR_X = 4 / 110 // 0.0363
+const TAIL_ANCHOR_Y = 34 / 50 // 0.6800
+const JET_ASPECT = 110 / 50   // 2.2
 
 /**
- * Draws the jet anchored at (anchorXRatio: 0.32, anchorYRatio: 0.66)
- * with mobile edge protection and subtle turbulence oscillation.
+ * Call this inside requestAnimationFrame loop to render trajectory curve, shade, and locked jet.
  */
-function drawPlane(
+function renderFlightAndPlane(
   ctx: CanvasRenderingContext2D,
-  endX: number,
-  endY: number,
   canvasWidth: number,
-  isTurbulence: boolean,
-  timeMs: number
+  canvasHeight: number,
+  progress: number,
+  timeMs: number,
+  domPlaneEl: HTMLElement | null = null
 ) {
-  // 1. Base desired width
-  const aspect = 120 / 52 // 2.307
-  let desiredWidth = Math.min(Math.max(canvasWidth * 0.13, 68), 115)
+  // 1. Origin (0,0) point at bottom-left axis
+  const startX = PAD.left
+  const startY = canvasHeight - PAD.bottom
 
-  // 2. Anchor point inside the jet sprite (32% from tail, 66% from top)
-  // This puts the green line tip right under the rear wing/engine
-  const anchorXRatio = 0.32
-  const anchorYRatio = 0.66
+  // 2. Responsive plane size (longer than old plane, shorter than Aspirebet, safe on mobile)
+  const planeWidth = Math.min(Math.max(canvasWidth * 0.115, 62), 104)
+  const planeHeight = planeWidth / JET_ASPECT
 
-  // 3. Mobile Right-Edge Protection:
-  // Ensure the nose (which extends (1 - anchorXRatio) to the right of endX)
-  // always stops at least 6px inside the right canvas border.
-  const rightPadding = 6
-  const availableRightSpace = canvasWidth - endX - rightPadding
-  const maxSafeWidth = availableRightSpace / (1 - anchorXRatio)
+  // 3. Max turbulence position (keeps turbulence at proper spot while guaranteeing
+  //    the nose tip never crops on mobile edges)
+  const rightMargin = 8
+  const noseExtension = planeWidth * (1 - TAIL_ANCHOR_X)
+  const maxTurbulenceX = Math.min(canvasWidth * 0.86, canvasWidth - noseExtension - rightMargin)
+  const maxTurbulenceY = canvasHeight * 0.22
 
-  const planeWidth = Math.max(16, Math.min(desiredWidth, maxSafeWidth))
-  const planeHeight = planeWidth / aspect
+  // Clamp progress between 0 (at 0,0 rest) and 1 (turbulence cruise)
+  const t = Math.max(0, Math.min(1, progress))
 
-  // 4. Subtle turbulence oscillation at max height
-  const pitchShake = isTurbulence ? Math.sin(timeMs * 0.012) * 0.04 : 0
-  const basePitchRad = (-11 * Math.PI) / 180 // -11 deg nose-up angle
+  // Smooth ease-out climb from (0,0) to the turbulence point
+  const baseTipX = startX + (maxTurbulenceX - startX) * t
+  const baseTipY = startY - (startY - maxTurbulenceY) * Math.pow(t, 0.85)
 
-  ctx.save()
-  // Move origin to the exact tip of the green trajectory line
-  ctx.translate(endX, endY)
-  ctx.rotate(basePitchRad + pitchShake)
+  // 4. Smooth, slow, small-height turbulence ONLY when reaching max height (t > 0.85)
+  //    Blends in smoothly from 0 to 1 between t=0.85 and t=1.0 so there is zero sudden jump
+  const turbulenceBlend = Math.max(0, Math.min(1, (t - 0.85) / 0.15))
+  const slowBobY = Math.sin(timeMs * 0.0022) * 3.5 * turbulenceBlend
+  const slowBobX = Math.cos(timeMs * 0.0016) * 1.5 * turbulenceBlend
 
-  // Draw jet anchored at (anchorXRatio, anchorYRatio)
-  if (jetImg.complete && jetImg.naturalWidth > 0) {
-    ctx.drawImage(
-      jetImg,
-      -planeWidth * anchorXRatio,
-      -planeHeight * anchorYRatio,
-      planeWidth,
-      planeHeight
-    )
+  // 5. LOCKED TAIL TIP COORDINATE: Used by BOTH the trajectory line AND the plane tail
+  const tipX = baseTipX + slowBobX
+  const tipY = baseTipY + slowBobY
+
+  // 6. Draw Trajectory Fill & Line (Only when t > 0 so at rest only the plane sits at 0,0)
+  if (t > 0.001) {
+    // Subtle Aspirebet upward curve control point
+    const cpX = startX + (tipX - startX) * 0.54
+    const cpY = startY - (startY - tipY) * 0.22
+
+    // A. Translucent Green Area Under Curve
+    ctx.beginPath()
+    ctx.moveTo(startX, startY)
+    ctx.quadraticCurveTo(cpX, cpY, tipX, tipY)
+    ctx.lineTo(tipX, startY)
+    ctx.closePath()
+
+    const grad = ctx.createLinearGradient(0, tipY, 0, startY)
+    grad.addColorStop(0, 'rgba(0, 231, 84, 0.38)')
+    grad.addColorStop(1, 'rgba(0, 231, 84, 0.05)')
+    ctx.fillStyle = grad
+    ctx.fill()
+
+    // B. Bright Green Trajectory Line Ending Exactly at (tipX, tipY)
+    ctx.beginPath()
+    ctx.moveTo(startX, startY)
+    ctx.quadraticCurveTo(cpX, cpY, tipX, tipY)
+    ctx.strokeStyle = '#19e660'
+    ctx.lineWidth = 3.5
+    ctx.lineCap = 'round'
+    ctx.stroke()
   }
-  ctx.restore()
+
+  // 7. Draw the Plane with Tail Tip Locked to (tipX, tipY) and ZERO Angle Twisting
+  const drawX = tipX - planeWidth * TAIL_ANCHOR_X
+  const drawY = tipY - planeHeight * TAIL_ANCHOR_Y
+
+  if (domPlaneEl) {
+    domPlaneEl.style.width = `${planeWidth}px`
+    domPlaneEl.style.height = `${planeHeight}px`
+    domPlaneEl.style.left = `${drawX}px`
+    domPlaneEl.style.top = `${drawY}px`
+    domPlaneEl.style.transform = 'none'
+  } else if (greenJetImg.complete) {
+    ctx.drawImage(greenJetImg, drawX, drawY, planeWidth, planeHeight)
+  }
+
+  return { tipX, tipY, planeWidth, planeHeight, drawX, drawY }
 }
 
 
@@ -349,10 +380,9 @@ export function GameCanvas({
   const propsRef = useRef({ phase, elapsedMs, multiplier, plane })
   propsRef.current = { phase, elapsedMs, multiplier, plane }
 
-  // Smooth interpolation state for buttery plane movement
+  // Smooth progress state for buttery plane movement
   const smoothRef = useRef({
-    tipX: 0, tipY: 0,
-    velX: { v: 0 }, velY: { v: 0 },
+    progress: 0,
     initialized: false,
   })
 
@@ -395,9 +425,6 @@ export function GameCanvas({
 
     ctx.clearRect(0, 0, CW, CH)
 
-    const startX = PAD.left
-    const startY = CH - PAD.bottom
-
     // ═══════════════ BACKGROUND ROTATION CALCULATION ═══════════════════
     const bgDeltaTime = bgRotationRef.current.lastTime > 0 
       ? Math.min((time - bgRotationRef.current.lastTime) / 1000, 0.1) 
@@ -430,12 +457,11 @@ export function GameCanvas({
     if (phase === 'waiting') {
       flyRef.current.active = false
       smoothRef.current.initialized = false
+      smoothRef.current.progress = 0
 
-      // Plane sits resting near origin on the runway
-      const restX = startX + 22
-      const restY = startY - 8
-      lastPosRef.current = { x: restX, y: restY }
-      drawPlane(ctx, restX, restY, CW, false, time)
+      // Plane sits resting near origin (0,0) on the runway
+      const info = renderFlightAndPlane(ctx, CW, CH, 0, time)
+      lastPosRef.current = { x: info.tipX, y: info.tipY }
     }
 
     // ═══════════════ FLYING ════════════════════════════════════════════
@@ -445,60 +471,21 @@ export function GameCanvas({
       const deltaTime = lastTimeRef.current > 0 ? Math.min((time - lastTimeRef.current) / 1000, 0.1) : 0.016
       lastTimeRef.current = time
 
-      // Calculate desired plane sizing for safe margins
-      const aspect = 120 / 52
-      const desiredWidth = Math.min(Math.max(CW * 0.13, 68), 115)
-      const anchorXRatio = 0.32
-      const rightPadding = 8
-      const maxSafeWidth = (CW - startX - rightPadding) / (1 - anchorXRatio)
-      const planeWidth = Math.min(desiredWidth, maxSafeWidth)
-
-      // Clamping limits: nose stops inside right border, plane stays below top bar
-      const maxEndX = CW - rightPadding - planeWidth * (1 - anchorXRatio) - 8
-      const minEndY = PAD.top + Math.max(28, CH * 0.12)
-      const distanceX = maxEndX - startX
-      const distanceY = startY - minEndY
-
-      // Progress calculation
-      const flightDuration = 8500
-      const rawT = Math.min(1, elapsedMs / flightDuration)
-      const tX = Math.min(1, Math.pow(rawT, 0.95))
-      const tY = Math.min(1, Math.pow(rawT, 0.85))
-
-      const targetX = startX + distanceX * tX
-      const targetY = startY - distanceY * tY
-
-      const isTurbulence = rawT >= 0.85 || multiplier >= 5
+      // Flight progress from 0.0 (takeoff) to 1.0 (max turbulence cruise point)
+      const flightDuration = 8000
+      const targetProgress = Math.min(1, elapsedMs / flightDuration)
 
       const sm = smoothRef.current
       if (!sm.initialized || elapsedMs < 50) {
-        sm.tipX = targetX
-        sm.tipY = targetY
-        sm.velX = { v: 0 }
-        sm.velY = { v: 0 }
+        sm.progress = targetProgress
         sm.initialized = true
       } else {
-        const smoothTime = 0.05
-        sm.tipX = smoothDamp(sm.tipX, targetX, sm.velX, smoothTime, deltaTime)
-        sm.tipY = smoothDamp(sm.tipY, targetY, sm.velY, smoothTime, deltaTime)
+        const smoothFactor = Math.min(1, deltaTime * 12)
+        sm.progress += (targetProgress - sm.progress) * smoothFactor
       }
 
-      const clampedEndX = Math.min(sm.tipX, maxEndX)
-      const clampedEndY = Math.max(minEndY, sm.tipY)
-
-      // Subtle turbulence oscillation at max height
-      const bobOffsetY = isTurbulence ? Math.sin(time * 0.008) * 3.5 : 0
-      const wiredEndY = clampedEndY + bobOffsetY
-
-      lastPosRef.current = { x: clampedEndX, y: wiredEndY }
-
-      // 1. Draw trajectory curve wired directly to the plane anchor
-      if (clampedEndX - startX > 2) {
-        drawFlightCurve(ctx, startX, startY, clampedEndX, wiredEndY)
-      }
-
-      // 2. Draw plane anchored at the exact tip of the trajectory line
-      drawPlane(ctx, clampedEndX, wiredEndY, CW, isTurbulence, time)
+      const info = renderFlightAndPlane(ctx, CW, CH, sm.progress, time)
+      lastPosRef.current = { x: info.tipX, y: info.tipY }
     }
 
     // ═══════════════ CRASHING / CRASHED ════════════════════════════════
@@ -507,8 +494,8 @@ export function GameCanvas({
 
       if (!fa.active) {
         fa.active = true
-        fa.x = lastPosRef.current.x
-        fa.y = lastPosRef.current.y
+        fa.x = lastPosRef.current.x || (CW * 0.7)
+        fa.y = lastPosRef.current.y || (CH * 0.22)
         fa.t0 = time
       }
 
@@ -518,7 +505,13 @@ export function GameCanvas({
       const flyY = fa.y - speed * dt * 0.75
 
       if (flyX < CW + 150 && flyY > -150) {
-        drawPlane(ctx, flyX, flyY, CW, false, time)
+        const planeWidth = Math.min(Math.max(CW * 0.115, 62), 104)
+        const planeHeight = planeWidth / JET_ASPECT
+        const drawX = flyX - planeWidth * TAIL_ANCHOR_X
+        const drawY = flyY - planeHeight * TAIL_ANCHOR_Y
+        if (greenJetImg.complete) {
+          ctx.drawImage(greenJetImg, drawX, drawY, planeWidth, planeHeight)
+        }
       }
     }
 
@@ -536,8 +529,8 @@ export function GameCanvas({
     <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ display: 'block' }} />
 
-      {/* Top bar: wallet toggle bordering vertical Y-axis (x=18px) edge-to-edge, with online status below */}
-      <div className="absolute left-[18px] top-2 z-10 flex flex-col items-start gap-1">
+      {/* Top bar: wallet toggle bordering vertical Y-axis (x=28px) edge-to-edge, with online status below */}
+      <div className="absolute left-[28px] top-2 z-10 flex flex-col items-start gap-1">
         <BetModeToggle
           betMode={betMode}
           onToggle={onToggleBetMode}
