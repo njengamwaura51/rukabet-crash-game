@@ -8,6 +8,7 @@ import {
   Zap, Sparkles, Timer, Sliders, Flame, Clock, Dices, Scale, FileSpreadsheet
 } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
+import ErrorButton from '@/components/ErrorButton'
 
 type OddsEngineLiveState = {
   enabled: boolean
@@ -3250,6 +3251,21 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+
+            {/* Sentry Logging & Error Diagnostic Card */}
+            <div className="space-y-3 rounded-lg border border-line bg-panel p-5">
+              <h2 className="border-b border-line pb-3 text-sm font-semibold text-ink flex items-center justify-between">
+                <span>Sentry Diagnostics &amp; Error Tracking</span>
+                <span className="text-[11px] font-normal text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">Active</span>
+              </h2>
+              <p className="text-xs text-ink-2 leading-relaxed">
+                Test real-time error logging, performance monitoring, and session replay integration. Clicking the button below sends a structured log (<code className="text-amber-400">Sentry.logger.info</code>), increments a counter metric (<code className="text-amber-400">Sentry.metrics.count</code>), and throws an error to your Sentry dashboard.
+              </p>
+              <div className="pt-2 flex items-center gap-3">
+                <ErrorButton />
+                <span className="text-[11px] text-ink-3">DSN: ingest.us.sentry.io/4512272155738112</span>
+              </div>
+            </div>
           </div>
         )}
       </main>

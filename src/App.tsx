@@ -20,12 +20,31 @@ function RefRedirect({ code }: { code: string }) {
   return <AviatorGame />;
 }
 
+import ErrorButton from "@/components/ErrorButton";
+
+function SentryTestPage() {
+  return (
+    <div className="min-h-screen bg-[#070b12] text-white flex flex-col items-center justify-center p-6 space-y-4">
+      <div className="max-w-md w-full bg-[#0d1424] border border-slate-800 rounded-xl p-6 text-center space-y-4 shadow-2xl">
+        <h1 className="text-xl font-bold text-white">Sentry Diagnostic Test</h1>
+        <p className="text-slate-400 text-xs leading-relaxed">
+          Click the button below to emit a structured log (<code>Sentry.logger.info</code>), record a metric counter (<code>Sentry.metrics.count</code>), and trigger a test error to verify your Sentry dashboard ingestion.
+        </p>
+        <div className="pt-2 flex justify-center">
+          <ErrorButton />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={AviatorGame} />
       <Route path="/ref/:code">{(params) => <RefRedirect code={params.code} />}</Route>
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/test-sentry" component={SentryTestPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/referrals" component={ReferralsPage} />
       <Route path="/bonuses" component={BonusesPage} />
