@@ -6,6 +6,7 @@ import { Deposit } from '../models/Deposit.js';
 import { Withdrawal } from '../models/Withdrawal.js';
 import { OddsControl } from '../models/OddsControl.js';
 import { Settings } from '../models/Settings.js';
+import { Round } from '../models/Round.js';
 import { getOddsEngineState, applyOddsEngineRule, resetOddsEngineToNormal, getIO, emitUserBalanceUpdate } from '../socket.js';
 import { creditDepositAtomically } from './webhookController.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'rukabet-jwt-secret-2026';
@@ -894,5 +895,44 @@ export async function reconcileAllBalances(req, res) {
     catch (error) {
         console.error('reconcileAllBalances error:', error);
         return res.status(500).json({ error: error.message || 'Failed to reconcile all balances' });
+    }
+}
+export async function exportDatabase(req, res) {
+    try {
+        const [users, deposits, withdrawals, settings, oddsControls, rounds, bets] = await Promise.all([
+            User.find({}).lean(),
+            Deposit.find({}).lean(),
+            Withdrawal.find({}).lean(),
+            Settings.find({}).lean(),
+            OddsControl.find({}).lean(),
+            Round.find({}).sort({ createdAt: -1 }).limit(100).lean(),
+            Bet.find({}).sort({ createdAt: -1 }).limit(500).lean()
+        ]);
+        return res.json({
+            success: true,
+            exportedAt: new Date().toISOString(),
+            counts: {
+                users: users.length,
+                deposits: deposits.length,
+                withdrawals: withdrawals.length,
+                settings: settings.length,
+                oddsControls: oddsControls.length,
+                rounds: rounds.length,
+                bets: bets.length
+            },
+            data: {
+                users,
+                deposits,
+                withdrawals,
+                settings,
+                oddsControls,
+                rounds,
+                bets
+            }
+        });
+    }
+    catch (error) {
+        console.error('Database export error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to export database' });
     }
 }

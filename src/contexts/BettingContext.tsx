@@ -116,8 +116,18 @@ export function BettingProvider({
       )
     }
 
-    const onBetError = (data: { error: string }) => {
+    const onBetError = (data: { error: string; panelId?: number }) => {
       console.warn('[BettingContext] Server bet error:', data.error)
+      // Rollback unconfirmed active bets and refund optimistic deductions
+      setBets(prev => {
+        const failed = data.panelId
+          ? prev.filter(b => b.panelId === data.panelId && !b.betId)
+          : prev.filter(b => !b.betId && b.status === 'ACTIVE')
+        failed.forEach(b => {
+          onBalanceChange?.(b.amount, b.isFreebet)
+        })
+        return prev.filter(b => !failed.includes(b))
+      })
     }
 
     const onCashoutSuccessEvent = (data: {
@@ -308,14 +318,12 @@ export function BettingProvider({
     // Send authoritative CASH_OUT event to server
     const socket = getSocket()
     const token = getStoredAuthToken()
-    if (activeBet.betId) {
-      socket.emit('CASH_OUT', {
-        betId: activeBet.betId,
-        panelId,
-        multiplier: cashoutMultiplier,
-        token
-      })
-    }
+    socket.emit('CASH_OUT', {
+      betId: activeBet.betId,
+      panelId,
+      multiplier: cashoutMultiplier,
+      token
+    })
     
     // For freebet: only profit goes to real balance
     if (activeBet.isFreebet) {
@@ -362,7 +370,7 @@ export function BettingProvider({
     prevPhaseRef.current = gamePhase
 
     // CRASHED → Record lost bets and clear active bets
-    if (gamePhase === 'crashed' && prevPhase === 'crashing') {
+    if ((gamePhase === 'crashed' || gamePhase === 'crashing') && (prevPhase === 'flying' || prevPhase === 'waiting')) {
       // Record any uncashed active bets as losses
       bets.forEach(bet => {
         if (bet.status === 'ACTIVE') {
@@ -385,7 +393,7 @@ export function BettingProvider({
     }
     
     // WAITING → Activate queued bets & increment round
-    if (gamePhase === 'waiting' && prevPhase === 'crashed') {
+    if (gamePhase === 'waiting' && prevPhase !== 'waiting') {
       roundIdRef.current++
       
       const queued = bets.filter(b => b.status === 'QUEUED')

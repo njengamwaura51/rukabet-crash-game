@@ -12,8 +12,8 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
   const [animState, setAnimState] = useState<'enter' | 'float' | 'exit'>('enter')
 
   useEffect(() => {
-    const enterTimer = setTimeout(() => setAnimState('float'), 40)
-    const floatTimer = setTimeout(() => setAnimState('exit'), 700)
+    const enterTimer = setTimeout(() => setAnimState('float'), 30)
+    const floatTimer = setTimeout(() => setAnimState('exit'), 800)
     const exitTimer = setTimeout(() => {
       setVisible(false)
       onComplete?.()
@@ -29,21 +29,21 @@ export function CashoutPopup({ multiplier, amount, currency = 'KSH', onComplete 
   if (!visible) return null
 
   const animClasses = {
-    enter: 'scale-50 opacity-0 translate-y-4',
+    enter: 'scale-75 opacity-0 translate-y-2',
     float: 'scale-100 opacity-100 translate-y-0',
-    exit: 'scale-75 opacity-0 -translate-y-8',
+    exit: 'scale-90 opacity-0 -translate-y-4',
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-50 flex items-start justify-center pt-14">
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-start justify-center pt-8 sm:pt-10">
       <div
         role="status"
-        className={`flex flex-col items-center gap-0.5 rounded-lg border border-brand/40 bg-page px-6 py-3 shadow-md transition-all duration-200 ease-out ${animClasses[animState]}`}
+        className={`flex items-center gap-3 rounded-full border border-brand/50 bg-page/95 backdrop-blur-sm px-4 py-1.5 shadow-lg transition-all duration-200 ease-out ${animClasses[animState]}`}
       >
-        <span className="text-sm text-ink-2">You cashed out</span>
-        <span className="text-3xl font-bold tabular-nums text-ink">{multiplier.toFixed(2)}x</span>
-        <span className="text-base font-semibold tabular-nums text-brand">
-          Won {amount.toLocaleString()} {currency}
+        <span className="text-xs font-medium text-ink-2">Cashed out</span>
+        <span className="text-base sm:text-lg font-bold tabular-nums text-ink">{multiplier.toFixed(2)}x</span>
+        <span className="text-xs sm:text-sm font-bold tabular-nums text-brand">
+          +{amount.toLocaleString()} {currency}
         </span>
       </div>
     </div>

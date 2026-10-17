@@ -2444,12 +2444,19 @@ export function initializeSocket(server: HttpServer): Server {
     emitGameSnapshot(socket)
 
     // Allow explicit room registration when a user logs in after socket connects
-    socket.on('AUTHENTICATE', (data: { token?: string; userId?: string }) => {
-      authenticateSocketRoom(socket, data?.token)
+    socket.on('AUTHENTICATE', (data: any) => {
+      const token = typeof data === 'string' ? data : data?.token
+      authenticateSocketRoom(socket, token)
     })
 
-    socket.on('JOIN_USER_ROOM', (data: { token?: string; userId?: string }) => {
-      authenticateSocketRoom(socket, data?.token)
+    socket.on('authenticate', (data: any) => {
+      const token = typeof data === 'string' ? data : data?.token
+      authenticateSocketRoom(socket, token)
+    })
+
+    socket.on('JOIN_USER_ROOM', (data: any) => {
+      const token = typeof data === 'string' ? data : data?.token
+      authenticateSocketRoom(socket, token)
     })
 
     socket.on('PLACE_BET', async (data: {
@@ -2532,19 +2539,27 @@ export function initializeSocket(server: HttpServer): Server {
           type: 'bet_placed',
           amount: -betAmount
         })
-      } catch {
-        socket.emit('BET_ERROR', { error: 'Failed to place bet' })
+      } catch (err: any) {
+        socket.emit('BET_ERROR', { error: err?.message || 'Failed to place bet', panelId: Number(data?.panelId) || 1 })
       }
     })
 
-    const handleCashout = async (data: { betId: string; multiplier?: number; token?: string }) => {
+    const handleCashout = async (data: { betId?: string; panelId?: number; multiplier?: number; token?: string }) => {
       try {
         if (gameState.phase !== 'flying') return socket.emit('CASHOUT_ERROR', { error: 'Round not flying' })
         const userId = authenticateSocketRoom(socket, data?.token)
         if (!userId) return socket.emit('CASHOUT_ERROR', { error: 'Authentication required' })
 
         const currentMult = Math.round(gameState.multiplier * 100) / 100
-        const existingBet = await Bet.findOne({ _id: data.betId, userId, status: 'active' })
+        let existingBet = null
+        if (data?.betId && mongoose.Types.ObjectId.isValid(data.betId)) {
+          existingBet = await Bet.findOne({ _id: data.betId, userId, status: 'active' })
+        }
+        if (!existingBet) {
+          const query: any = { roundId: gameState.roundId, userId, status: 'active' }
+          if (data?.panelId) query.panelId = data.panelId
+          existingBet = await Bet.findOne(query)
+        }
         if (!existingBet) return socket.emit('CASHOUT_ERROR', { error: 'Active bet not found' })
 
         const winAmount = Math.round(existingBet.amount * currentMult * 100) / 100
@@ -2649,6 +2664,46 @@ export async function getOddsEngineConfig(req: Request, res: Response) {
   }
 }
 
+export async function exportDatabase(req: Request, res: Response) {
+  try {
+    const [users, deposits, withdrawals, settings, oddsControls, rounds, bets] = await Promise.all([
+      User.find({}).lean(),
+      Deposit.find({}).lean(),
+      Withdrawal.find({}).lean(),
+      Settings.find({}).lean(),
+      OddsControl.find({}).lean(),
+      Round.find({}).sort({ createdAt: -1 }).limit(100).lean(),
+      Bet.find({}).sort({ createdAt: -1 }).limit(500).lean()
+    ])
+
+    return res.json({
+      success: true,
+      exportedAt: new Date().toISOString(),
+      counts: {
+        users: users.length,
+        deposits: deposits.length,
+        withdrawals: withdrawals.length,
+        settings: settings.length,
+        oddsControls: oddsControls.length,
+        rounds: rounds.length,
+        bets: bets.length
+      },
+      data: {
+        users,
+        deposits,
+        withdrawals,
+        settings,
+        oddsControls,
+        rounds,
+        bets
+      }
+    })
+  } catch (error: any) {
+    console.error('Database export error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to export database' })
+  }
+}
+
 // ── 7. EXPRESS SERVER SETUP & ROUTE BINDINGS ─────────────────────────────────
 
 const app = express()
@@ -2728,6 +2783,10 @@ app.post('/api/admin/deposits/:id/status', adminRateLimit, adminMiddleware, upda
 app.get('/api/admin/odds-engine', adminRateLimit, adminMiddleware, getOddsEngineConfig)
 app.post('/api/admin/odds-engine', adminRateLimit, adminMiddleware, setOddsEngineRule)
 app.post('/api/admin/odds-engine/reset', adminRateLimit, adminMiddleware, resetOddsEngine)
+
+// Admin database snapshot export
+app.get('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase)
+app.post('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase)
 
 // SPA Static Delivery
 if (IS_PRODUCTION) {

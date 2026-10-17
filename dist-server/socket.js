@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { User } from './models/User.js';
 import { Bet } from './models/Bet.js';
 import { Round } from './models/Round.js';
@@ -272,8 +273,11 @@ async function markRoundLostBets(roundId, crashPoint) {
         console.error('Round crash persistence error:', error);
     }
 }
-export async function processBetCashout(betId, userId, targetMultiplier) {
+export async function processBetCashout(betId, userId, targetMultiplier, panelId) {
     try {
+        if (!userId) {
+            return { success: false, error: 'User ID is required' };
+        }
         if (gameState.phase !== 'flying') {
             return { success: false, error: 'Cannot cash out outside flying phase' };
         }
@@ -284,12 +288,22 @@ export async function processBetCashout(betId, userId, targetMultiplier) {
         if (serverMultiplier < 1.01) {
             return { success: false, error: 'Multiplier too low' };
         }
-        const existingBet = await Bet.findOne({ _id: betId, userId, status: 'active' });
+        let existingBet = null;
+        if (betId && mongoose.Types.ObjectId.isValid(betId)) {
+            existingBet = await Bet.findOne({ _id: betId, userId, status: 'active' });
+        }
+        if (!existingBet) {
+            const query = { roundId: gameState.roundId, userId, status: 'active' };
+            if (panelId)
+                query.panelId = panelId;
+            existingBet = await Bet.findOne(query);
+        }
         if (!existingBet) {
             return { success: false, error: 'Bet not found or already cashed out' };
         }
+        const resolvedBetId = existingBet._id.toString();
         const winAmount = Math.round(existingBet.amount * serverMultiplier * 100) / 100;
-        const bet = await Bet.findOneAndUpdate({ _id: betId, userId, status: 'active' }, {
+        const bet = await Bet.findOneAndUpdate({ _id: existingBet._id, userId, status: 'active' }, {
             status: 'won',
             multiplierCaught: serverMultiplier,
             winAmount
@@ -297,7 +311,7 @@ export async function processBetCashout(betId, userId, targetMultiplier) {
         if (!bet) {
             return { success: false, error: 'Bet already cashed out' };
         }
-        activeRoundBets.delete(betId);
+        activeRoundBets.delete(resolvedBetId);
         // For freebets: only net profit (winnings - stake) goes to main balance
         let creditAmount = winAmount;
         if (bet.isFreebet) {
@@ -610,9 +624,7 @@ export function authenticateSocketRoom(socket, rawToken) {
 export function initializeSocket(httpServer) {
     io = new Server(httpServer, {
         cors: {
-            origin: process.env.NODE_ENV === 'production'
-                ? process.env.FRONTEND_URL
-                : ['http://localhost:5175', 'http://localhost:3000'],
+            origin: true,
             methods: ['GET', 'POST'],
             credentials: true
         },
@@ -627,56 +639,42 @@ export function initializeSocket(httpServer) {
         socket.emit('GAME_SNAPSHOT', gameState);
         socket.emit('LIVE_BETS_SNAPSHOT', gameState.liveBets);
         socket.on('AUTHENTICATE', (data) => {
-            authenticateSocketRoom(socket, data?.token);
+            const token = typeof data === 'string' ? data : data?.token;
+            authenticateSocketRoom(socket, token);
+        });
+        socket.on('authenticate', (data) => {
+            const token = typeof data === 'string' ? data : data?.token;
+            authenticateSocketRoom(socket, token);
         });
         socket.on('JOIN_USER_ROOM', (data) => {
             authenticateSocketRoom(socket, data?.token);
         });
-        socket.on('authenticate', async (token) => {
-            try {
-                const decoded = jwt.verify(token, JWT_SECRET);
-                const user = await User.findById(decoded.userId);
-                if (user) {
-                    socket.data.userId = decoded.userId;
-                    socket.join(`user:${decoded.userId}`);
-                    console.log(`✅ User ${user.phone} authenticated on socket ${socket.id}`);
-                    socket.emit('authenticated', {
-                        success: true,
-                        balance: user.balance,
-                        freebet: user.freebet
-                    });
-                }
-            }
-            catch (error) {
-                console.error('Socket auth error:', error);
-                socket.emit('authenticated', { success: false, error: 'Invalid token' });
-            }
-        });
         socket.on('PLACE_BET', async (data) => {
+            const panelId = Number(data.panelId) || 1;
             try {
                 const userId = socket.data.userId || (data?.token ? authenticateSocketRoom(socket, data.token) : null);
                 if (!userId) {
-                    return socket.emit('BET_ERROR', { error: 'Not authenticated. Please log in.' });
+                    return socket.emit('BET_ERROR', { error: 'Not authenticated. Please log in.', panelId });
                 }
                 const { amount, isFreebet } = data;
                 if (!amount || amount < 1) {
-                    return socket.emit('BET_ERROR', { error: 'Invalid bet amount' });
+                    return socket.emit('BET_ERROR', { error: 'Invalid bet amount', panelId });
                 }
                 if (gameState.phase !== 'waiting') {
-                    return socket.emit('BET_ERROR', { error: 'Betting window is closed for this round' });
+                    return socket.emit('BET_ERROR', { error: 'Betting window is closed for this round', panelId });
                 }
                 let user;
                 if (isFreebet) {
                     const checkUser = await User.findById(userId);
                     if (!checkUser)
-                        return socket.emit('BET_ERROR', { error: 'User not found' });
+                        return socket.emit('BET_ERROR', { error: 'User not found', panelId });
                     if (checkUser.freebetLocked) {
                         const settings = await Settings.getSettings();
                         const unlockAmount = Number(settings?.freebetUnlockAmount ?? 50);
-                        return socket.emit('BET_ERROR', { error: `Freebets locked: Deposit KSH ${unlockAmount}+ to unlock` });
+                        return socket.emit('BET_ERROR', { error: `Freebets locked: Deposit KSH ${unlockAmount}+ to unlock`, panelId });
                     }
                     if ((checkUser.freebet || 0) < amount) {
-                        return socket.emit('BET_ERROR', { error: 'Insufficient freebet balance' });
+                        return socket.emit('BET_ERROR', { error: 'Insufficient freebet balance', panelId });
                     }
                     user = await User.findOneAndUpdate({ _id: userId, freebet: { $gte: amount } }, { $inc: { freebet: -amount } }, { new: true });
                 }
@@ -684,12 +682,11 @@ export function initializeSocket(httpServer) {
                     user = await User.findOneAndUpdate({ _id: userId, balance: { $gte: amount } }, { $inc: { balance: -amount }, $set: { hasPlayedWithMoney: true } }, { new: true });
                 }
                 if (!user) {
-                    return socket.emit('BET_ERROR', { error: isFreebet ? 'Insufficient freebet balance' : 'Insufficient balance' });
+                    return socket.emit('BET_ERROR', { error: isFreebet ? 'Insufficient freebet balance' : 'Insufficient balance', panelId });
                 }
                 const targetCashout = data.autoCashoutTarget && Number(data.autoCashoutTarget) >= 1.01
                     ? Math.round(Number(data.autoCashoutTarget) * 100) / 100
                     : null;
-                const panelId = Number(data.panelId) || 1;
                 const bet = await Bet.create({
                     userId,
                     roundId: gameState.roundId,
@@ -746,7 +743,7 @@ export function initializeSocket(httpServer) {
             }
             catch (error) {
                 console.error('Place bet error:', error);
-                socket.emit('BET_ERROR', { error: error.message });
+                socket.emit('BET_ERROR', { error: error.message, panelId });
             }
         });
         socket.on('CASH_OUT', async (data) => {
@@ -758,8 +755,8 @@ export function initializeSocket(httpServer) {
                 if (gameState.phase !== 'flying') {
                     return socket.emit('CASHOUT_ERROR', { error: 'Cannot cash out outside flying phase' });
                 }
-                const { betId } = data;
-                const cashoutResult = await processBetCashout(betId, userId.toString(), data.multiplier);
+                const { betId, panelId } = data;
+                const cashoutResult = await processBetCashout(betId, userId.toString(), data.multiplier, panelId);
                 if (!cashoutResult.success) {
                     return socket.emit('CASHOUT_ERROR', { error: cashoutResult.error });
                 }

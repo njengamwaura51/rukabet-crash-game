@@ -28,7 +28,7 @@ import { initiateDeposit, verifyPendingDeposit, getDepositStatus } from './contr
 import { requestWithdrawal, getUserTransactions } from './controllers/withdrawalController.js';
 import { paydWebhook, intasendWebhook } from './controllers/webhookController.js';
 import { getPublicConfig, getSettings, updateSettings } from './controllers/settingsController.js';
-import { getAdminOverview, adminLogin, getAdminUsers, getAdminUserDetail, adjustUserBalance, adjustUserFreebet, toggleUserFreeze, resetUserPassword, getAdminWithdrawals, updateWithdrawalStatus, getAdminDeposits, updateAdminDepositStatus, getOddsEngineConfig, setOddsEngineRule, resetOddsEngine, syncDatabaseUsers, getAdminBets, reconcileUserBalance, reconcileAllBalances } from './controllers/adminController.js';
+import { getAdminOverview, adminLogin, getAdminUsers, getAdminUserDetail, adjustUserBalance, adjustUserFreebet, toggleUserFreeze, resetUserPassword, getAdminWithdrawals, updateWithdrawalStatus, getAdminDeposits, updateAdminDepositStatus, getOddsEngineConfig, setOddsEngineRule, resetOddsEngine, syncDatabaseUsers, getAdminBets, reconcileUserBalance, reconcileAllBalances, exportDatabase } from './controllers/adminController.js';
 import { Deposit } from './models/Deposit.js';
 import { authMiddleware, adminMiddleware } from './middleware/auth.js';
 import { adminRateLimit, depositRateLimit, webhookRateLimit } from './middleware/rateLimit.js';
@@ -112,6 +112,9 @@ app.post('/api/admin/withdrawals/:id/status', adminRateLimit, adminMiddleware, u
 app.get('/api/admin/odds-engine', adminRateLimit, adminMiddleware, getOddsEngineConfig);
 app.post('/api/admin/odds-engine', adminRateLimit, adminMiddleware, setOddsEngineRule);
 app.post('/api/admin/odds-engine/reset', adminRateLimit, adminMiddleware, resetOddsEngine);
+// Admin database snapshot export
+app.get('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase);
+app.post('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase);
 // Catch-all 404 for unhandled API requests
 app.all('/api/{*splat}', (req, res) => {
     res.status(404).json({ error: 'API endpoint not found' });

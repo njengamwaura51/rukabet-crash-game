@@ -53,7 +53,8 @@ import {
   syncDatabaseUsers,
   getAdminBets,
   reconcileUserBalance,
-  reconcileAllBalances
+  reconcileAllBalances,
+  exportDatabase
 } from './controllers/adminController.js'
 import { Deposit } from './models/Deposit.js'
 import { authMiddleware, adminMiddleware } from './middleware/auth.js'
@@ -155,6 +156,10 @@ app.post('/api/admin/withdrawals/:id/status', adminRateLimit, adminMiddleware, u
 app.get('/api/admin/odds-engine', adminRateLimit, adminMiddleware, getOddsEngineConfig)
 app.post('/api/admin/odds-engine', adminRateLimit, adminMiddleware, setOddsEngineRule)
 app.post('/api/admin/odds-engine/reset', adminRateLimit, adminMiddleware, resetOddsEngine)
+
+// Admin database snapshot export
+app.get('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase)
+app.post('/api/admin/database/export', adminRateLimit, adminMiddleware, exportDatabase)
 
 // Catch-all 404 for unhandled API requests
 app.all('/api/{*splat}', (req, res) => {
