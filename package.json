@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "db:export": "npx tsx scripts/export-database.ts",
     "db:migrate": "npx tsx scripts/migrate-to-render.ts",
+    "dns:verify": "npx tsx scripts/verify-dns.ts",
     "render:deploy": "npx tsx scripts/deploy-to-render.ts"
   },
   "dependencies": {
