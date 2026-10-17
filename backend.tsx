@@ -2817,7 +2817,15 @@ export async function startServer() {
         console.log('🌱 Empty database detected on boot! Auto-seeding from production snapshot...')
         const rawData = fs.readFileSync(snapshotFile, 'utf-8')
         const snapshot = JSON.parse(rawData)
-        const { users = [], settings: snapSettings = [], oddsControls = [], deposits = [] } = snapshot.data || {}
+        const { 
+          users = [], 
+          settings: snapSettings = [], 
+          oddsControls = [], 
+          deposits = [],
+          withdrawals = [],
+          rounds = [],
+          bets = []
+        } = snapshot.data || {}
         
         if (users.length > 0) {
           await User.insertMany(users)
@@ -2834,6 +2842,18 @@ export async function startServer() {
         if (deposits.length > 0) {
           await Deposit.insertMany(deposits)
           console.log(`✅ Auto-seeded ${deposits.length} deposits.`)
+        }
+        if (withdrawals.length > 0) {
+          await Withdrawal.insertMany(withdrawals)
+          console.log(`✅ Auto-seeded ${withdrawals.length} withdrawals.`)
+        }
+        if (rounds.length > 0) {
+          await Round.insertMany(rounds)
+          console.log(`✅ Auto-seeded ${rounds.length} rounds.`)
+        }
+        if (bets.length > 0) {
+          await Bet.insertMany(bets)
+          console.log(`✅ Auto-seeded ${bets.length} bets.`)
         }
       }
     }

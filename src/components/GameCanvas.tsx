@@ -218,8 +218,8 @@ function renderFlightAndPlane(
   const rawBlend = Math.max(0, Math.min(1, (t - 0.85) / 0.15))
   const turbulenceBlend = rawBlend * rawBlend * (3 - 2 * rawBlend)
 
-  const slowBobY = Math.sin(timeMs * 0.0018) * 3.5 * turbulenceBlend
-  const slowBobX = Math.cos(timeMs * 0.0012) * 0.95 * turbulenceBlend
+  const slowBobY = Math.sin(timeMs * 0.0018) * 3.57 * turbulenceBlend
+  const slowBobX = Math.cos(timeMs * 0.0012) * 0.969 * turbulenceBlend
 
   // 6. SINGLE LOCKED TAIL-TIP COORDINATE used by BOTH the trajectory line AND the plane tail
   const tipX = baseTipX + slowBobX

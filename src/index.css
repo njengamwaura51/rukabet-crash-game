@@ -650,10 +650,10 @@ body {
 
 @keyframes planeTurbulence {
   0% {
-    transform: translate(-32%, calc(-66% - 3px)) rotate(-9deg);
+    transform: translate(-32%, calc(-66% - 3.06px)) rotate(-9deg);
   }
   100% {
-    transform: translate(-32%, calc(-66% + 3px)) rotate(-13.5deg);
+    transform: translate(-32%, calc(-66% + 3.06px)) rotate(-13.5deg);
   }
 }
 
