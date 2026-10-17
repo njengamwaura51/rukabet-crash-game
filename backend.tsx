@@ -7,6 +7,7 @@
 import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import path from 'path'
+import fs from 'fs'
 import { createServer, Server as HttpServer } from 'http'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
@@ -2806,6 +2807,39 @@ export async function startServer() {
 
   await mongoose.connect(MONGO_URI)
   console.log('✅ Connected to MongoDB')
+
+  // Auto-seed empty database from production snapshot if available (ideal for fresh Render deployment)
+  try {
+    const userCount = await User.countDocuments()
+    if (userCount === 0) {
+      const snapshotFile = path.join(__dirname, 'data', 'production_snapshot.json')
+      if (fs.existsSync(snapshotFile)) {
+        console.log('🌱 Empty database detected on boot! Auto-seeding from production snapshot...')
+        const rawData = fs.readFileSync(snapshotFile, 'utf-8')
+        const snapshot = JSON.parse(rawData)
+        const { users = [], settings: snapSettings = [], oddsControls = [], deposits = [] } = snapshot.data || {}
+        
+        if (users.length > 0) {
+          await User.insertMany(users)
+          console.log(`✅ Auto-seeded ${users.length} users.`)
+        }
+        if (snapSettings.length > 0) {
+          await Settings.insertMany(snapSettings)
+          console.log(`✅ Auto-seeded settings.`)
+        }
+        if (oddsControls.length > 0) {
+          await OddsControl.insertMany(oddsControls)
+          console.log(`✅ Auto-seeded odds engine config.`)
+        }
+        if (deposits.length > 0) {
+          await Deposit.insertMany(deposits)
+          console.log(`✅ Auto-seeded ${deposits.length} deposits.`)
+        }
+      }
+    }
+  } catch (seedErr) {
+    console.error('⚠️ Auto-seed from snapshot error (non-fatal):', seedErr)
+  }
 
   // Backfill `credited: true` for any historical completed deposits so migrations are seamless
   await Deposit.updateMany(

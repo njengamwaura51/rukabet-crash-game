@@ -1,0 +1,43 @@
+services:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 1. RUKABET INTERNAL DATABASE (MongoDB Private Service)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - type: pserv
+    name: rukabet-mongo
+    env: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile.mongo
+    disk:
+      name: mongodb-data
+      mountPath: /data/db
+      sizeGB: 10
+    envVars:
+      - key: MONGO_INITDB_DATABASE
+        value: rukabet_db
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 2. RUKABET WEB APP & GAME ENGINE (Node.js Full-Stack Service)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - type: web
+    name: rukabet-app
+    env: node
+    plan: starter
+    buildCommand: npm run build && npm run build:server
+    startCommand: node dist-server/index.js
+    envVars:
+      - key: MONGO_URI
+        value: mongodb://rukabet-mongo:27017/rukabet_db
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        value: dsf897y2389hrnfsd87f23bjdksf
+      - key: ADMIN_USERNAME
+        value: pirate101
+      - key: ADMIN_PASSWORD
+        value: "117402"
+      - key: ADMIN_TOKEN
+        value: "117402"
+      - key: GAME_CLIENT_SEED
+        value: b5a529b6f24451149bb8f28aad789ed92481ced007531461f2668995390740e1
