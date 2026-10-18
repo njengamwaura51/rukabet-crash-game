@@ -297,7 +297,6 @@ async function checkAndApplyOddsExpiration(): Promise<void> {
   if (activeOddsState.durationType === 'rounds' && activeOddsState.roundsRemaining <= 0) {
     console.log(`[OddsEngine] Completed all ${activeOddsState.roundsTotal} scheduled rounds. Reverting to normal odds.`)
     await resetOddsEngineInternal('Completed all scheduled rounds')
-    return
   }
 }
 
@@ -550,9 +549,8 @@ function startWaiting(): void {
   if (activeOddsState.enabled) {
     const now = Date.now()
     if (activeOddsState.durationType === 'scheduled_window') {
-      const inWindow = (!activeOddsState.scheduledStartTime || now >= activeOddsState.scheduledStartTime) &&
-                       (!activeOddsState.scheduledEndTime || now <= activeOddsState.scheduledEndTime)
-      isOverrideActive = inWindow
+      isOverrideActive = (!activeOddsState.scheduledStartTime || now >= activeOddsState.scheduledStartTime) &&
+                         (!activeOddsState.scheduledEndTime || now <= activeOddsState.scheduledEndTime)
     } else {
       isOverrideActive = true
     }
@@ -789,7 +787,9 @@ export function initializeSocket(httpServer: HttpServer): Server {
     transports: ['websocket', 'polling']
   })
 
-  initializeGameLoop()
+  initializeGameLoop().catch(err => {
+    console.error('Failed to initialize game loop:', err)
+  })
 
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Client connected: ${socket.id}`)
@@ -820,14 +820,15 @@ export function initializeSocket(httpServer: HttpServer): Server {
       autoCashoutTarget?: number
       token?: string
     }) => {
-      const panelId = Number(data.panelId) || 1
+      const safeData = data || {}
+      const panelId = Number(safeData.panelId) || 1
       try {
-        const userId = socket.data.userId || (data?.token ? authenticateSocketRoom(socket, data.token) : null)
+        const userId = socket.data.userId || (safeData.token ? authenticateSocketRoom(socket, safeData.token) : null)
         if (!userId) {
           return socket.emit('BET_ERROR', { error: 'Not authenticated. Please log in.', panelId })
         }
 
-        const { amount, isFreebet } = data
+        const { amount, isFreebet } = safeData
         if (!amount || amount < 1) {
           return socket.emit('BET_ERROR', { error: 'Invalid bet amount', panelId })
         }
@@ -936,7 +937,8 @@ export function initializeSocket(httpServer: HttpServer): Server {
 
     socket.on('CASH_OUT', async (data: { betId?: string; panelId?: number; multiplier?: number; token?: string }) => {
       try {
-        const userId = socket.data.userId || (data?.token ? authenticateSocketRoom(socket, data.token) : null)
+        const safeData = data || {}
+        const userId = socket.data.userId || (safeData.token ? authenticateSocketRoom(socket, safeData.token) : null)
         if (!userId) {
           return socket.emit('CASHOUT_ERROR', { error: 'Not authenticated' })
         }
@@ -945,8 +947,8 @@ export function initializeSocket(httpServer: HttpServer): Server {
           return socket.emit('CASHOUT_ERROR', { error: 'Cannot cash out outside flying phase' })
         }
 
-        const { betId, panelId } = data
-        const cashoutResult = await processBetCashout(betId, userId.toString(), data.multiplier, panelId)
+        const { betId, panelId } = safeData
+        const cashoutResult = await processBetCashout(betId, userId.toString(), safeData.multiplier, panelId)
         if (!cashoutResult.success) {
           return socket.emit('CASHOUT_ERROR', { error: cashoutResult.error })
         }

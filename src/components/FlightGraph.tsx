@@ -10,7 +10,6 @@ interface FlightGraphProps {
 export function FlightGraph({ phase, multiplier, countdown }: FlightGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
-  const animRef = useRef<number>(0);
   const prevPhaseRef = useRef<GamePhase>("waiting");
 
   const drawFrame = useCallback(() => {
@@ -180,7 +179,6 @@ export function FlightGraph({ phase, multiplier, countdown }: FlightGraphProps) 
     const drawH = H - padBottom - padTop;
     const maxM = Math.max(multiplier * 1.2, 2.0);
 
-    const totalPoints = Math.max(2, pointsRef.current.length + 1);
     const maxPoints = 200;
 
     const progress = Math.min(1, (multiplier - 1) / (maxM - 1));

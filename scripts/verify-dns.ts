@@ -55,4 +55,4 @@ async function checkDNS() {
   }
 }
 
-checkDNS()
+checkDNS().catch(console.error)

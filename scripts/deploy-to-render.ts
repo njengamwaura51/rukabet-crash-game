@@ -32,7 +32,8 @@ or set RENDER_API_KEY in your environment or .env file.
     const ownersRes = await client.get('/owners')
     const owners = ownersRes.data
     if (!owners || owners.length === 0) {
-      throw new Error('No Render owner account found for this API key.')
+      console.error('❌ No Render owner account found for this API key.')
+      process.exit(1)
     }
 
     const owner = owners[0].owner
@@ -44,7 +45,6 @@ or set RENDER_API_KEY in your environment or .env file.
     console.log(`Found ${services.length} existing service(s) on Render.`)
 
     const appService = services.find((s: any) => s.service?.name === 'rukabet-app' || s.service?.name === 'rukabet')
-    const mongoService = services.find((s: any) => s.service?.name === 'rukabet-mongo')
 
     if (appService) {
       console.log(`🚀 Found existing web service '${appService.service.name}' (${appService.service.id}). Triggering deploy...`)
@@ -77,5 +77,5 @@ const args = process.argv.slice(2)
 const apiKeyArg = args.find(a => a.startsWith('--api-key='))?.replace('--api-key=', '')
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-to-render.ts')) {
-  deployToRender(apiKeyArg)
+  deployToRender(apiKeyArg).catch(console.error)
 }

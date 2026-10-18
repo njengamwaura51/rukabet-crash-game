@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { useConfig } from '@/hooks/useConfig'
-import type { Phase, PlaneTransform } from '../hooks/useGameState'
+import type { Phase, PlaneTransform } from '@/hooks/useGameState'
 
 interface GameCanvasProps {
   phase: Phase
@@ -27,7 +27,6 @@ function drawBackground(
   w: number,
   h: number,
   bgAngle: number,
-  phase: string,
   multiplier: number = 1
 ) {
   ctx.fillStyle = '#0e1115'
@@ -442,7 +441,7 @@ export function GameCanvas({
       bgRotationRef.current.angle -= Math.PI * 200
     }
 
-    drawBackground(ctx, CW, CH, bgRotationRef.current.angle, phase, multiplier)
+    drawBackground(ctx, CW, CH, bgRotationRef.current.angle, multiplier)
     drawAxes(ctx, CW, CH)
     drawDots(ctx, CW, CH, time)
 

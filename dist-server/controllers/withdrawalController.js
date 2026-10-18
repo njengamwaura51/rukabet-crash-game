@@ -5,7 +5,7 @@ import { Settings } from '../models/Settings.js';
 export async function requestWithdrawal(req, res) {
     try {
         const userId = req.userId;
-        const { amount, phone } = req.body;
+        const { amount } = req.body;
         if (!userId) {
             return res.status(401).json({ error: 'Authentication required' });
         }

@@ -9,7 +9,7 @@ export function HistoryBar({ history }: HistoryBarProps) {
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-2">
-      {history.map((h, i) => (
+      {history.map((h) => (
         <div
           key={h.timestamp}
           className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold border ${getMultiplierBgClass(h.multiplier)} fade-in`}

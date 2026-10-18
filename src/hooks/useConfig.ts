@@ -122,7 +122,7 @@ export function useConfigState() {
       }
     }
 
-    syncPublicConfig()
+    void syncPublicConfig()
   }, [config.apiBaseUrl, updateConfig])
 
   return { config, updateConfig }

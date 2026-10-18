@@ -5,7 +5,7 @@ interface LiveBetsProps {
   multiplier: number;
 }
 
-export function LiveBets({ playerBets, multiplier }: LiveBetsProps) {
+export function LiveBets({ playerBets, multiplier: _multiplier }: LiveBetsProps) {
   const sorted = [...playerBets].sort((a, b) => {
     if (a.cashedOut && !b.cashedOut) return -1;
     if (!a.cashedOut && b.cashedOut) return 1;

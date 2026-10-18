@@ -69,7 +69,7 @@ interface BettingProviderProps {
 export function BettingProvider({ 
   children, 
   gamePhase, 
-  currentMultiplier,
+  currentMultiplier: _currentMultiplier,
   onBalanceChange,
   onCashoutSuccess 
 }: BettingProviderProps) {

@@ -119,7 +119,7 @@ export async function initiateDeposit(req, res) {
         return res.json({
             success: true,
             message: 'STK Push sent to your phone. Please enter your M-Pesa PIN.',
-            depositId: deposit._id,
+            depositId,
             apiRef: internalRef,
             externalRef
         });

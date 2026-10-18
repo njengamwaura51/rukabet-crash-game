@@ -136,7 +136,7 @@ if (isProduction) {
     });
 }
 // Initialize Socket.IO with Heroku-friendly settings
-const io = initializeSocket(httpServer);
+initializeSocket(httpServer);
 // Start server
 const PORT = process.env.PORT || 3001;
 async function startServer() {
@@ -233,5 +233,8 @@ async function startServer() {
         process.exit(1);
     }
 }
-startServer();
+startServer().catch(error => {
+    console.error('Unhandled startServer error:', error);
+    process.exit(1);
+});
 export { app, httpServer };

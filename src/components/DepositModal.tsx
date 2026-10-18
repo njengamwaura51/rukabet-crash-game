@@ -51,7 +51,7 @@ export function DepositModal({
   const [tab, setTab] = useState<WalletTab>('deposit')
   const [amount, setAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [withdrawPhone, setWithdrawPhone] = useState(userPhone || '')
+  const withdrawPhone = userPhone || ''
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
@@ -127,10 +127,11 @@ export function DepositModal({
 
       if (response.status === 401) {
         const err = data?.error || ''
-        if (err.toLowerCase().includes('token') || err.toLowerCase().includes('authentication') || err === 'No token provided') {
-          throw new Error('Session expired. Please log in again.')
-        }
-        throw new Error(err || 'Payment service error. Please try again.')
+        const msg = (err.toLowerCase().includes('token') || err.toLowerCase().includes('authentication') || err === 'No token provided')
+          ? 'Session expired. Please log in again.'
+          : (err || 'Payment service error. Please try again.')
+        setStatus({ type: 'error', message: msg })
+        return
       }
 
       if (response.ok && data?.success) {
@@ -139,7 +140,10 @@ export function DepositModal({
           message: 'STK push sent! Check your phone and enter your M-Pesa PIN.',
         })
       } else {
-        throw new Error(data?.error || 'STK push failed. Please try again.')
+        setStatus({
+          type: 'error',
+          message: data?.error || 'STK push failed. Please try again.',
+        })
       }
     } catch (error) {
       setStatus({

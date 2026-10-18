@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent } from 'react'
 import { AlertCircle, Minus, Plus } from 'lucide-react'
 import { useBetting } from '@/contexts/BettingContext'
 import { useConfig } from '@/hooks/useConfig'
@@ -106,7 +106,7 @@ export default function BetPanel({
   const cashedOutBet = betting.bets.find(b => b.panelId === panelId && b.status === 'CASHED_OUT')
   const ceiling = maxBalance || FALLBACK_MAX
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAmountChange = (e: ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/[^0-9]/g, '')
     if (digits === '') {
       setAmount(0)
@@ -141,8 +141,8 @@ export default function BetPanel({
   useEffect(() => {
     if (autoBetEnabled && gamePhase === 'waiting' && lastBetAmount >= MIN_AMOUNT && isLoggedIn && !activeBet && !queuedBet) {
       if (lastBetAmount <= maxBalance) {
-        const targetMultiplier = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
-        const validAutoCashout = targetMultiplier && !Number.isNaN(targetMultiplier) && targetMultiplier >= 1.01 ? targetMultiplier : undefined
+        const parsed = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
+        const validAutoCashout = typeof parsed === 'number' && Number.isFinite(parsed) && parsed >= 1.01 ? parsed : undefined
         betting.placeBet(panelId, lastBetAmount, isFreebet, maxBalance, freebetLocked, validAutoCashout)
       }
     }
@@ -169,8 +169,8 @@ export default function BetPanel({
     }
 
     const betAmount = Math.max(minAmount, Math.min(amount, maxBalance))
-    const targetMultiplier = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
-    const validAutoCashout = targetMultiplier && !Number.isNaN(targetMultiplier) && targetMultiplier >= 1.01 ? targetMultiplier : undefined
+    const parsedTarget = autoCashoutEnabled && autoCashout ? parseFloat(autoCashout) : undefined
+    const validAutoCashout = typeof parsedTarget === 'number' && Number.isFinite(parsedTarget) && parsedTarget >= 1.01 ? parsedTarget : undefined
 
     // Check freebet lock upfront across all phases
     if (isFreebet && freebetLocked) {

@@ -37,7 +37,6 @@ const CRASH_DISPLAY_MS = 3000
 const CRASHING_MS = 700
 const TICK_MS = 100
 const MAX_HISTORY = 20
-const MAX_LIVE_BETS = 10
 const MIN_BOT_BETS = 42
 const BOT_BET_VARIANCE = 14
 const INITIAL_NONCE = 1
@@ -826,9 +825,7 @@ export async function initiateDeposit(req: AuthRequest, res: Response) {
     }
 
     const webhookUrl = sanitizeKey(settings?.paydCallbackUrl) || sanitizeKey(process.env.PAYD_CALLBACK_URL) || PAYD_WEBHOOK_URL
-    if (webhookUrl) {
-      requestBody.callback_url = webhookUrl
-    }
+    requestBody.callback_url = webhookUrl
 
     const authCredential = paydApiPassword || paydApiSecret
     const basicAuth = Buffer.from(`${paydApiUsername}:${authCredential}`).toString('base64')
@@ -1612,7 +1609,7 @@ export async function adjustUserBalance(req: Request, res: Response) {
     const existingUser = await User.findById(id)
     if (!existingUser) return res.status(404).json({ error: 'User not found' })
 
-    let newBalance = existingUser.balance
+    let newBalance: number
     if (type === 'credit') newBalance = Math.round((existingUser.balance + delta) * 100) / 100
     else if (type === 'debit') newBalance = Math.max(0, Math.round((existingUser.balance - delta) * 100) / 100)
     else if (type === 'set') newBalance = Math.max(0, Math.round(delta * 100) / 100)
@@ -1720,7 +1717,7 @@ export async function getAdminWithdrawals(req: Request, res: Response) {
   try {
     const { status = 'all' } = req.query
     const query: any = {}
-    if (status && status !== 'all') query.status = status
+    if (status !== 'all') query.status = status
     const withdrawals = await Withdrawal.find(query).sort({ createdAt: -1 }).limit(100).populate('userId', 'username phone balance')
     return res.json({ success: true, withdrawals })
   } catch (error: any) {
@@ -1785,7 +1782,7 @@ export async function getAdminDeposits(req: Request, res: Response) {
   try {
     const { status = 'all', search = '', limit = 100, page = 1 } = req.query
     const query: any = {}
-    if (status && status !== 'all') query.status = status
+    if (status !== 'all') query.status = status
     if (search) {
       query.$or = [
         { apiRef: { $regex: search,$options: 'i' } },
@@ -1868,7 +1865,7 @@ export async function getAdminBets(req: Request, res: Response) {
 
     const query: any = {}
 
-    if (status && status !== 'all') {
+    if (status !== 'all') {
       query.status = status
     }
 
@@ -2211,7 +2208,6 @@ let activeOddsState = {
 let currentServerSeed = ''
 let waitingStartedAt = Date.now()
 let flyingStartedAt = 0
-let crashingStartedAt = 0
 
 let tickTimer: NodeJS.Timeout | null = null
 let waitingTimer: NodeJS.Timeout | null = null
@@ -2312,6 +2308,8 @@ function generateMockLiveBets(): SharedLiveBet[] {
 }
 
 function startWaitingPhase(): void {
+  if (crashingTimer) clearTimeout(crashingTimer)
+  if (crashedTimer) clearTimeout(crashedTimer)
   gameState.phase = 'waiting'
   gameState.nonce += 1
   gameState.roundId = `round-${gameState.nonce}`
@@ -2371,11 +2369,10 @@ function startFlyingPhase(): void {
 
 function startCrashingPhase(): void {
   gameState.phase = 'crashing'
-  crashingStartedAt = Date.now()
   emitGameSnapshot()
 
   crashingTimer = setTimeout(() => {
-    startCrashedPhase()
+    startCrashedPhase().catch(() => {})
   }, CRASHING_MS)
 }
 
@@ -2468,10 +2465,11 @@ export function initializeSocket(server: HttpServer): Server {
       token?: string
     }) => {
       try {
-        const userId = authenticateSocketRoom(socket, data?.token)
+        const safeData = data || {}
+        const userId = authenticateSocketRoom(socket, safeData.token)
         if (!userId) return socket.emit('BET_ERROR', { error: 'Authentication required' })
 
-        const { amount, isFreebet } = data
+        const { amount, isFreebet } = safeData
         const betAmount = Number(amount)
         if (!Number.isFinite(betAmount) || betAmount < 1) {
           return socket.emit('BET_ERROR', { error: 'Invalid bet amount' })
@@ -2506,10 +2504,10 @@ export function initializeSocket(server: HttpServer): Server {
 
         if (!user) return socket.emit('BET_ERROR', { error: 'Insufficient funds' })
 
-        const targetCashout = data.autoCashoutTarget && Number(data.autoCashoutTarget) >= 1.01
-          ? Math.round(Number(data.autoCashoutTarget) * 100) / 100
+        const targetCashout = safeData.autoCashoutTarget && Number(safeData.autoCashoutTarget) >= 1.01
+          ? Math.round(Number(safeData.autoCashoutTarget) * 100) / 100
           : null
-        const panelId = Number(data.panelId) || 1
+        const panelId = Number(safeData.panelId) || 1
 
         const bet = await Bet.create({
           userId,
@@ -2547,18 +2545,19 @@ export function initializeSocket(server: HttpServer): Server {
 
     const handleCashout = async (data: { betId?: string; panelId?: number; multiplier?: number; token?: string }) => {
       try {
+        const safeData = data || {}
         if (gameState.phase !== 'flying') return socket.emit('CASHOUT_ERROR', { error: 'Round not flying' })
-        const userId = authenticateSocketRoom(socket, data?.token)
+        const userId = authenticateSocketRoom(socket, safeData.token)
         if (!userId) return socket.emit('CASHOUT_ERROR', { error: 'Authentication required' })
 
         const currentMult = Math.round(gameState.multiplier * 100) / 100
         let existingBet = null
-        if (data?.betId && mongoose.Types.ObjectId.isValid(data.betId)) {
-          existingBet = await Bet.findOne({ _id: data.betId, userId, status: 'active' })
+        if (safeData.betId && mongoose.Types.ObjectId.isValid(safeData.betId)) {
+          existingBet = await Bet.findOne({ _id: safeData.betId, userId, status: 'active' })
         }
         if (!existingBet) {
           const query: any = { roundId: gameState.roundId, userId, status: 'active' }
-          if (data?.panelId) query.panelId = data.panelId
+          if (safeData.panelId) query.panelId = safeData.panelId
           existingBet = await Bet.findOne(query)
         }
         if (!existingBet) return socket.emit('CASHOUT_ERROR', { error: 'Active bet not found' })

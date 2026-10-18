@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode, type FormEvent } from 'react'
 import { Link } from 'wouter'
 import { Check, ChevronLeft, Copy, Gift, KeyRound, Link2, MessageCircle, Ticket } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -69,7 +69,7 @@ export function ProfilePage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault()
     setMessage(null)
 
@@ -218,7 +218,7 @@ export function ReferralsPage() {
   const totalEarned = user?.referralsEarnings ?? 0
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(referralLink)
+    void navigator.clipboard.writeText(referralLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

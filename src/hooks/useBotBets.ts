@@ -15,12 +15,6 @@ export interface BotBet {
   avatar: string
 }
 
-// Masked phone-style usernames like k2****76, m7****23, etc.
-const USERNAME_PREFIXES = [
-  'k', 'm', 'j', 'b', 'd', 'p', 's', 'a', 'r', 'f',
-  'c', 'n', 'e', 'v', 'g', 'w', 'h', 't', 'l', 'o',
-]
-
 function seededRandom(seed: number): () => number {
   let s = seed | 0
   return () => {

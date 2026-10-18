@@ -1,14 +1,14 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { Link } from 'wouter'
-import { 
-  Users, DollarSign, Activity, TrendingUp, Key, Lock, Unlock, Shield, 
-  Search, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff, 
-  CreditCard, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, 
-  Copy, Check, LogOut, ChevronRight, UserCheck, UserX, AlertCircle, ArrowRight,
-  Zap, Sparkles, Timer, Sliders, Flame, Clock, Dices, Scale, FileSpreadsheet
+import {
+  Users, Activity, TrendingUp, Key, Lock, Unlock, Shield,
+  Search, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff,
+  CreditCard, ArrowDownRight, Settings as SettingsIcon,
+  Copy, Check, LogOut, AlertCircle,
+  Zap, Timer, Dices, Scale,
+  Menu, X, LayoutDashboard, Wallet, Gift, ExternalLink
 } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
-import ErrorButton from '@/components/ErrorButton'
 
 type OddsEngineLiveState = {
   enabled: boolean
@@ -216,6 +216,8 @@ type UserDetailData = {
   recentWithdrawals: Array<any>
 }
 
+type NavTab = 'overview' | 'deposits' | 'withdrawals' | 'users' | 'bets' | 'odds' | 'gateway' | 'settings'
+
 function formatMoney(value: number) {
   return `KSH ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
@@ -235,14 +237,17 @@ export default function AdminDashboard() {
     return typeof window !== 'undefined' ? !!sessionStorage.getItem('rukabet_admin_token') : false
   })
 
+  // Mobile Sidebar Drawer State
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   // Auth Inputs
   const [usernameInput, setUsernameInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [authError, setAuthError] = useState('')
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'deposits' | 'bets' | 'users' | 'withdrawals' | 'odds' | 'gateway' | 'settings'>('overview')
+  // Active Section
+  const [activeTab, setActiveTab] = useState<NavTab>('overview')
 
   // Odds Engine State
   const [oddsEngine, setOddsEngine] = useState<OddsEngineLiveState | null>(null)
@@ -361,9 +366,7 @@ export default function AdminDashboard() {
   const [newApiSecret, setNewApiSecret] = useState('')
   const [showApiSecret, setShowApiSecret] = useState(false)
   const [isSecretConfigured, setIsSecretConfigured] = useState(false)
-  const [paymentSaved, setPaymentSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
-  const [paymentMessage, setPaymentMessage] = useState('')
   const [copiedWebhook, setCopiedWebhook] = useState(false)
 
   // Banner Notification
@@ -372,6 +375,11 @@ export default function AdminDashboard() {
   const showNotice = (type: 'success' | 'error', message: string) => {
     setBannerNotice({ type, message })
     setTimeout(() => setBannerNotice(null), 4500)
+  }
+
+  const selectTab = (tab: NavTab) => {
+    setActiveTab(tab)
+    setMobileNavOpen(false)
   }
 
   // Fetch Dashboard Overview & Settings
@@ -434,7 +442,7 @@ export default function AdminDashboard() {
     loadCoreData()
   }, [adminToken, config.apiBaseUrl, refreshKey])
 
-  // Fetch Users when Users tab is active
+  // Fetch Users
   useEffect(() => {
     if (!adminToken || activeTab !== 'users') return
 
@@ -454,8 +462,8 @@ export default function AdminDashboard() {
         if (res.ok) {
           const data = await res.json()
           setUsersList(data.users || [])
-          setUsersTotal(data.total || 0)
-          setUsersTotalPages(data.totalPages || 1)
+          setUsersTotal(data.total || data.pagination?.total || 0)
+          setUsersTotalPages(data.totalPages || data.pagination?.totalPages || 1)
         }
       } catch (err) {
         console.error('Failed to load users:', err)
@@ -468,7 +476,7 @@ export default function AdminDashboard() {
     return () => clearTimeout(timer)
   }, [adminToken, activeTab, userSearch, userStatusFilter, usersPage, usersLimit, config.apiBaseUrl, refreshKey])
 
-  // Fetch Withdrawals when Withdrawals tab is active
+  // Fetch Withdrawals
   useEffect(() => {
     if (!adminToken || activeTab !== 'withdrawals') return
 
@@ -496,7 +504,7 @@ export default function AdminDashboard() {
     fetchWithdrawals()
   }, [adminToken, activeTab, withdrawalFilter, config.apiBaseUrl, refreshKey])
 
-  // Fetch Deposits when Deposits tab is active
+  // Fetch Deposits
   useEffect(() => {
     if (!adminToken || activeTab !== 'deposits') return
 
@@ -531,7 +539,7 @@ export default function AdminDashboard() {
     return () => clearTimeout(timer)
   }, [adminToken, activeTab, depositFilter, depositSearch, depositsPage, config.apiBaseUrl, refreshKey])
 
-  // Fetch Bets when Bets tab is active
+  // Fetch Bets
   useEffect(() => {
     if (!adminToken || activeTab !== 'bets') return
 
@@ -585,18 +593,17 @@ export default function AdminDashboard() {
       if (res.ok && data.success) {
         setReconcileAudit(data.audit)
         if (apply) {
-          setBannerNotice({ type: 'success', message: `Balance successfully reconciled to KSH ${data.user.balance}` })
+          showNotice('success', `Balance reconciled to KSH ${data.user.balance}`)
           setRefreshKey(prev => prev + 1)
           if (selectedUserForDetail) {
             setSelectedUserForDetail(prev => prev ? { ...prev, user: { ...prev.user, balance: data.user.balance } } : null)
           }
         }
       } else {
-        setBannerNotice({ type: 'error', message: data.error || 'Failed to reconcile balance' })
+        showNotice('error', data.error || 'Failed to reconcile balance')
       }
     } catch (err: any) {
-      console.error('Reconciliation error:', err)
-      setBannerNotice({ type: 'error', message: err.message || 'Reconciliation failed' })
+      showNotice('error', err.message || 'Reconciliation failed')
     } finally {
       setIsReconciling(false)
     }
@@ -658,7 +665,7 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => null)
       if (res.ok && data?.success) {
         setOddsEngine(data.state)
-        setOddsToast({ type: 'success', message: data.message || 'Odds Engine rule activated successfully!' })
+        setOddsToast({ type: 'success', message: data.message || 'Odds Engine rule activated.' })
         fetchOddsEngine()
       } else {
         setOddsToast({ type: 'error', message: data?.error || 'Failed to apply odds engine rule.' })
@@ -686,7 +693,7 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => null)
       if (res.ok && data?.success) {
         setOddsEngine(data.state)
-        setOddsToast({ type: 'success', message: 'Odds Engine reset to standard normal provably fair mode.' })
+        setOddsToast({ type: 'success', message: 'Odds Engine reset to standard provably fair mode.' })
         fetchOddsEngine()
       } else {
         setOddsToast({ type: 'error', message: data?.error || 'Failed to reset odds engine.' })
@@ -698,8 +705,8 @@ export default function AdminDashboard() {
     }
   }
 
-  // Admin Login Handler
-  const handleLogin = async (e: React.FormEvent) => {
+  // Admin Login
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault()
     setIsAuthenticating(true)
     setAuthError('')
@@ -731,15 +738,14 @@ export default function AdminDashboard() {
     }
   }
 
-  // Admin Logout Handler
   const handleLogout = () => {
     sessionStorage.removeItem('rukabet_admin_token')
     setAdminToken(null)
     setIsAuthenticated(false)
   }
 
-  // User Operations Handlers
   const handleOpenUserDetail = async (userId: string) => {
+    if (!userId) return
     setDetailLoading(true)
     setReconcileAudit(null)
     try {
@@ -748,9 +754,15 @@ export default function AdminDashboard() {
       })
       if (res.ok) {
         const data = await res.json()
-        setSelectedUserForDetail(data)
+        setSelectedUserForDetail({
+          user: data.user,
+          stats: data.stats || { totalBets: 0, totalWagered: 0, totalWon: 0, netProfitLoss: 0 },
+          recentBets: data.recentBets || [],
+          recentDeposits: data.recentDeposits || [],
+          recentWithdrawals: data.recentWithdrawals || []
+        })
       }
-    } catch (err) {
+    } catch {
       showNotice('error', 'Failed to load user details')
     } finally {
       setDetailLoading(false)
@@ -770,7 +782,7 @@ export default function AdminDashboard() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        showNotice('success', data.message || 'Database synced and early user records normalized!')
+        showNotice('success', data.message || 'Database synced and user records normalized.')
         setRefreshKey(k => k + 1)
       } else {
         showNotice('error', data.error || 'Failed to sync database')
@@ -782,7 +794,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleAdjustBalance = async (e: React.FormEvent) => {
+  const handleAdjustBalance = async (e: FormEvent) => {
     e.preventDefault()
     if (!balanceModalUser || !adminToken) return
     setIsSubmittingBalance(true)
@@ -804,9 +816,6 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (res.ok && data.success) {
         showNotice('success', data.message || 'Balance updated successfully')
-        if (data.user) {
-          setUsersList(prev => prev.map(u => u._id === data.user._id ? { ...u, balance: data.user.balance } : u))
-        }
         setBalanceModalUser(null)
         setBalanceAmount('')
         setBalanceReason('')
@@ -821,7 +830,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleAdjustFreebet = async (e: React.FormEvent) => {
+  const handleAdjustFreebet = async (e: FormEvent) => {
     e.preventDefault()
     if (!freebetModalUser || !adminToken) return
     setIsSubmittingFreebet(true)
@@ -858,7 +867,7 @@ export default function AdminDashboard() {
   const handleToggleFreeze = async (user: AdminUser) => {
     if (!adminToken) return
     const action = user.isFrozen ? 'unfreeze' : 'freeze'
-    if (!confirm(`Are you sure you want to ${action} account for ${user.username} (${user.phone})?`)) return
+    if (!confirm(`Confirm ${action} account for ${user.username} (${user.phone})?`)) return
 
     try {
       const res = await fetch(`${config.apiBaseUrl}/api/admin/users/${user._id}/toggle-freeze`, {
@@ -868,17 +877,17 @@ export default function AdminDashboard() {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        showNotice('success', data.message)
+        showNotice('success', data.message || `Account status updated`)
         setRefreshKey(k => k + 1)
       } else {
-        showNotice('error', data.error || 'Failed to change freeze status')
+        showNotice('error', data.error || 'Failed to change account status')
       }
     } catch {
       showNotice('error', 'Network error')
     }
   }
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: FormEvent) => {
     e.preventDefault()
     if (!passwordModalUser || !adminToken) return
     setIsSubmittingPassword(true)
@@ -908,12 +917,11 @@ export default function AdminDashboard() {
     }
   }
 
-  // Withdrawal Action Handler (Complete or Reject)
   const handleUpdateWithdrawal = async (withdrawalId: string, status: 'completed' | 'rejected', amount: number) => {
     if (!adminToken) return
     const promptMsg = status === 'completed'
-      ? `Confirm marking withdrawal of KSH ${amount} as COMPLETED / PAID?`
-      : `Confirm REJECTING withdrawal of KSH ${amount}? The funds will be automatically refunded back to the user.`
+      ? `Mark withdrawal of KSH ${amount} as PAID?`
+      : `Reject withdrawal of KSH ${amount}? Funds will be refunded to the player's wallet.`
 
     if (!confirm(promptMsg)) return
     setUpdatingWithdrawalId(withdrawalId)
@@ -930,7 +938,7 @@ export default function AdminDashboard() {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        showNotice('success', data.message)
+        showNotice('success', data.message || `Withdrawal marked ${status}`)
         setRefreshKey(k => k + 1)
       } else {
         showNotice('error', data.error || 'Action failed')
@@ -942,7 +950,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Deposit Action Handler (Approve & Credit or Reject)
   const handleUpdateDepositStatus = async (
     depositId: string,
     status: 'completed' | 'failed',
@@ -952,8 +959,8 @@ export default function AdminDashboard() {
     if (!adminToken) return
     const receiptToSubmit = receiptCode || manualReceiptInput[depositId] || ''
     const promptMsg = status === 'completed'
-      ? `Confirm manually APPROVING and CREDITING KSH ${amount} to the player's wallet?${receiptToSubmit ? ` (Receipt: ${receiptToSubmit})` : ''}`
-      : `Confirm REJECTING this pending deposit of KSH ${amount}?`
+      ? `Approve and credit KSH ${amount} to player wallet?${receiptToSubmit ? ` (Receipt: ${receiptToSubmit})` : ''}`
+      : `Reject pending deposit of KSH ${amount}?`
 
     if (!confirm(promptMsg)) return
     setUpdatingDepositId(depositId)
@@ -974,7 +981,7 @@ export default function AdminDashboard() {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        showNotice('success', status === 'completed' ? `Deposit of KSH ${amount} approved and credited!` : 'Deposit marked as failed')
+        showNotice('success', status === 'completed' ? `Deposit of KSH ${amount} credited.` : 'Deposit rejected.')
         setRefreshKey(k => k + 1)
       } else {
         showNotice('error', data.error || 'Action failed')
@@ -986,12 +993,10 @@ export default function AdminDashboard() {
     }
   }
 
-  // Save Payment Gateway (Payd) Credentials
-  const handleSaveGateway = async (e: React.FormEvent) => {
+  const handleSaveGateway = async (e: FormEvent) => {
     e.preventDefault()
     if (!adminToken) return
     setPaymentLoading(true)
-    setPaymentMessage('')
 
     try {
       const payload: any = {
@@ -1000,12 +1005,8 @@ export default function AdminDashboard() {
         paydApiBaseUrl: paymentConfig.paydApiBaseUrl.trim() || 'https://api.mypayd.app/api/v2/payments',
         paydCallbackUrl: paymentConfig.paydCallbackUrl.trim(),
       }
-      if (newApiPassword.trim()) {
-        payload.paydApiPassword = newApiPassword.trim()
-      }
-      if (newApiSecret.trim()) {
-        payload.paydApiSecret = newApiSecret.trim()
-      }
+      if (newApiPassword.trim()) payload.paydApiPassword = newApiPassword.trim()
+      if (newApiSecret.trim()) payload.paydApiSecret = newApiSecret.trim()
 
       const res = await fetch(`${config.apiBaseUrl}/api/settings`, {
         method: 'PUT',
@@ -1022,7 +1023,7 @@ export default function AdminDashboard() {
         setIsSecretConfigured(Boolean(data.settings?.isSecretConfigured))
         setNewApiPassword('')
         setNewApiSecret('')
-        showNotice('success', 'Payd gateway credentials saved directly to database successfully!')
+        showNotice('success', 'Payd gateway credentials saved.')
       } else {
         showNotice('error', data.error || 'Failed to save gateway configuration')
       }
@@ -1033,8 +1034,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // Save General System Settings
-  const handleSaveSystemSettings = async (e: React.FormEvent) => {
+  const handleSaveSystemSettings = async (e: FormEvent) => {
     e.preventDefault()
     if (!adminToken) return
     setPaymentLoading(true)
@@ -1075,7 +1075,7 @@ export default function AdminDashboard() {
           minBet: payload.minBet,
           maxBet: payload.maxBet,
         })
-        showNotice('success', 'System settings saved successfully')
+        showNotice('success', 'System settings updated.')
       } else {
         showNotice('error', data.error || 'Failed to save settings')
       }
@@ -1088,31 +1088,87 @@ export default function AdminDashboard() {
 
   const copyWebhookUrl = () => {
     const url = paymentConfig.paydCallbackUrl.trim() || `${window.location.origin}/api/webhooks/payd`
-    navigator.clipboard.writeText(url)
+    void navigator.clipboard.writeText(url)
     setCopiedWebhook(true)
     setTimeout(() => setCopiedWebhook(false), 2500)
   }
 
-  // Pending withdrawals count
-  const pendingWithdrawalCount = overview?.totals.totalWithdrawals ?? 0
+  // Pending badges
+  const pendingDepositsCount = overview?.totals.pendingDeposits || 0
+  const hasPendingWithdrawals = overview?.recentWithdrawals?.some(w => w.status === 'pending') || false
+
+  type NavItem = {
+    id: NavTab
+    label: string
+    icon: any
+    badge?: string
+    badgeAlert?: boolean
+    badgeSuccess?: boolean
+  }
+
+  type NavSection = {
+    title: string
+    items: NavItem[]
+  }
+
+  const navSections: NavSection[] = [
+    {
+      title: 'Operations',
+      items: [
+        { id: 'overview' as NavTab, label: 'Overview', icon: LayoutDashboard },
+        { id: 'bets' as NavTab, label: 'Bets & Ledger', icon: Dices, badge: overview?.totals.activeBets ? `${overview.totals.activeBets} live` : undefined },
+      ]
+    },
+    {
+      title: 'Cashier & CRM',
+      items: [
+        { id: 'deposits' as NavTab, label: 'Deposits', icon: ArrowDownRight, badge: pendingDepositsCount > 0 ? String(pendingDepositsCount) : undefined, badgeAlert: pendingDepositsCount > 0 },
+        { id: 'withdrawals' as NavTab, label: 'Withdrawals', icon: CreditCard, badge: hasPendingWithdrawals ? 'Pending' : undefined, badgeAlert: hasPendingWithdrawals },
+        { id: 'users' as NavTab, label: 'Players', icon: Users, badge: overview?.totals.users ? String(overview.totals.users) : undefined },
+      ]
+    },
+    {
+      title: 'Configuration',
+      items: [
+        { id: 'odds' as NavTab, label: 'Odds Engine', icon: Zap, badge: oddsEngine?.enabled ? 'BOOST' : undefined, badgeSuccess: oddsEngine?.enabled },
+        { id: 'gateway' as NavTab, label: 'Payd Gateway', icon: Key },
+        { id: 'settings' as NavTab, label: 'System Settings', icon: SettingsIcon },
+      ]
+    }
+  ]
+
+  const currentTabMeta: Record<NavTab, { title: string; subtitle: string }> = {
+    overview: { title: 'Platform Overview', subtitle: 'Real-time treasury summary, recent cashier activity, and top player turnover' },
+    deposits: { title: 'M-Pesa Deposits', subtitle: 'Audit incoming STK pushes, verify M-Pesa receipt codes, and manually credit stuck payments' },
+    withdrawals: { title: 'Withdrawal Requests', subtitle: 'Review player payout requests, mark disbursements paid, or reject and refund balances' },
+    users: { title: 'Player Directory', subtitle: 'Inspect player accounts, reconcile wallet ledgers, adjust balances, or manage account access' },
+    bets: { title: 'Bets & Round Ledger', subtitle: 'Live and historical wager breakdown across real cash and freebet rounds' },
+    odds: { title: 'Odds Engine Control', subtitle: 'Configure promotional multiplier ranges, minimum crash floors, or scheduled reward windows' },
+    gateway: { title: 'Payd Payment Gateway', subtitle: 'Manage M-Pesa STK Push API credentials and webhook callback endpoints' },
+    settings: { title: 'System Limits & Branding', subtitle: 'Configure platform deposit/withdrawal thresholds, bonus rules, and support contacts' }
+  }
 
   // ══════════════════════════════════════════════════════════════
-  // RENDER: LOGIN FORM (IF NOT AUTHENTICATED)
+  // RENDER: LOGIN SCREEN (SOLID DARK BACK-OFFICE)
   // ══════════════════════════════════════════════════════════════
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-page px-4 py-12">
-        <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-6 shadow-2xl">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
-              <Shield className="size-6" />
+      <div className="flex min-h-screen items-center justify-center bg-[#0d0f12] px-4 py-12 text-[#f3f4f6]">
+        <div className="w-full max-w-sm rounded-lg border border-[#262a33] bg-[#15181e] p-6">
+          <div className="mb-6 border-b border-[#262a33] pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded bg-[#0da84b] text-white">
+                <Shield className="size-4" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold tracking-tight text-white">RukaBet Backoffice</h1>
+                <p className="text-xs text-[#8e96a4]">Administrator Authentication</p>
+              </div>
             </div>
-            <h1 className="text-xl font-bold text-ink">Admin Control Hub</h1>
-            <p className="mt-1 text-xs text-ink-3">Sign in with authorized administrative credentials</p>
           </div>
 
           {authError && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-loss/30 bg-loss/10 p-3 text-xs text-loss">
+            <div className="mb-4 flex items-center gap-2 rounded border border-[#dc2626] bg-[#2a1215] p-3 text-xs font-medium text-[#f87171]">
               <AlertCircle className="size-4 shrink-0" />
               <span>{authError}</span>
             </div>
@@ -1120,40 +1176,40 @@ export default function AdminDashboard() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink-2">Admin Username</label>
+              <label className="mb-1.5 block text-xs font-semibold text-[#c4c9d4]">Username</label>
               <input
                 type="text"
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value)}
-                placeholder="Username (e.g. pirate101)"
+                placeholder="Enter admin username"
                 required
-                className="h-10 w-full rounded-lg border border-line bg-field px-3 text-sm text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm text-white placeholder:text-[#5e6675] focus:border-[#0da84b] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink-2">Admin Password</label>
+              <label className="mb-1.5 block text-xs font-semibold text-[#c4c9d4]">Password</label>
               <input
                 type="password"
                 value={passwordInput}
                 onChange={e => setPasswordInput(e.target.value)}
-                placeholder="Password"
+                placeholder="Enter password"
                 required
-                className="h-10 w-full rounded-lg border border-line bg-field px-3 text-sm text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm text-white placeholder:text-[#5e6675] focus:border-[#0da84b] focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={isAuthenticating}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-brand font-semibold text-brand-ink transition-colors hover:bg-brand-hover disabled:opacity-50"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded bg-[#0da84b] text-sm font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
             >
-              {isAuthenticating ? <RefreshCw className="size-4 animate-spin" /> : 'Sign In as Admin'}
+              {isAuthenticating ? <RefreshCw className="size-4 animate-spin" /> : 'Sign In'}
             </button>
 
             <div className="pt-2 text-center">
-              <Link href="/" className="text-xs text-ink-3 transition-colors hover:text-ink">
-                ← Return to Aviator Game
+              <Link href="/" className="text-xs font-medium text-[#8e96a4] hover:text-white">
+                ← Return to Live Game
               </Link>
             </div>
           </form>
@@ -1163,2202 +1219,1782 @@ export default function AdminDashboard() {
   }
 
   // ══════════════════════════════════════════════════════════════
-  // RENDER: AUTHENTICATED ADMIN DASHBOARD
+  // RENDER: AUTHENTICATED BACK-OFFICE SHELL
   // ══════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-page text-ink">
-      {/* Toast Notification Banner */}
+    <div className="flex min-h-screen bg-[#0d0f12] text-[#f3f4f6] font-sans antialiased">
+      {/* Solid Notification Toast */}
       {bannerNotice && (
-        <div className={`fixed right-4 top-4 z-50 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm shadow-xl ${
-          bannerNotice.type === 'success' 
-            ? 'border-brand/40 bg-brand/15 text-brand backdrop-blur' 
-            : 'border-loss/40 bg-loss/15 text-loss backdrop-blur'
-        }`}>
-          {bannerNotice.type === 'success' ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
+        <div
+          className={`fixed right-4 top-4 z-50 flex items-center gap-2.5 rounded border px-4 py-3 text-xs font-semibold shadow-lg ${
+            bannerNotice.type === 'success'
+              ? 'border-[#0da84b] bg-[#102618] text-[#34d399]'
+              : 'border-[#dc2626] bg-[#2a1215] text-[#f87171]'
+          }`}
+        >
+          {bannerNotice.type === 'success' ? <CheckCircle2 className="size-4 shrink-0" /> : <AlertTriangle className="size-4 shrink-0" />}
           <span>{bannerNotice.message}</span>
+          <button onClick={() => setBannerNotice(null)} className="ml-2 text-[#8e96a4] hover:text-white">
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-line bg-panel/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 text-sm font-bold tracking-wider text-brand">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-brand/10">🎮</span>
-              RUKABET
-            </Link>
-            <span className="rounded bg-raised px-2 py-0.5 text-[11px] font-semibold uppercase text-ink-2">
-              Admin Ops Hub
-            </span>
+      {/* Mobile Drawer Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/75 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Left Sidebar Navigation (Fixed on Desktop, Slide-over Drawer on Mobile) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[#242830] bg-[#14171c] transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="flex h-14 items-center justify-between border-b border-[#242830] px-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded bg-[#0da84b] text-xs font-black text-white">
+              RB
+            </div>
+            <div>
+              <div className="text-sm font-bold tracking-tight text-white leading-none">RUKABET</div>
+              <div className="mt-0.5 text-[11px] font-medium text-[#8e96a4]">Admin Console</div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden items-center gap-1.5 rounded-full border border-brand/20 bg-brand/5 px-2.5 py-1 text-xs text-brand sm:inline-flex">
-              <span className="size-1.5 rounded-full bg-brand animate-pulse"></span>
-              Admin: pirate101
-            </span>
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            className="rounded p-1.5 text-[#8e96a4] hover:bg-[#1e222a] hover:text-white lg:hidden"
+            aria-label="Close navigation menu"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
 
-            <button
-              onClick={() => setRefreshKey(k => k + 1)}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-field px-2.5 text-xs font-medium text-ink-2 hover:bg-raised hover:text-ink"
-              title="Refresh all metrics"
-            >
-              <RefreshCw className="size-3.5" />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+        {/* Navigation Links */}
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+          {navSections.map(section => (
+            <div key={section.title}>
+              <div className="mb-1.5 px-2.5 text-[11px] font-bold uppercase tracking-wider text-[#6e7685]">
+                {section.title}
+              </div>
+              <div className="space-y-0.5">
+                {section.items.map(item => {
+                  const Icon = item.icon
+                  const isActive = activeTab === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selectTab(item.id)}
+                      className={`flex w-full items-center justify-between rounded px-2.5 py-2 text-xs font-semibold transition-colors ${
+                        isActive
+                          ? 'bg-[#0da84b] text-white'
+                          : 'text-[#b4bcc8] hover:bg-[#1e222a] hover:text-white'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon className="size-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </span>
 
+                      {item.badge && (
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                            isActive
+                              ? 'bg-black/25 text-white'
+                              : item.badgeAlert
+                              ? 'bg-[#f59e0b] text-[#111317]'
+                              : item.badgeSuccess
+                              ? 'bg-[#0da84b] text-white'
+                              : 'bg-[#242830] text-[#b4bcc8]'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="border-t border-[#242830] p-3 space-y-2">
+          <Link
+            href="/"
+            className="flex w-full items-center justify-between rounded border border-[#282d37] bg-[#1a1e25] px-3 py-2 text-xs font-semibold text-[#c4c9d4] hover:border-[#383f4d] hover:text-white"
+          >
+            <span>Open Live Game</span>
+            <ExternalLink className="size-3.5 text-[#8e96a4]" />
+          </Link>
+
+          <div className="flex items-center justify-between pt-1 px-1">
+            <div className="text-xs">
+              <div className="font-semibold text-white">pirate101</div>
+              <div className="text-[11px] text-[#7e8694]">Super Admin</div>
+            </div>
             <button
+              type="button"
               onClick={handleLogout}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-field px-2.5 text-xs font-medium text-loss hover:bg-loss/10"
-              title="Logout"
+              className="flex items-center gap-1 rounded border border-[#3b1d22] bg-[#251316] px-2.5 py-1.5 text-xs font-semibold text-[#f87171] hover:bg-[#32181c]"
             >
               <LogOut className="size-3.5" />
-              <span className="hidden sm:inline">Logout</span>
+              <span>Logout</span>
             </button>
           </div>
         </div>
+      </aside>
 
-        {/* Navigation Pill Tabs matching Deposit Modal */}
-        <div className="mx-auto flex max-w-7xl overflow-x-auto px-3 sm:px-6 py-2 border-t border-[#25262b]">
-          <div className="flex bg-[#282a2e] p-1 rounded-lg gap-1 text-xs">
+      {/* Right Main Column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Sticky Top Bar */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#242830] bg-[#14171c] px-4 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => setActiveTab('overview')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'overview' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="flex size-9 items-center justify-center rounded border border-[#2c313c] bg-[#1a1e25] text-white hover:bg-[#242933] lg:hidden"
+              aria-label="Open navigation menu"
             >
-              <Activity className="size-3.5" />
-              Overview
+              <Menu className="size-5" />
             </button>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold text-white sm:text-base">
+                {currentTabMeta[activeTab].title}
+              </h1>
+              <p className="hidden truncate text-xs text-[#8e96a4] sm:block">
+                {currentTabMeta[activeTab].subtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Live Odds Status Indicator */}
             <button
-              onClick={() => setActiveTab('deposits')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'deposits' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
-            >
-              <ArrowDownRight className="size-3.5" />
-              Deposits
-              {overview?.recentDeposits?.some(d => d.status === 'pending') && (
-                <span className="size-2 rounded-full bg-amber-400 animate-pulse"></span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('bets')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'bets' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
-            >
-              <Dices className="size-3.5" />
-              Bets & Ledger
-            </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'users' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
-            >
-              <Users className="size-3.5" />
-              Users & Tracking
-            </button>
-            <button
-              onClick={() => setActiveTab('withdrawals')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'withdrawals' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
-            >
-              <CreditCard className="size-3.5" />
-              Withdrawals
-              {overview?.recentWithdrawals?.some(w => w.status === 'pending') && (
-                <span className="size-2 rounded-full bg-amber-400 animate-pulse"></span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('odds')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'odds' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
+              type="button"
+              onClick={() => selectTab('odds')}
+              className={`hidden sm:flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-semibold ${
+                oddsEngine?.enabled
+                  ? 'border-[#0da84b] bg-[#102618] text-[#34d399]'
+                  : 'border-[#2c313c] bg-[#1a1e25] text-[#b4bcc8] hover:text-white'
               }`}
             >
               <Zap className="size-3.5" />
-              Odds Engine
-              {oddsEngine?.enabled && (
-                <span className="flex items-center gap-0.5 rounded bg-black/30 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                  ON
-                </span>
-              )}
+              <span>{oddsEngine?.enabled ? `Boost Active (${oddsEngine.mode})` : 'Odds: Standard Fair'}</span>
             </button>
+
             <button
-              onClick={() => setActiveTab('gateway')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'gateway' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
+              type="button"
+              onClick={() => setRefreshKey(k => k + 1)}
+              className="flex h-8 items-center gap-1.5 rounded border border-[#2c313c] bg-[#1a1e25] px-3 text-xs font-semibold text-[#e5e7eb] hover:bg-[#242933]"
+              title="Refresh data"
             >
-              <Key className="size-3.5" />
-              Payd Gateway
-            </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-medium transition-all ${
-                activeTab === 'settings' ? 'bg-[#00eb5b] text-[#091e0f] font-bold shadow' : 'text-[#d1d5db] hover:text-white'
-              }`}
-            >
-              <SettingsIcon className="size-3.5" />
-              Settings
+              <RefreshCw className={`size-3.5 ${overviewLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6">
-        {/* Compact KPI Metrics Ribbon */}
-        {overview && (
-          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
-              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
-                <span>Total Users</span>
-                <Users className="size-3.5 text-[#00eb5b]" />
-              </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{overview.totals.users}</span>
-                <span className="text-[11px] text-[#00eb5b]">+{overview.totals.newUsers24h} 24h</span>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
-              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
-                <span>Total Deposits</span>
-                <ArrowDownRight className="size-3.5 text-[#00eb5b]" />
-              </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-[#00eb5b]">{formatMoney(overview.totals.totalDepositsAmount)}</span>
-                <span className="text-[11px] text-[#a0a6b1]">{overview.totals.completedDeposits} completed</span>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
-              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
-                <span>House Margin</span>
-                <TrendingUp className="size-3.5 text-[#00eb5b]" />
-              </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className={`text-xl font-bold ${overview.totals.houseGross >= 0 ? 'text-[#00eb5b]' : 'text-[#ff5c6c]'}`}>
-                  {formatMoney(overview.totals.houseGross)}
-                </span>
-                <span className="text-[11px] text-[#a0a6b1]">gross</span>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
-              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
-                <span>Total Bets</span>
-                <Activity className="size-3.5 text-[#00eb5b]" />
-              </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{overview.totals.bets}</span>
-                <span className="text-[11px] text-[#00eb5b]">{overview.totals.activeBets} active</span>
-              </div>
-            </div>
-
-            <div className="col-span-2 sm:col-span-1 rounded-lg border border-[#25262b] bg-[#282a2e] p-3">
-              <div className="flex items-center justify-between text-xs text-[#a0a6b1]">
-                <span>Withdrawals</span>
-                <CreditCard className="size-3.5 text-amber-400" />
-              </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{overview.totals.totalWithdrawals || 0}</span>
-                <span className="text-[11px] text-[#a0a6b1]">total requests</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            TAB 1: OVERVIEW
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'overview' && overview && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* Recent Deposits */}
-              <div className="rounded-lg border border-line bg-panel p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-ink">Recent Deposits</h2>
-                  <button 
-                    onClick={() => setActiveTab('deposits')} 
-                    className="text-xs text-brand hover:underline font-medium"
-                  >
-                    View All →
-                  </button>
+        {/* Workspace Content */}
+        <main className="flex-1 p-4 sm:p-6 space-y-5 max-w-[1440px] w-full mx-auto">
+          {/* Global KPI Strip (Shown on Overview, Deposits, Withdrawals, Users) */}
+          {overview && ['overview', 'deposits', 'withdrawals', 'users'].includes(activeTab) && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#8e96a4]">
+                  <span>Registered Players</span>
+                  <Users className="size-4 text-[#6e7685]" />
                 </div>
+                <div className="mt-1.5 flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-white tabular-nums">{overview.totals.users}</span>
+                  <span className="text-xs font-semibold text-[#10b981] tabular-nums">+{overview.totals.newUsers24h} today</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#8e96a4]">
+                  <span>Settled Deposits</span>
+                  <ArrowDownRight className="size-4 text-[#10b981]" />
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-[#10b981] tabular-nums">{formatMoney(overview.totals.totalDepositsAmount)}</span>
+                  <span className="text-xs text-[#8e96a4] tabular-nums">{overview.totals.completedDeposits} txns</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#8e96a4]">
+                  <span>House Net (GGR)</span>
+                  <TrendingUp className="size-4 text-[#6e7685]" />
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between">
+                  <span className={`text-xl font-bold tabular-nums ${overview.totals.houseGross >= 0 ? 'text-white' : 'text-[#f87171]'}`}>
+                    {formatMoney(overview.totals.houseGross)}
+                  </span>
+                  <span className="text-xs text-[#8e96a4]">margin</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#8e96a4]">
+                  <span>Total Bets</span>
+                  <Activity className="size-4 text-[#6e7685]" />
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-white tabular-nums">{overview.totals.bets}</span>
+                  <span className="text-xs font-semibold text-[#10b981] tabular-nums">{overview.totals.activeBets} active</span>
+                </div>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#8e96a4]">
+                  <span>Withdrawals</span>
+                  <CreditCard className="size-4 text-[#f59e0b]" />
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-white tabular-nums">{overview.totals.totalWithdrawals || 0}</span>
+                  <span className="text-xs text-[#8e96a4]">requests</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 1: OVERVIEW
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'overview' && overview && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* Recent Deposits */}
+                <div className="rounded-md border border-[#242830] bg-[#16191f]">
+                  <div className="flex items-center justify-between border-b border-[#242830] px-4 py-3">
+                    <h2 className="text-sm font-bold text-white">Recent Deposits</h2>
+                    <button
+                      onClick={() => selectTab('deposits')}
+                      className="text-xs font-semibold text-[#10b981] hover:underline"
+                    >
+                      View All Deposits →
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                          <th className="px-4 py-2.5">Player</th>
+                          <th className="px-4 py-2.5">Amount</th>
+                          <th className="px-4 py-2.5">Status</th>
+                          <th className="px-4 py-2.5">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#22262e]">
+                        {overview.recentDeposits.length === 0 ? (
+                          <tr><td colSpan={4} className="py-6 text-center text-[#8e96a4]">No recent deposits</td></tr>
+                        ) : (
+                          overview.recentDeposits.map(d => (
+                            <tr key={d._id} className="hover:bg-[#1c2028]">
+                              <td className="px-4 py-2.5">
+                                <div className="font-semibold text-white">{d.userId?.username || 'Player'}</div>
+                                <div className="font-mono text-[11px] text-[#8e96a4]">{d.userId?.phone || '-'}</div>
+                              </td>
+                              <td className="px-4 py-2.5 font-bold text-[#10b981] tabular-nums">KSH {d.amount}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                  d.status === 'completed'
+                                    ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                                    : d.status === 'pending'
+                                    ? 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                                    : 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                                }`}>
+                                  {d.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-[#8e96a4] tabular-nums">{formatDate(d.createdAt)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Recent Withdrawals */}
+                <div className="rounded-md border border-[#242830] bg-[#16191f]">
+                  <div className="flex items-center justify-between border-b border-[#242830] px-4 py-3">
+                    <h2 className="text-sm font-bold text-white">Recent Withdrawals</h2>
+                    <button
+                      onClick={() => selectTab('withdrawals')}
+                      className="text-xs font-semibold text-[#10b981] hover:underline"
+                    >
+                      Manage Payouts →
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                          <th className="px-4 py-2.5">Player</th>
+                          <th className="px-4 py-2.5">Amount</th>
+                          <th className="px-4 py-2.5">Status</th>
+                          <th className="px-4 py-2.5">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#22262e]">
+                        {!overview.recentWithdrawals || overview.recentWithdrawals.length === 0 ? (
+                          <tr><td colSpan={4} className="py-6 text-center text-[#8e96a4]">No recent withdrawals</td></tr>
+                        ) : (
+                          overview.recentWithdrawals.map(w => (
+                            <tr key={w._id} className="hover:bg-[#1c2028]">
+                              <td className="px-4 py-2.5">
+                                <div className="font-semibold text-white">{w.userId?.username || 'Player'}</div>
+                                <div className="font-mono text-[11px] text-[#8e96a4]">{w.phone}</div>
+                              </td>
+                              <td className="px-4 py-2.5 font-bold text-[#f87171] tabular-nums">KSH {w.amount}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                  w.status === 'completed'
+                                    ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                                    : w.status === 'pending'
+                                    ? 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                                    : 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                                }`}>
+                                  {w.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-[#8e96a4] tabular-nums">{formatDate(w.createdAt)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Players by Turnover */}
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-4">
+                <h2 className="mb-3 text-sm font-bold text-white">Top Players by Wagering Volume</h2>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {overview.topPlayers.length === 0 ? (
+                    <p className="text-xs text-[#8e96a4]">No player turnover data recorded yet.</p>
+                  ) : (
+                    overview.topPlayers.map((player, idx) => (
+                      <div key={player.userId} className="flex items-center justify-between rounded border border-[#262a33] bg-[#1c2028] p-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-bold text-white">#{idx + 1} {player.username}</p>
+                          <p className="mt-0.5 font-mono text-[11px] text-[#8e96a4]">{player.phone} • {player.totalBets} bets</p>
+                        </div>
+                        <div className="text-right tabular-nums">
+                          <p className="font-bold text-[#10b981]">KSH {player.totalBetAmount.toLocaleString()}</p>
+                          <p className="mt-0.5 text-[11px] text-[#8e96a4]">Won: KSH {player.totalWinAmount.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 2: DEPOSITS MANAGEMENT
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'deposits' && (
+            <div className="space-y-4">
+              {/* Toolbar */}
+              <div className="flex flex-col gap-3 rounded-md border border-[#242830] bg-[#16191f] p-3.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 size-4 text-[#6e7685]" />
+                  <input
+                    type="text"
+                    value={depositSearch}
+                    onChange={e => {
+                      setDepositSearch(e.target.value)
+                      setDepositsPage(1)
+                    }}
+                    placeholder="Search by phone, DEP reference, Payd reference, or M-Pesa receipt..."
+                    className="h-9 w-full rounded border border-[#2c313c] bg-[#0d0f12] pl-9 pr-3 text-xs text-white placeholder:text-[#6e7685] focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded border border-[#2c313c] bg-[#0d0f12] p-0.5 text-xs">
+                    {(['all', 'pending', 'completed', 'failed'] as const).map(f => (
+                      <button
+                        key={f}
+                        onClick={() => { setDepositFilter(f); setDepositsPage(1) }}
+                        className={`capitalize rounded px-3 py-1 font-semibold ${
+                          depositFilter === f ? 'bg-[#242933] text-white' : 'text-[#8e96a4] hover:text-white'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="rounded border border-[#242830] bg-[#1c2028] px-3 py-1.5 text-xs font-semibold text-[#b4bcc8] tabular-nums">
+                    Verified Total: <span className="font-bold text-[#10b981]">KSH {totalCompletedDepositAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deposits Table */}
+              <div className="overflow-hidden rounded-md border border-[#242830] bg-[#16191f]">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-line text-ink-3">
-                        <th className="pb-2">User / Phone</th>
-                        <th className="pb-2">Amount</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2">Time</th>
+                      <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                        <th className="p-3">Player / Phone</th>
+                        <th className="p-3">Amount</th>
+                        <th className="p-3">References & Receipt</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Created</th>
+                        <th className="p-3 text-right">Manual Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line/40">
-                      {overview.recentDeposits.length === 0 ? (
-                        <tr><td colSpan={4} className="py-4 text-center text-ink-3">No recent deposits</td></tr>
+                    <tbody className="divide-y divide-[#22262e]">
+                      {depositsLoading ? (
+                        <tr>
+                          <td colSpan={6} className="py-10 text-center text-[#8e96a4]">
+                            <RefreshCw className="mx-auto size-5 animate-spin mb-1.5 text-[#0da84b]" />
+                            Loading deposits...
+                          </td>
+                        </tr>
+                      ) : depositsList.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-10 text-center text-[#8e96a4]">
+                            No deposits match the current filter.
+                          </td>
+                        </tr>
                       ) : (
-                        overview.recentDeposits.map(d => (
-                          <tr key={d._id} className="hover:bg-field/50">
-                            <td className="py-2.5 font-medium text-ink">
-                              {d.userId?.username || 'User'} <span className="text-ink-3">({d.userId?.phone || '-'})</span>
-                            </td>
-                            <td className="py-2.5 font-semibold text-brand">KSH {d.amount}</td>
-                            <td className="py-2.5">
-                              <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                                d.status === 'completed' ? 'bg-brand/10 text-brand' : 'bg-line text-ink-3'
-                              }`}>
-                                {d.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-ink-3">{formatDate(d.createdAt)}</td>
-                          </tr>
-                        ))
+                        depositsList.map(d => {
+                          const effectiveReceipt = d.mpesaReceipt || d.submittedReceipt || manualReceiptInput[d._id] || ''
+                          return (
+                            <tr key={d._id} className="hover:bg-[#1c2028]">
+                              <td className="p-3">
+                                <div className="font-bold text-white">{d.userId?.username || 'Player'}</div>
+                                <div className="font-mono text-[11px] text-[#8e96a4]">{d.phone}</div>
+                                {d.userId?.balance !== undefined && (
+                                  <div className="text-[11px] text-[#6e7685] tabular-nums">Wallet: KSH {d.userId.balance.toFixed(2)}</div>
+                                )}
+                              </td>
+                              <td className="p-3 font-bold text-sm text-[#10b981] tabular-nums">
+                                KSH {d.amount.toFixed(2)}
+                              </td>
+                              <td className="p-3 space-y-1">
+                                <div className="font-mono text-[11px] text-[#c4c9d4]">{d.apiRef}</div>
+                                {d.mpesaReceipt && (
+                                  <div className="inline-block rounded bg-[#102618] border border-[#164e30] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#34d399]">
+                                    M-Pesa: {d.mpesaReceipt}
+                                  </div>
+                                )}
+                                {!d.mpesaReceipt && d.submittedReceipt && (
+                                  <div className="inline-block rounded bg-[#2b2111] border border-[#523c16] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#fbbf24]">
+                                    User SMS Code: {d.submittedReceipt}
+                                  </div>
+                                )}
+                                {(d.paydReference || d.externalRef) && (
+                                  <div className="font-mono text-[11px] text-[#6e7685]">
+                                    Ref: {d.paydReference || d.externalRef}
+                                  </div>
+                                )}
+                                {d.failureReason && (
+                                  <div className="text-[11px] font-medium text-[#f87171]">{d.failureReason}</div>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                  d.status === 'completed'
+                                    ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                                    : d.status === 'pending'
+                                    ? 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                                    : 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                                }`}>
+                                  {d.status}
+                                </span>
+                                {d.credited && (
+                                  <div className="mt-1 text-[11px] font-semibold text-[#10b981]">Credited</div>
+                                )}
+                              </td>
+                              <td className="p-3 text-[#8e96a4] tabular-nums whitespace-nowrap">
+                                {formatDate(d.createdAt)}
+                              </td>
+                              <td className="p-3 text-right">
+                                {d.status === 'pending' ? (
+                                  <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={manualReceiptInput[d._id] !== undefined ? manualReceiptInput[d._id] : (d.submittedReceipt || '')}
+                                      onChange={e => setManualReceiptInput({ ...manualReceiptInput, [d._id]: e.target.value.toUpperCase() })}
+                                      placeholder="M-Pesa Code"
+                                      className="h-7 w-28 rounded border border-[#2c313c] bg-[#0d0f12] px-2 font-mono text-[11px] text-white uppercase placeholder:text-[#5e6675]"
+                                    />
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, effectiveReceipt)}
+                                        disabled={updatingDepositId === d._id}
+                                        className="rounded bg-[#0da84b] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={() => handleUpdateDepositStatus(d._id, 'failed', d.amount)}
+                                        disabled={updatingDepositId === d._id}
+                                        className="rounded border border-[#541b21] bg-[#2a1215] px-2.5 py-1 text-[11px] font-bold text-[#f87171] hover:bg-[#3b181c] disabled:opacity-50"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : d.status === 'failed' ? (
+                                  <button
+                                    onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, d.mpesaReceipt || d.submittedReceipt || undefined)}
+                                    disabled={updatingDepositId === d._id}
+                                    className="rounded border border-[#2c313c] bg-[#1c2028] px-2.5 py-1 text-[11px] font-semibold text-[#c4c9d4] hover:border-[#0da84b] hover:text-white disabled:opacity-50"
+                                  >
+                                    Force Credit
+                                  </button>
+                                ) : (
+                                  <span className="font-mono text-[11px] text-[#6e7685]">{d.mpesaReceipt || 'Settled'}</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
-              </div>
 
-              {/* Recent Withdrawals */}
-              <div className="rounded-lg border border-line bg-panel p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-ink">Recent Withdrawals</h2>
-                  <button 
-                    onClick={() => setActiveTab('withdrawals')} 
-                    className="text-xs text-brand hover:underline"
-                  >
-                    View All →
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-line text-ink-3">
-                        <th className="pb-2">User / Phone</th>
-                        <th className="pb-2">Amount</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line/40">
-                      {!overview.recentWithdrawals || overview.recentWithdrawals.length === 0 ? (
-                        <tr><td colSpan={4} className="py-4 text-center text-ink-3">No recent withdrawals</td></tr>
-                      ) : (
-                        overview.recentWithdrawals.map(w => (
-                          <tr key={w._id} className="hover:bg-field/50">
-                            <td className="py-2.5 font-medium text-ink">
-                              {w.userId?.username || 'User'} <span className="text-ink-3">({w.phone})</span>
-                            </td>
-                            <td className="py-2.5 font-semibold text-loss">KSH {w.amount}</td>
-                            <td className="py-2.5">
-                              <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                                w.status === 'completed' ? 'bg-brand/10 text-brand' :
-                                w.status === 'pending' ? 'bg-amber-500/10 text-amber-500' :
-                                'bg-loss/10 text-loss'
-                              }`}>
-                                {w.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-ink-3">{formatDate(w.createdAt)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Top Players & Turnover */}
-            <div className="rounded-lg border border-line bg-panel p-4">
-              <h2 className="mb-3 text-sm font-semibold text-ink">Top Players by Turnover</h2>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
-                {overview.topPlayers.length === 0 ? (
-                  <p className="text-xs text-ink-3">No player turnover data yet.</p>
-                ) : (
-                  overview.topPlayers.map((player, idx) => (
-                    <div key={player.userId} className="flex items-center justify-between rounded-md border border-line bg-field p-2.5 text-xs">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-ink">#{idx + 1} {player.username}</p>
-                        <p className="text-[11px] text-ink-3">{player.phone} • {player.totalBets} bets</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-brand">KSH {player.totalBetAmount.toLocaleString()}</p>
-                        <p className="text-[10px] text-ink-3">Won: KSH {player.totalWinAmount.toLocaleString()}</p>
-                      </div>
+                {depositsTotalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-[#242830] bg-[#1c2028] px-4 py-2.5 text-xs">
+                    <span className="text-[#8e96a4] tabular-nums">
+                      Showing {(depositsPage - 1) * 50 + 1}–{Math.min(depositsPage * 50, depositsTotal)} of {depositsTotal}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setDepositsPage(p => Math.max(1, p - 1))}
+                        disabled={depositsPage <= 1}
+                        className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <span className="px-2 font-semibold text-[#c4c9d4] tabular-nums">
+                        {depositsPage} / {depositsTotalPages}
+                      </span>
+                      <button
+                        onClick={() => setDepositsPage(p => Math.min(depositsTotalPages, p + 1))}
+                        disabled={depositsPage >= depositsTotalPages}
+                        className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                      >
+                        Next
+                      </button>
                     </div>
-                  ))
+                  </div>
                 )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ══════════════════════════════════════════════════════════════
-            TAB: DEPOSITS MANAGEMENT & DIRECT M-PESA AUDIT
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'deposits' && (
-          <div className="space-y-4">
-            {/* Top Summary Cards */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg border border-line bg-panel p-3.5">
-                <span className="text-[11px] font-medium text-ink-3">Total Verified Deposits</span>
-                <p className="mt-1 text-lg font-bold text-brand">KSH {totalCompletedDepositAmount.toLocaleString()}</p>
-                <span className="text-[10px] text-ink-3">Settled via M-Pesa / Payd</span>
-              </div>
-              <div className="rounded-lg border border-line bg-panel p-3.5">
-                <span className="text-[11px] font-medium text-ink-3">Total Records</span>
-                <p className="mt-1 text-lg font-bold text-ink">{depositsTotal}</p>
-                <span className="text-[10px] text-ink-3">All recorded attempts</span>
-              </div>
-              <div className="rounded-lg border border-line bg-panel p-3.5">
-                <span className="text-[11px] font-medium text-ink-3">Pending Deposits</span>
-                <p className="mt-1 text-lg font-bold text-amber-400">
-                  {depositsList.filter(d => d.status === 'pending').length}
-                </p>
-                <span className="text-[10px] text-ink-3">Awaiting M-Pesa webhook / audit</span>
-              </div>
-              <div className="rounded-lg border border-line bg-panel p-3.5">
-                <span className="text-[11px] font-medium text-ink-3">Current Filter</span>
-                <p className="mt-1 text-lg font-bold uppercase text-ink">{depositFilter}</p>
-                <span className="text-[10px] text-ink-3">Page {depositsPage} of {depositsTotalPages}</span>
-              </div>
-            </div>
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 3: WITHDRAWAL REQUESTS
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'withdrawals' && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-md border border-[#242830] bg-[#16191f] p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-[#8e96a4]">
+                  Filter payout requests by status. Rejecting a pending request automatically refunds the player's wallet.
+                </div>
 
-            {/* Search, Filter & Actions Toolbar */}
-            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 size-4 text-ink-3" />
-                <input
-                  type="text"
-                  value={depositSearch}
-                  onChange={e => {
-                    setDepositSearch(e.target.value)
-                    setDepositsPage(1)
-                  }}
-                  placeholder="Search by phone, API ref, Payd ref, M-Pesa receipt code..."
-                  className="h-9 w-full rounded-md border border-line bg-field pl-9 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
-                  {(['all', 'pending', 'completed', 'failed'] as const).map(f => (
+                <div className="flex rounded border border-[#2c313c] bg-[#0d0f12] p-0.5 text-xs w-fit">
+                  {(['pending', 'completed', 'rejected', 'all'] as const).map(f => (
                     <button
                       key={f}
-                      onClick={() => { setDepositFilter(f); setDepositsPage(1); }}
-                      className={`capitalize rounded px-2.5 py-1 ${depositFilter === f ? 'bg-raised font-semibold text-ink' : 'text-ink-3'}`}
+                      onClick={() => setWithdrawalFilter(f)}
+                      className={`capitalize rounded px-3 py-1 font-semibold ${
+                        withdrawalFilter === f ? 'bg-[#242933] text-white' : 'text-[#8e96a4] hover:text-white'
+                      }`}
                     >
                       {f}
                     </button>
                   ))}
                 </div>
-
-                <button
-                  onClick={() => setRefreshKey(k => k + 1)}
-                  disabled={depositsLoading}
-                  className="flex h-8 items-center gap-1.5 rounded-md border border-line bg-field px-3 text-xs font-medium text-ink hover:bg-raised disabled:opacity-50"
-                >
-                  <RefreshCw className={`size-3.5 ${depositsLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
               </div>
-            </div>
 
-            {/* Deposits Data Table */}
-            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-line bg-field/50 text-ink-3">
-                      <th className="p-3">User / Phone</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3">Receipt / References</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/40">
-                    {depositsLoading ? (
-                      <tr>
-                        <td colSpan={6} className="py-10 text-center text-ink-3">
-                          <RefreshCw className="mx-auto size-5 animate-spin mb-1 text-brand" />
-                          Loading deposits...
-                        </td>
+              <div className="overflow-hidden rounded-md border border-[#242830] bg-[#16191f]">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                        <th className="p-3">Player</th>
+                        <th className="p-3">M-Pesa Phone</th>
+                        <th className="p-3">Payout Amount</th>
+                        <th className="p-3">Remaining Wallet</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Requested</th>
+                        <th className="p-3 text-right">Actions</th>
                       </tr>
-                    ) : depositsList.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-10 text-center text-ink-3">
-                          No deposits found matching the current search/filter.
-                        </td>
-                      </tr>
-                    ) : (
-                      depositsList.map(d => {
-                        const effectiveReceipt = d.mpesaReceipt || d.submittedReceipt || manualReceiptInput[d._id] || ''
-                        return (
-                          <tr key={d._id} className="hover:bg-field/40 transition-colors">
+                    </thead>
+                    <tbody className="divide-y divide-[#22262e]">
+                      {withdrawalsLoading ? (
+                        <tr><td colSpan={7} className="py-10 text-center text-[#8e96a4]"><RefreshCw className="mx-auto size-5 animate-spin mb-1.5 text-[#0da84b]" />Loading withdrawals...</td></tr>
+                      ) : withdrawalsList.length === 0 ? (
+                        <tr><td colSpan={7} className="py-10 text-center text-[#8e96a4]">No withdrawal requests in this view.</td></tr>
+                      ) : (
+                        withdrawalsList.map(w => (
+                          <tr key={w._id} className="hover:bg-[#1c2028]">
+                            <td className="p-3 font-bold text-white">{w.userId?.username || 'Player'}</td>
+                            <td className="p-3 font-mono font-semibold text-[#e5e7eb]">{w.phone}</td>
+                            <td className="p-3 font-bold text-sm text-[#f87171] tabular-nums">KSH {w.amount.toFixed(2)}</td>
+                            <td className="p-3 text-[#8e96a4] tabular-nums">KSH {(w.userId?.balance ?? 0).toFixed(2)}</td>
                             <td className="p-3">
-                              <div className="font-semibold text-ink">{d.userId?.username || 'User'}</div>
-                              <div className="text-ink-3 text-[11px] font-mono">{d.phone}</div>
-                              {d.userId?.balance !== undefined && (
-                                <div className="text-[10px] text-ink-3">Bal: KSH {d.userId.balance.toFixed(2)}</div>
-                              )}
+                              <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                w.status === 'completed'
+                                  ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                                  : w.status === 'pending'
+                                  ? 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                                  : 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                              }`}>
+                                {w.status}
+                              </span>
                             </td>
-                            <td className="p-3">
-                              <span className="font-bold text-sm text-brand">KSH {d.amount.toFixed(2)}</span>
-                            </td>
-                            <td className="p-3 space-y-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-mono text-[11px] text-ink-2 bg-field px-1.5 py-0.5 rounded border border-line/60">
-                                  {d.apiRef}
-                                </span>
-                              </div>
-                              {d.mpesaReceipt && (
-                                <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded w-fit">
-                                  <span>M-Pesa: {d.mpesaReceipt}</span>
-                                </div>
-                              )}
-                              {!d.mpesaReceipt && d.submittedReceipt && (
-                                <div className="flex items-center gap-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit">
-                                  <span>SMS Code: {d.submittedReceipt}</span>
-                                </div>
-                              )}
-                              {(d.paydReference || d.externalRef) && (
-                                <div className="text-[10px] text-ink-3 font-mono">
-                                  Gateway Ref: {d.paydReference || d.externalRef}
-                                </div>
-                              )}
-                              {d.failureReason && (
-                                <div className="text-[10px] text-loss">
-                                  {d.failureReason}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex flex-col gap-1">
-                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase w-fit ${
-                                  d.status === 'completed'
-                                    ? 'bg-brand/15 text-brand border border-brand/30'
-                                    : d.status === 'pending'
-                                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                                    : 'bg-loss/15 text-loss border border-loss/30'
-                                }`}>
-                                  {d.status === 'completed' && <CheckCircle2 className="size-3" />}
-                                  {d.status === 'pending' && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />}
-                                  {d.status === 'failed' && <XCircle className="size-3" />}
-                                  {d.status}
-                                </span>
-                                {d.credited && (
-                                  <span className="text-[9px] font-semibold text-brand flex items-center gap-0.5">
-                                    ✓ Credited to wallet
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 text-ink-3 text-[11px] whitespace-nowrap">
-                              {formatDate(d.createdAt)}
-                            </td>
+                            <td className="p-3 text-[#8e96a4] tabular-nums">{formatDate(w.createdAt)}</td>
                             <td className="p-3 text-right">
-                              {d.status === 'pending' ? (
-                                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
-                                  <input
-                                    type="text"
-                                    value={manualReceiptInput[d._id] !== undefined ? manualReceiptInput[d._id] : (d.submittedReceipt || '')}
-                                    onChange={e => setManualReceiptInput({ ...manualReceiptInput, [d._id]: e.target.value.toUpperCase() })}
-                                    placeholder="Receipt code"
-                                    className="h-7 w-28 rounded border border-line bg-field px-1.5 text-[11px] font-mono text-ink uppercase placeholder:text-ink-3"
-                                  />
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, effectiveReceipt)}
-                                      disabled={updatingDepositId === d._id}
-                                      className="flex items-center gap-1 rounded bg-brand/15 border border-brand/30 px-2 py-1 text-[11px] font-bold text-brand hover:bg-brand/25 disabled:opacity-50 transition-colors"
-                                      title="Approve and credit balance"
-                                    >
-                                      ✓ Approve
-                                    </button>
-                                    <button
-                                      onClick={() => handleUpdateDepositStatus(d._id, 'failed', d.amount)}
-                                      disabled={updatingDepositId === d._id}
-                                      className="flex items-center gap-1 rounded bg-loss/15 border border-loss/30 px-2 py-1 text-[11px] font-bold text-loss hover:bg-loss/25 disabled:opacity-50 transition-colors"
-                                      title="Reject deposit"
-                                    >
-                                      ✕ Reject
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : d.status === 'failed' ? (
+                              {w.status === 'pending' ? (
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
-                                    onClick={() => handleUpdateDepositStatus(d._id, 'completed', d.amount, d.mpesaReceipt || d.submittedReceipt || undefined)}
-                                    disabled={updatingDepositId === d._id}
-                                    className="flex items-center gap-1 rounded bg-field border border-line px-2 py-1 text-[10px] font-semibold text-ink-2 hover:text-brand hover:border-brand/40 disabled:opacity-50 transition-colors"
-                                    title="Manual override: credit user wallet anyway"
+                                    onClick={() => handleUpdateWithdrawal(w._id, 'completed', w.amount)}
+                                    disabled={updatingWithdrawalId === w._id}
+                                    className="rounded bg-[#0da84b] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
                                   >
-                                    Force Credit
+                                    Mark Paid
+                                  </button>
+                                  <button
+                                    onClick={() => handleUpdateWithdrawal(w._id, 'rejected', w.amount)}
+                                    disabled={updatingWithdrawalId === w._id}
+                                    className="rounded border border-[#541b21] bg-[#2a1215] px-2.5 py-1 text-[11px] font-bold text-[#f87171] hover:bg-[#3b181c] disabled:opacity-50"
+                                  >
+                                    Reject & Refund
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-[11px] text-ink-3 font-mono">
-                                  {d.mpesaReceipt || 'Settled'}
-                                </span>
+                                <span className="text-xs text-[#6e7685]">Processed</span>
                               )}
                             </td>
                           </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Bar */}
-              {depositsTotalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-line bg-field/30 px-3 py-2 text-xs">
-                  <span className="text-ink-3">
-                    Showing {(depositsPage - 1) * 50 + 1} - {Math.min(depositsPage * 50, depositsTotal)} of {depositsTotal} deposits
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setDepositsPage(p => Math.max(1, p - 1))}
-                      disabled={depositsPage <= 1}
-                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
-                    >
-                      ← Prev
-                    </button>
-                    <span className="px-2 text-ink-3">
-                      {depositsPage} / {depositsTotalPages}
-                    </span>
-                    <button
-                      onClick={() => setDepositsPage(p => Math.min(depositsTotalPages, p + 1))}
-                      disabled={depositsPage >= depositsTotalPages}
-                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
-                    >
-                      Next →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            TAB: BETS & AUDIT LEDGER
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'bets' && (
-          <div className="space-y-4">
-            {/* KPI Metrics Strip */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-              <div className="rounded-lg border border-line bg-panel p-3">
-                <div className="text-[11px] font-medium text-ink-3">TOTAL BETS</div>
-                <div className="mt-1 text-lg font-bold text-ink">
-                  {betsMetrics?.totalBets ?? betsTotal}
-                </div>
-                <div className="mt-0.5 text-[10px] text-ink-3">
-                  Won: {betsMetrics?.countWon ?? 0} • Lost: {betsMetrics?.countLost ?? 0}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-line bg-panel p-3">
-                <div className="text-[11px] font-medium text-ink-3">TOTAL WAGERED</div>
-                <div className="mt-1 text-lg font-bold text-white">
-                  {formatMoney(betsMetrics?.totalWagered ?? 0)}
-                </div>
-                <div className="mt-0.5 text-[10px] text-ink-3">Total turnover</div>
-              </div>
-
-              <div className="rounded-lg border border-line bg-panel p-3">
-                <div className="text-[11px] font-medium text-ink-3">TOTAL PAYOUT</div>
-                <div className="mt-1 text-lg font-bold text-brand">
-                  {formatMoney(betsMetrics?.totalWon ?? 0)}
-                </div>
-                <div className="mt-0.5 text-[10px] text-ink-3">Paid out to players</div>
-              </div>
-
-              <div className="rounded-lg border border-line bg-panel p-3">
-                <div className="text-[11px] font-medium text-ink-3">HOUSE GROSS (GGR)</div>
-                <div className={`mt-1 text-lg font-bold ${(betsMetrics?.houseGross ?? 0) >= 0 ? 'text-brand' : 'text-loss'}`}>
-                  {formatMoney(betsMetrics?.houseGross ?? 0)}
-                </div>
-                <div className="mt-0.5 text-[10px] text-ink-3">Net platform revenue</div>
-              </div>
-
-              <div className="col-span-2 sm:col-span-1 rounded-lg border border-line bg-panel p-3">
-                <div className="text-[11px] font-medium text-ink-3">PLAYER WIN RATE</div>
-                <div className="mt-1 text-lg font-bold text-amber-400">
-                  {betsMetrics?.winRate ?? 0}%
-                </div>
-                <div className="mt-0.5 text-[10px] text-ink-3">
-                  Active now: {betsMetrics?.countActive ?? 0}
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Filter & Search Bar */}
-            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 sm:flex-row sm:items-center sm:justify-between">
-              {/* Status & Type Pills */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div className="flex rounded-lg bg-field p-0.5 text-xs">
-                  {(['all', 'won', 'lost', 'active'] as const).map(st => (
-                    <button
-                      key={st}
-                      onClick={() => { setBetStatusFilter(st); setBetsPage(1); }}
-                      className={`rounded px-2.5 py-1 font-medium capitalize transition-colors ${
-                        betStatusFilter === st
-                          ? 'bg-brand text-brand-ink font-bold shadow'
-                          : 'text-ink-2 hover:text-ink'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex rounded-lg bg-field p-0.5 text-xs">
-                  <button
-                    onClick={() => { setBetTypeFilter('all'); setBetsPage(1); }}
-                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                      betTypeFilter === 'all' ? 'bg-raised text-ink font-bold' : 'text-ink-2 hover:text-ink'
-                    }`}
-                  >
-                    All Types
-                  </button>
-                  <button
-                    onClick={() => { setBetTypeFilter('money'); setBetsPage(1); }}
-                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                      betTypeFilter === 'money' ? 'bg-raised text-brand font-bold' : 'text-ink-2 hover:text-ink'
-                    }`}
-                  >
-                    Real Money
-                  </button>
-                  <button
-                    onClick={() => { setBetTypeFilter('freebet'); setBetsPage(1); }}
-                    className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                      betTypeFilter === 'freebet' ? 'bg-raised text-amber-400 font-bold' : 'text-ink-2 hover:text-ink'
-                    }`}
-                  >
-                    Freebet
-                  </button>
-                </div>
-              </div>
-
-              {/* Search Inputs */}
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 4: USERS & PLAYER OPERATIONS
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'users' && (
+            <div className="space-y-4">
+              {/* Filter & Search Bar */}
+              <div className="flex flex-col gap-3 rounded-md border border-[#242830] bg-[#16191f] p-3.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 size-4 text-[#6e7685]" />
                   <input
                     type="text"
-                    value={betSearch}
-                    onChange={e => { setBetSearch(e.target.value); setBetsPage(1); }}
-                    placeholder="Search phone/username..."
-                    className="h-8 w-44 sm:w-52 rounded-lg border border-line bg-field pl-8 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
+                    value={userSearch}
+                    onChange={e => {
+                      setUserSearch(e.target.value)
+                      setUsersPage(1)
+                    }}
+                    placeholder="Search player by phone number, username, or ID..."
+                    className="h-9 w-full rounded border border-[#2c313c] bg-[#0d0f12] pl-9 pr-3 text-xs text-white placeholder:text-[#6e7685] focus:border-[#0da84b] focus:outline-none"
                   />
                 </div>
 
-                <input
-                  type="text"
-                  value={betRoundId}
-                  onChange={e => { setBetRoundId(e.target.value); setBetsPage(1); }}
-                  placeholder="Round ID..."
-                  className="h-8 w-24 sm:w-28 rounded-lg border border-line bg-field px-2.5 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-
-                <button
-                  onClick={() => setRefreshKey(k => k + 1)}
-                  className="flex size-8 items-center justify-center rounded-lg border border-line bg-field text-ink-2 hover:bg-raised hover:text-ink"
-                  title="Refresh bets"
-                >
-                  <RefreshCw className={`size-3.5 ${betsLoading ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Bets Data Table */}
-            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-line bg-field/60 text-[11px] font-semibold uppercase text-ink-3">
-                    <tr>
-                      <th className="p-3">Time</th>
-                      <th className="p-3">Round ID</th>
-                      <th className="p-3">Player</th>
-                      <th className="p-3">Type</th>
-                      <th className="p-3">Stake</th>
-                      <th className="p-3">Target</th>
-                      <th className="p-3">Multiplier</th>
-                      <th className="p-3">Payout</th>
-                      <th className="p-3">Profit / Loss</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/60">
-                    {betsLoading ? (
-                      <tr>
-                        <td colSpan={10} className="p-8 text-center text-ink-3">
-                          <RefreshCw className="mx-auto size-5 animate-spin text-brand" />
-                          <p className="mt-2 text-xs">Loading bets ledger...</p>
-                        </td>
-                      </tr>
-                    ) : betsList.length === 0 ? (
-                      <tr>
-                        <td colSpan={10} className="p-8 text-center text-ink-3">
-                          <Dices className="mx-auto size-8 text-ink-3/40" />
-                          <p className="mt-2 font-medium text-ink">No bets found</p>
-                          <p className="text-xs text-ink-3">Bets placed across rounds will appear here in real time.</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      betsList.map(b => {
-                        const isWon = b.status === 'won'
-                        const isLost = b.status === 'lost'
-                        const profit = isWon ? (b.winAmount - b.amount) : -b.amount
-
-                        return (
-                          <tr key={b._id} className="hover:bg-raised/40 transition-colors">
-                            <td className="p-3 font-mono text-[11px] text-ink-3 whitespace-nowrap">
-                              {formatDate(b.createdAt)}
-                            </td>
-                            <td className="p-3 font-mono text-[11px] text-brand whitespace-nowrap">
-                              {b.roundId}
-                            </td>
-                            <td className="p-3">
-                              {b.userId ? (
-                                <button
-                                  onClick={() => handleOpenUserDetail(b.userId?._id || '')}
-                                  className="text-left group"
-                                >
-                                  <div className="font-semibold text-ink group-hover:text-brand flex items-center gap-1">
-                                    {b.userId.username}
-                                    <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                  </div>
-                                  <div className="text-[10px] text-ink-3 font-mono">{b.userId.phone}</div>
-                                </button>
-                              ) : (
-                                <span className="text-ink-3">—</span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                                b.isFreebet ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-brand/10 text-brand border border-brand/20'
-                              }`}>
-                                {b.isFreebet ? 'Freebet' : 'Real Cash'}
-                              </span>
-                            </td>
-                            <td className="p-3 font-semibold text-white whitespace-nowrap">
-                              KSH {b.amount}
-                            </td>
-                            <td className="p-3 text-ink-3 font-mono whitespace-nowrap">
-                              {b.autoCashoutTarget ? `${b.autoCashoutTarget.toFixed(2)}x` : '—'}
-                            </td>
-                            <td className="p-3 font-bold whitespace-nowrap">
-                              {b.multiplierCaught ? (
-                                <span className={isWon ? 'text-brand' : 'text-ink-3'}>
-                                  {b.multiplierCaught}x
-                                </span>
-                              ) : (
-                                <span className="text-ink-3">—</span>
-                              )}
-                            </td>
-                            <td className="p-3 font-semibold whitespace-nowrap">
-                              {isWon ? (
-                                <span className="text-brand">KSH {b.winAmount}</span>
-                              ) : (
-                                <span className="text-ink-3">KSH 0</span>
-                              )}
-                            </td>
-                            <td className="p-3 font-semibold whitespace-nowrap">
-                              {isWon ? (
-                                <span className="text-brand">+{formatMoney(profit)}</span>
-                              ) : isLost ? (
-                                <span className="text-loss">-{formatMoney(Math.abs(profit))}</span>
-                              ) : (
-                                <span className="text-ink-3">—</span>
-                              )}
-                            </td>
-                            <td className="p-3 whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                isWon
-                                  ? 'bg-brand/15 text-brand border border-brand/30'
-                                  : isLost
-                                  ? 'bg-loss/15 text-loss border border-loss/30'
-                                  : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                              }`}>
-                                {isWon && <CheckCircle2 className="size-3" />}
-                                {isLost && <XCircle className="size-3" />}
-                                {b.status === 'active' && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />}
-                                {b.status}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Bar */}
-              {betsTotalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-line bg-field/30 px-3 py-2 text-xs">
-                  <span className="text-ink-3">
-                    Showing {(betsPage - 1) * 25 + 1} - {Math.min(betsPage * 25, betsTotal)} of {betsTotal} bets
-                  </span>
-                  <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded border border-[#2c313c] bg-[#0d0f12] p-0.5 text-xs">
                     <button
-                      onClick={() => setBetsPage(p => Math.max(1, p - 1))}
-                      disabled={betsPage <= 1}
-                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                      onClick={() => { setUserStatusFilter('all'); setUsersPage(1) }}
+                      className={`rounded px-3 py-1 font-semibold ${userStatusFilter === 'all' ? 'bg-[#242933] text-white' : 'text-[#8e96a4]'}`}
                     >
-                      ← Prev
+                      All ({usersTotal})
                     </button>
-                    <span className="px-2 text-ink-3">
-                      {betsPage} / {betsTotalPages}
-                    </span>
                     <button
-                      onClick={() => setBetsPage(p => Math.min(betsTotalPages, p + 1))}
-                      disabled={betsPage >= betsTotalPages}
-                      className="rounded border border-line bg-field px-2.5 py-1 text-ink hover:bg-raised disabled:opacity-40"
+                      onClick={() => { setUserStatusFilter('active'); setUsersPage(1) }}
+                      className={`rounded px-3 py-1 font-semibold ${userStatusFilter === 'active' ? 'bg-[#242933] text-[#10b981]' : 'text-[#8e96a4]'}`}
                     >
-                      Next →
+                      Active
+                    </button>
+                    <button
+                      onClick={() => { setUserStatusFilter('frozen'); setUsersPage(1) }}
+                      className={`rounded px-3 py-1 font-semibold ${userStatusFilter === 'frozen' ? 'bg-[#242933] text-[#f87171]' : 'text-[#8e96a4]'}`}
+                    >
+                      Suspended
                     </button>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* ══════════════════════════════════════════════════════════════
-            TAB 2: USERS & OPERATIONS (ADVANCED TRACKING)
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'users' && (
-          <div className="space-y-3">
-            {/* Search, Filter & DB Refresh Bar */}
-            <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 size-4 text-ink-3" />
-                <input
-                  type="text"
-                  value={userSearch}
-                  onChange={e => {
-                    setUserSearch(e.target.value)
-                    setUsersPage(1)
-                  }}
-                  placeholder="Search user by phone (e.g. 719220220), username, or ID..."
-                  className="h-9 w-full rounded-md border border-line bg-field pl-9 pr-3 text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Status Filter */}
-                <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
-                  <button
-                    onClick={() => { setUserStatusFilter('all'); setUsersPage(1); }}
-                    className={`rounded px-2.5 py-1 ${userStatusFilter === 'all' ? 'bg-raised font-semibold text-ink' : 'text-ink-3'}`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => { setUserStatusFilter('active'); setUsersPage(1); }}
-                    className={`rounded px-2.5 py-1 ${userStatusFilter === 'active' ? 'bg-raised font-semibold text-brand' : 'text-ink-3'}`}
-                  >
-                    Active
-                  </button>
-                  <button
-                    onClick={() => { setUserStatusFilter('frozen'); setUsersPage(1); }}
-                    className={`rounded px-2.5 py-1 ${userStatusFilter === 'frozen' ? 'bg-raised font-semibold text-loss' : 'text-ink-3'}`}
-                  >
-                    Suspended
-                  </button>
-                </div>
-
-                {/* Rows per page selector */}
-                <div className="flex items-center gap-1 text-xs text-ink-3">
-                  <span>Show:</span>
                   <select
                     value={usersLimit}
                     onChange={e => {
                       setUsersLimit(e.target.value as any)
                       setUsersPage(1)
                     }}
-                    className="h-7 rounded border border-line bg-field px-1.5 text-xs text-ink focus:border-brand focus:outline-none"
+                    className="h-8 rounded border border-[#2c313c] bg-[#0d0f12] px-2.5 text-xs font-semibold text-white focus:border-[#0da84b] focus:outline-none"
                   >
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="all">All</option>
+                    <option value="25">25 rows</option>
+                    <option value="50">50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="all">All rows</option>
                   </select>
-                </div>
 
-                {/* Database Sync / Refresh button */}
-                <button
-                  type="button"
-                  onClick={handleSyncDatabase}
-                  disabled={isSyncingDb}
-                  className="flex h-8 items-center gap-1.5 rounded-md border border-brand/40 bg-brand/10 px-3 text-xs font-semibold text-brand hover:bg-brand/20 disabled:opacity-50"
-                  title="Detect early users, normalize balances, and refresh MongoDB data"
-                >
-                  <RefreshCw className={`size-3.5 ${isSyncingDb ? 'animate-spin' : ''}`} />
-                  {isSyncingDb ? 'Syncing...' : 'Sync & Refresh DB'}
-                </button>
-              </div>
-            </div>
-
-            {/* Total count badge bar */}
-            <div className="flex items-center justify-between px-1 text-xs text-ink-3">
-              <div>
-                Total: <span className="font-semibold text-ink">{usersTotal}</span> registered users detected
-              </div>
-              <div>
-                Showing page <span className="font-semibold text-ink">{usersPage}</span> of <span className="font-semibold text-ink">{usersTotalPages}</span>
-              </div>
-            </div>
-
-            {/* Users Table */}
-            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-line bg-field/50 text-ink-3">
-                      <th className="p-3">User & Phone</th>
-                      <th className="p-3">Real Wallet Balance</th>
-                      <th className="p-3">Freebet</th>
-                      <th className="p-3">Referrals</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Joined</th>
-                      <th className="p-3 text-right">Operations</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/40">
-                    {usersLoading ? (
-                      <tr><td colSpan={7} className="py-8 text-center text-ink-3"><RefreshCw className="mx-auto size-5 animate-spin mb-1 text-brand" />Loading users...</td></tr>
-                    ) : usersList.length === 0 ? (
-                      <tr><td colSpan={7} className="py-8 text-center text-ink-3">No matching users found</td></tr>
-                    ) : (
-                      usersList.map(u => (
-                        <tr key={u._id} className="hover:bg-field/40">
-                          <td className="p-3">
-                            <div className="font-semibold text-ink">{u.username || 'User'}</div>
-                            <div className="font-mono text-[11px] text-ink-3">{u.phone}</div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-bold text-brand">
-                              KSH {Number(u.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                            <div className="text-[10px] text-ink-3">
-                              {Number(u.balance || 0) > 0 ? '🟢 Active Funds' : '⚪ Zero Balance'}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-medium text-bonus">KSH {u.freebet ?? 0}</div>
-                            <div className="text-[10px] text-ink-3">{u.freebetLocked ? '🔒 Locked' : '✅ Unlocked'}</div>
-                          </td>
-                          <td className="p-3 text-ink-2">
-                            {u.referralsCount || 0} refs <span className="text-ink-3">(KSH {u.referralsEarnings || 0})</span>
-                          </td>
-                          <td className="p-3">
-                            <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${
-                              u.isFrozen ? 'bg-loss/15 text-loss' : 'bg-brand/10 text-brand'
-                            }`}>
-                              {u.isFrozen ? 'Suspended' : 'Active'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-ink-3">{formatDate(u.createdAt)}</td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* View Details */}
-                              <button
-                                onClick={() => handleOpenUserDetail(u._id)}
-                                className="rounded bg-field px-2 py-1 text-[11px] font-medium text-ink-2 hover:bg-raised hover:text-ink"
-                                title="View User Bets & Transactions"
-                              >
-                                👁️ View
-                              </button>
-
-                              {/* Adjust Balance */}
-                              <button
-                                onClick={() => {
-                                  setBalanceModalUser(u)
-                                  setBalanceAmount('')
-                                  setBalanceType('credit')
-                                }}
-                                className="rounded bg-field px-2 py-1 text-[11px] font-medium text-brand hover:bg-brand/10"
-                                title="Credit, Debit or Set Balance"
-                              >
-                                💰 Balance
-                              </button>
-
-                              {/* Adjust Freebet */}
-                              <button
-                                onClick={() => {
-                                  setFreebetModalUser(u)
-                                  setFreebetAmount(String(u.freebet || 0))
-                                  setFreebetLocked(u.freebetLocked)
-                                }}
-                                className="rounded bg-field px-2 py-1 text-[11px] font-medium text-bonus hover:bg-bonus/10"
-                                title="Adjust Freebet"
-                              >
-                                🎁 Freebet
-                              </button>
-
-                              {/* Freeze / Unfreeze */}
-                              <button
-                                onClick={() => handleToggleFreeze(u)}
-                                className={`rounded px-2 py-1 text-[11px] font-medium ${
-                                  u.isFrozen ? 'bg-brand/10 text-brand hover:bg-brand/20' : 'bg-loss/10 text-loss hover:bg-loss/20'
-                                }`}
-                                title={u.isFrozen ? 'Activate User' : 'Suspend User'}
-                              >
-                                {u.isFrozen ? '🔓 Unsuspend' : '🔒 Suspend'}
-                              </button>
-
-                              {/* Reset Password */}
-                              <button
-                                onClick={() => {
-                                  setPasswordModalUser(u)
-                                  setNewPasswordVal('')
-                                }}
-                                className="rounded bg-field px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-raised hover:text-ink"
-                                title="Reset User Password"
-                              >
-                                🔑 Password
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Controls */}
-              {usersTotalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-line bg-field/30 px-4 py-2.5 text-xs text-ink-3">
-                  <button
-                    onClick={() => setUsersPage(p => Math.max(1, p - 1))}
-                    disabled={usersPage <= 1}
-                    className="rounded border border-line bg-panel px-3 py-1 font-medium text-ink hover:bg-raised disabled:opacity-40"
-                  >
-                    ← Previous
-                  </button>
-                  <span>Page {usersPage} of {usersTotalPages} ({usersTotal} total users)</span>
-                  <button
-                    onClick={() => setUsersPage(p => Math.min(usersTotalPages, p + 1))}
-                    disabled={usersPage >= usersTotalPages}
-                    className="rounded border border-line bg-panel px-3 py-1 font-medium text-ink hover:bg-raised disabled:opacity-40"
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            TAB 3: WITHDRAWAL REQUESTS
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'withdrawals' && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-line bg-panel p-3">
-              <div>
-                <h2 className="text-sm font-semibold text-ink">User Withdrawal Requests</h2>
-                <p className="text-xs text-ink-3">Process payouts or reject to automatically refund user balance</p>
-              </div>
-
-              <div className="flex rounded-md border border-line bg-field p-0.5 text-xs">
-                {(['pending', 'completed', 'rejected', 'all'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setWithdrawalFilter(f)}
-                    className={`capitalize rounded px-2.5 py-1 ${withdrawalFilter === f ? 'bg-raised font-semibold text-ink' : 'text-ink-3'}`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-line bg-field/50 text-ink-3">
-                      <th className="p-3">User</th>
-                      <th className="p-3">M-Pesa Number</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3">Current Balance</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/40">
-                    {withdrawalsLoading ? (
-                      <tr><td colSpan={7} className="py-8 text-center text-ink-3"><RefreshCw className="mx-auto size-5 animate-spin mb-1" />Loading withdrawals...</td></tr>
-                    ) : withdrawalsList.length === 0 ? (
-                      <tr><td colSpan={7} className="py-8 text-center text-ink-3">No withdrawals in this filter</td></tr>
-                    ) : (
-                      withdrawalsList.map(w => (
-                        <tr key={w._id} className="hover:bg-field/40">
-                          <td className="p-3 font-medium text-ink">{w.userId?.username || 'User'}</td>
-                          <td className="p-3 font-semibold text-ink">{w.phone}</td>
-                          <td className="p-3 font-bold text-loss">KSH {w.amount.toFixed(2)}</td>
-                          <td className="p-3 text-ink-3">KSH {(w.userId?.balance ?? 0).toFixed(2)}</td>
-                          <td className="p-3">
-                            <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                              w.status === 'completed' ? 'bg-brand/10 text-brand' :
-                              w.status === 'pending' ? 'bg-amber-500/15 text-amber-500 font-bold' :
-                              'bg-loss/10 text-loss'
-                            }`}>
-                              {w.status}
-                            </span>
-                          </td>
-                          <td className="p-3 text-ink-3">{formatDate(w.createdAt)}</td>
-                          <td className="p-3 text-right">
-                            {w.status === 'pending' ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => handleUpdateWithdrawal(w._id, 'completed', w.amount)}
-                                  disabled={updatingWithdrawalId === w._id}
-                                  className="flex items-center gap-1 rounded bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/20 disabled:opacity-50"
-                                >
-                                  ✅ Paid
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateWithdrawal(w._id, 'rejected', w.amount)}
-                                  disabled={updatingWithdrawalId === w._id}
-                                  className="flex items-center gap-1 rounded bg-loss/10 px-2.5 py-1 text-xs font-semibold text-loss hover:bg-loss/20 disabled:opacity-50"
-                                >
-                                  ❌ Reject & Refund
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-ink-3">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            TAB: ODDS ENGINE & SCHEDULED MULTIPLIER CONTROLS
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'odds' && (
-          <div className="mx-auto max-w-4xl space-y-5">
-            {/* Alert / Notification toast */}
-            {oddsToast && (
-              <div
-                className={`flex items-center justify-between rounded-lg p-3 text-xs font-medium ${
-                  oddsToast.type === 'success'
-                    ? 'border border-brand/40 bg-brand/10 text-brand'
-                    : 'border border-loss/40 bg-loss/10 text-loss'
-                }`}
-              >
-                <span>{oddsToast.message}</span>
-                <button onClick={() => setOddsToast(null)} className="text-ink-3 hover:text-ink">
-                  <XCircle className="size-4" />
-                </button>
-              </div>
-            )}
-
-            {/* 1. Live Engine Status & Emergency Reset Bar */}
-            <div
-              className={`rounded-xl border p-5 transition-all ${
-                oddsEngine?.enabled
-                  ? 'border-brand/50 bg-brand/5 shadow-lg shadow-brand/5'
-                  : 'border-line bg-panel'
-              }`}
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
-                      oddsEngine?.enabled ? 'bg-brand text-brand-ink' : 'bg-field text-ink-3'
-                    }`}
-                  >
-                    <Zap className="size-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold text-ink">
-                        {oddsEngine?.enabled ? 'Active Promotion Override Running' : 'Normal Odds Engine Running'}
-                      </h2>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          oddsEngine?.enabled
-                            ? 'bg-brand text-brand-ink animate-pulse'
-                            : 'bg-field text-ink-3 border border-line'
-                        }`}
-                      >
-                        {oddsEngine?.enabled ? 'BOOST ACTIVE' : 'STANDARD FAIR'}
-                      </span>
-                    </div>
-
-                    <p className="mt-1 text-xs text-ink-2">
-                      {oddsEngine?.enabled ? (
-                        <>
-                          Targeting{' '}
-                          <strong className="text-brand font-bold">
-                            {oddsEngine.mode === 'range'
-                              ? `${oddsEngine.minMultiplier.toFixed(2)}x – ${oddsEngine.maxMultiplier.toFixed(2)}x`
-                              : oddsEngine.mode === 'min_multiplier'
-                              ? `Over ${oddsEngine.minMultiplier.toFixed(2)}x`
-                              : `Exact ${oddsEngine.exactMultiplier?.toFixed(2)}x`}
-                          </strong>{' '}
-                          to reward active players. Mined server seeds guarantee 100% SHA-256 HMAC provably fair validation.
-                        </>
-                      ) : (
-                        'Standard provably fair odds generator. Multipliers calculated naturally from random server seeds & client seed nonces.'
-                      )}
-                    </p>
-
-                    {/* Progress / Timer when active */}
-                    {oddsEngine?.enabled && (
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink">
-                        {oddsEngine.durationType === 'minutes' && (
-                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
-                            <Clock className="size-3.5" />
-                            <span>
-                              Time Remaining:{' '}
-                              <strong className="tabular-nums">
-                                {Math.floor((oddsEngine.timeRemainingSeconds || 0) / 60)}m{' '}
-                                {((oddsEngine.timeRemainingSeconds || 0) % 60).toString().padStart(2, '0')}s
-                              </strong>
-                            </span>
-                          </div>
-                        )}
-                        {oddsEngine.durationType === 'rounds' && (
-                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
-                            <Flame className="size-3.5" />
-                            <span>
-                              Rounds Remaining:{' '}
-                              <strong className="tabular-nums">
-                                {oddsEngine.roundsRemaining} / {oddsEngine.roundsTotal}
-                              </strong>
-                            </span>
-                          </div>
-                        )}
-                        {oddsEngine.durationType === 'scheduled_window' && (
-                          <div className="flex items-center gap-1.5 rounded-md bg-field px-2.5 py-1 text-brand border border-line">
-                            <Timer className="size-3.5" />
-                            <span>Scheduled Window Active</span>
-                          </div>
-                        )}
-                        <span className="text-[11px] text-ink-3">
-                          (Automatically reverts back to normal odds generator once completed)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Reset button */}
-                {oddsEngine?.enabled ? (
                   <button
                     type="button"
-                    onClick={handleResetOddsRule}
-                    disabled={oddsSubmitting}
-                    className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-loss px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-loss/90 disabled:opacity-50 transition-colors"
+                    onClick={handleSyncDatabase}
+                    disabled={isSyncingDb}
+                    className="flex h-8 items-center gap-1.5 rounded border border-[#2c313c] bg-[#1c2028] px-3 text-xs font-semibold text-[#e5e7eb] hover:border-[#0da84b] disabled:opacity-50"
                   >
-                    <RefreshCw className={`size-3.5 ${oddsSubmitting ? 'animate-spin' : ''}`} />
-                    Reset to Normal Odds Now
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={fetchOddsEngine}
-                    disabled={oddsSubmitting}
-                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-line bg-field px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-raised hover:text-ink transition-colors"
-                  >
-                    <RefreshCw className="size-3" />
-                    Refresh Status
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Quick One-Click Reward Presets */}
-            <div className="rounded-xl border border-line bg-panel p-5">
-              <div className="mb-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
-                  1-Click Reward Presets for Active Users
-                </h3>
-                <p className="mt-0.5 text-xs text-ink-3">
-                  Instantly reward players currently online and active with guaranteed generous multiplier ranges.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Preset 1 */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplyOddsRule({
-                      mode: 'range',
-                      minMultiplier: 2.0,
-                      maxMultiplier: 5.0,
-                      durationType: 'minutes',
-                      durationMinutes: 15,
-                      note: 'Active Users Reward: 2.00x - 5.00x for 15m'
-                    })
-                  }
-                  disabled={oddsSubmitting}
-                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-brand">
-                    <Sparkles className="size-3.5" />
-                    <span>Reward Active Users</span>
-                  </div>
-                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 5.00x</div>
-                  <div className="mt-1 text-[11px] text-ink-3">For 15 minutes • Auto-resets</div>
-                </button>
-
-                {/* Preset 2 */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplyOddsRule({
-                      mode: 'range',
-                      minMultiplier: 2.0,
-                      maxMultiplier: 10.0,
-                      durationType: 'minutes',
-                      durationMinutes: 30,
-                      note: 'Happy Hour Boost: 2.00x - 10.00x for 30m'
-                    })
-                  }
-                  disabled={oddsSubmitting}
-                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
-                    <Flame className="size-3.5" />
-                    <span>Happy Hour Boost</span>
-                  </div>
-                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 10.00x</div>
-                  <div className="mt-1 text-[11px] text-ink-3">For 30 minutes • Auto-resets</div>
-                </button>
-
-                {/* Preset 3 */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplyOddsRule({
-                      mode: 'range',
-                      minMultiplier: 2.0,
-                      maxMultiplier: 4.0,
-                      durationType: 'rounds',
-                      roundsTotal: 10,
-                      note: 'Active 10 Rounds Streak: 2.00x - 4.00x'
-                    })
-                  }
-                  disabled={oddsSubmitting}
-                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                    <Zap className="size-3.5" />
-                    <span>10 Rounds Streak</span>
-                  </div>
-                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">2.00x – 4.00x</div>
-                  <div className="mt-1 text-[11px] text-ink-3">Next 10 rounds • Auto-resets</div>
-                </button>
-
-                {/* Preset 4 */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplyOddsRule({
-                      mode: 'min_multiplier',
-                      minMultiplier: 2.0,
-                      maxMultiplier: 50.0,
-                      durationType: 'minutes',
-                      durationMinutes: 10,
-                      note: 'Over 2.00x Guaranteed: 10m'
-                    })
-                  }
-                  disabled={oddsSubmitting}
-                  className="flex flex-col items-start rounded-lg border border-line bg-field p-3.5 text-left transition-all hover:border-brand/50 hover:bg-raised"
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400">
-                    <TrendingUp className="size-3.5" />
-                    <span>Over 2.00x Guaranteed</span>
-                  </div>
-                  <div className="mt-1 text-sm font-extrabold text-ink tabular-nums">&ge; 2.00x</div>
-                  <div className="mt-1 text-[11px] text-ink-3">For 10 minutes • Auto-resets</div>
-                </button>
-              </div>
-            </div>
-
-            {/* 3. Custom Range & Schedule Builder */}
-            <form onSubmit={(e) => { e.preventDefault(); handleApplyOddsRule(); }} className="rounded-xl border border-line bg-panel p-5 space-y-4">
-              <div className="border-b border-line pb-3">
-                <h3 className="text-sm font-bold text-ink">Custom Odds Engine Configuration</h3>
-                <p className="mt-0.5 text-xs text-ink-3">
-                  Tailor the exact multiplier range and scheduled active period. Automatically reverts to standard provably fair odds once the schedule concludes.
-                </p>
-              </div>
-
-              {/* Mode Selection */}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-ink-2">Rule Mode</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOddsMode('range')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsMode === 'range'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <Sliders className="size-3.5" />
-                    Range (Min – Max)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOddsMode('min_multiplier')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsMode === 'min_multiplier'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <TrendingUp className="size-3.5" />
-                    Minimum Odds (Over X)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOddsMode('exact')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsMode === 'exact'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <Sparkles className="size-3.5" />
-                    Exact Multiplier
+                    <RefreshCw className={`size-3.5 ${isSyncingDb ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingDb ? 'Syncing...' : 'Sync DB'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Multiplier Inputs */}
-              {oddsMode === 'range' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Multiplier</label>
-                    <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="1.01"
-                        max="100"
-                        value={oddsMin}
-                        onChange={e => setOddsMin(e.target.value)}
-                        className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
-                      />
-                      <span className="text-xs text-ink-3">x</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-2">Maximum Multiplier</label>
-                    <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="1.01"
-                        max="200"
-                        value={oddsMax}
-                        onChange={e => setOddsMax(e.target.value)}
-                        className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
-                      />
-                      <span className="text-xs text-ink-3">x</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {oddsMode === 'min_multiplier' && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Guarantee Over Multiplier</label>
-                  <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="1.01"
-                      max="100"
-                      value={oddsMin}
-                      onChange={e => setOddsMin(e.target.value)}
-                      className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
-                    />
-                    <span className="text-xs text-ink-3">x</span>
-                  </div>
-                  <span className="mt-1 block text-[11px] text-ink-3">Every round crash point will be generated at or above this value.</span>
-                </div>
-              )}
-
-              {oddsMode === 'exact' && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Target Exact Multiplier</label>
-                  <div className="flex h-10 items-center rounded-md border border-line bg-field px-3">
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="1.01"
-                      max="100"
-                      value={oddsExact}
-                      onChange={e => setOddsExact(e.target.value)}
-                      className="w-full bg-transparent text-sm font-semibold text-ink outline-none"
-                    />
-                    <span className="text-xs text-ink-3">x</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Duration / Schedule Type */}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-ink-2">Duration & Schedule</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOddsDurationType('minutes')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsDurationType === 'minutes'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <Clock className="size-3.5" />
-                    Timer (Minutes)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOddsDurationType('rounds')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsDurationType === 'rounds'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <Flame className="size-3.5" />
-                    Round Counter
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOddsDurationType('scheduled_window')}
-                    className={`flex items-center justify-center gap-1.5 rounded-md border py-2 text-xs font-medium transition-colors ${
-                      oddsDurationType === 'scheduled_window'
-                        ? 'border-brand bg-brand/10 text-brand font-semibold'
-                        : 'border-line bg-field text-ink-3 hover:text-ink'
-                    }`}
-                  >
-                    <Timer className="size-3.5" />
-                    Time Window
-                  </button>
-                </div>
-              </div>
-
-              {/* Duration inputs */}
-              {oddsDurationType === 'minutes' && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-medium text-ink-2">Duration in Minutes</label>
-                    <div className="flex gap-1">
-                      {['5', '10', '15', '30', '60'].map(m => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setOddsDurationMinutes(m)}
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border ${
-                            oddsDurationMinutes === m ? 'border-brand bg-brand/20 text-brand' : 'border-line bg-field text-ink-3 hover:text-ink'
-                          }`}
-                        >
-                          {m}m
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1440"
-                    value={oddsDurationMinutes}
-                    onChange={e => setOddsDurationMinutes(e.target.value)}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm text-ink outline-none"
-                  />
-                  <span className="mt-1 block text-[11px] text-ink-3">
-                    Starts immediately upon activation and reverts automatically when the timer reaches 0.
-                  </span>
-                </div>
-              )}
-
-              {oddsDurationType === 'rounds' && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-medium text-ink-2">Total Number of Rounds</label>
-                    <div className="flex gap-1">
-                      {['5', '10', '20', '50'].map(r => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => setOddsRoundsTotal(r)}
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border ${
-                            oddsRoundsTotal === r ? 'border-brand bg-brand/20 text-brand' : 'border-line bg-field text-ink-3 hover:text-ink'
-                          }`}
-                        >
-                          {r} rounds
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <input
-                    type="number"
-                    min="1"
-                    max="500"
-                    value={oddsRoundsTotal}
-                    onChange={e => setOddsRoundsTotal(e.target.value)}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-sm text-ink outline-none"
-                  />
-                  <span className="mt-1 block text-[11px] text-ink-3">
-                    Applies to the next specified number of rounds and decrements automatically with each round.
-                  </span>
-                </div>
-              )}
-
-              {oddsDurationType === 'scheduled_window' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-2">Start Date & Time</label>
-                    <input
-                      type="datetime-local"
-                      value={oddsScheduledStart}
-                      onChange={e => setOddsScheduledStart(e.target.value)}
-                      className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-2">End Date & Time</label>
-                    <input
-                      type="datetime-local"
-                      value={oddsScheduledEnd}
-                      onChange={e => setOddsScheduledEnd(e.target.value)}
-                      className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">Campaign Description / Audit Note</label>
-                <input
-                  type="text"
-                  value={oddsNote}
-                  onChange={e => setOddsNote(e.target.value)}
-                  placeholder="e.g. Happy hour boost to reward active players"
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink outline-none"
-                />
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={oddsSubmitting}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand font-bold text-brand-ink text-xs uppercase tracking-wider shadow-sm hover:brightness-110 disabled:opacity-50 transition-all"
-                >
-                  <Zap className={`size-4 ${oddsSubmitting ? 'animate-bounce' : ''}`} />
-                  Activate Odds Engine Schedule
-                </button>
-              </div>
-            </form>
-
-            {/* 4. Audit & Activation Logs */}
-            <div className="rounded-xl border border-line bg-panel p-5">
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink">
-                Recent Odds Engine Activity Logs
-              </h3>
-
-              {oddsAuditLogs.length === 0 ? (
-                <div className="py-6 text-center text-xs text-ink-3">No recent activation logs recorded.</div>
-              ) : (
+              {/* Users Table */}
+              <div className="overflow-hidden rounded-md border border-[#242830] bg-[#16191f]">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-line text-[11px] font-semibold text-ink-3 uppercase">
-                        <th className="pb-2">Activated At</th>
-                        <th className="pb-2">Rule Mode</th>
-                        <th className="pb-2">Target Multipliers</th>
-                        <th className="pb-2">Duration</th>
-                        <th className="pb-2">Status / Result</th>
-                        <th className="pb-2">Activated By</th>
+                      <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                        <th className="p-3">Player</th>
+                        <th className="p-3">Wallet Balance</th>
+                        <th className="p-3">Freebet Bonus</th>
+                        <th className="p-3">Referrals</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Joined</th>
+                        <th className="p-3 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line/60">
-                      {oddsAuditLogs.map((log, i) => (
-                        <tr key={i} className="hover:bg-field/50 transition-colors">
-                          <td className="py-2.5 text-ink-2 tabular-nums">
-                            {new Date(log.activatedAt).toLocaleString()}
-                          </td>
-                          <td className="py-2.5 font-medium text-ink capitalize">{log.mode}</td>
-                          <td className="py-2.5 font-bold text-brand tabular-nums">
-                            {log.mode === 'range'
-                              ? `${log.minMultiplier}x – ${log.maxMultiplier || 5}x`
-                              : log.mode === 'min_multiplier'
-                              ? `Over ${log.minMultiplier}x`
-                              : `${log.minMultiplier}x`}
-                          </td>
-                          <td className="py-2.5 text-ink-2">
-                            {log.durationType === 'minutes'
-                              ? `${log.durationMinutes} mins`
-                              : log.durationType === 'rounds'
-                              ? `${log.roundsTotal} rounds`
-                              : 'Window'}
-                          </td>
-                          <td className="py-2.5">
-                            {log.expiredAt ? (
-                              <span className="rounded bg-field px-1.5 py-0.5 text-[10px] text-ink-3">
-                                Expired ({log.reason || 'Completed'})
+                    <tbody className="divide-y divide-[#22262e]">
+                      {usersLoading ? (
+                        <tr><td colSpan={7} className="py-10 text-center text-[#8e96a4]"><RefreshCw className="mx-auto size-5 animate-spin mb-1.5 text-[#0da84b]" />Loading players...</td></tr>
+                      ) : usersList.length === 0 ? (
+                        <tr><td colSpan={7} className="py-10 text-center text-[#8e96a4]">No players match the search criteria.</td></tr>
+                      ) : (
+                        usersList.map(u => (
+                          <tr key={u._id} className="hover:bg-[#1c2028]">
+                            <td className="p-3">
+                              <div className="font-bold text-white">{u.username || 'Player'}</div>
+                              <div className="font-mono text-[11px] text-[#8e96a4]">{u.phone}</div>
+                            </td>
+                            <td className="p-3 tabular-nums">
+                              <div className="font-bold text-sm text-[#10b981]">
+                                KSH {Number(u.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </td>
+                            <td className="p-3 tabular-nums">
+                              <div className="font-semibold text-white">KSH {u.freebet ?? 0}</div>
+                              <div className="text-[11px] text-[#8e96a4]">{u.freebetLocked ? 'Locked' : 'Unlocked'}</div>
+                            </td>
+                            <td className="p-3 text-[#c4c9d4] tabular-nums">
+                              {u.referralsCount || 0} <span className="text-[#6e7685]">(KSH {u.referralsEarnings || 0})</span>
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                u.isFrozen
+                                  ? 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                                  : 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                              }`}>
+                                {u.isFrozen ? 'Suspended' : 'Active'}
                               </span>
-                            ) : (
-                              <span className="rounded bg-brand/20 px-1.5 py-0.5 text-[10px] font-bold text-brand animate-pulse">
-                                Running
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 text-ink-3">{log.activatedBy || 'admin'}</td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="p-3 text-[#8e96a4] tabular-nums whitespace-nowrap">{formatDate(u.createdAt)}</td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenUserDetail(u._id)}
+                                  disabled={detailLoading}
+                                  className="inline-flex items-center gap-1 rounded border border-[#2c313c] bg-[#14171c] px-2 py-1 text-[11px] font-semibold text-[#e5e7eb] hover:bg-[#242933] disabled:opacity-50"
+                                  title="Inspect player ledger"
+                                >
+                                  <Eye className="size-3" />
+                                  <span>Inspect</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setBalanceModalUser(u)
+                                    setBalanceAmount('')
+                                    setBalanceType('credit')
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded border border-[#164e30] bg-[#102618] px-2 py-1 text-[11px] font-semibold text-[#34d399] hover:bg-[#163822]"
+                                  title="Adjust real balance"
+                                >
+                                  <Wallet className="size-3" />
+                                  <span>Balance</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setFreebetModalUser(u)
+                                    setFreebetAmount(String(u.freebet || 0))
+                                    setFreebetLocked(u.freebetLocked)
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded border border-[#2c313c] bg-[#14171c] px-2 py-1 text-[11px] font-semibold text-[#c4c9d4] hover:bg-[#242933] hover:text-white"
+                                  title="Adjust freebet"
+                                >
+                                  <Gift className="size-3" />
+                                  <span>Freebet</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleToggleFreeze(u)}
+                                  className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-semibold ${
+                                    u.isFrozen
+                                      ? 'border-[#164e30] bg-[#102618] text-[#34d399]'
+                                      : 'border-[#541b21] bg-[#2a1215] text-[#f87171]'
+                                  }`}
+                                  title={u.isFrozen ? 'Activate account' : 'Suspend account'}
+                                >
+                                  {u.isFrozen ? <Unlock className="size-3" /> : <Lock className="size-3" />}
+                                  <span>{u.isFrozen ? 'Activate' : 'Suspend'}</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setPasswordModalUser(u)
+                                    setNewPasswordVal('')
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded border border-[#2c313c] bg-[#14171c] px-2 py-1 text-[11px] font-semibold text-[#8e96a4] hover:text-white"
+                                  title="Reset password"
+                                >
+                                  <Key className="size-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* ══════════════════════════════════════════════════════════════
-            TAB 4: PAYMENT GATEWAY (PAYD)
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'gateway' && (
-          <div className="mx-auto max-w-2xl space-y-4">
-            <div className="rounded-lg border border-brand/30 bg-brand/5 p-4 text-xs text-ink-2">
-              <div className="flex items-center gap-2 font-semibold text-brand">
-                <Shield className="size-4" />
-                <span>Single Source of Truth: Configured in Admin Panel</span>
+                {usersTotalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-[#242830] bg-[#1c2028] px-4 py-2.5 text-xs">
+                    <button
+                      onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                      disabled={usersPage <= 1}
+                      className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-[#8e96a4] tabular-nums">
+                      Page {usersPage} of {usersTotalPages} ({usersTotal} players)
+                    </span>
+                    <button
+                      onClick={() => setUsersPage(p => Math.min(usersTotalPages, p + 1))}
+                      disabled={usersPage >= usersTotalPages}
+                      className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="mt-1">
-                Payd credentials set here are stored securely in the database and used for all M-Pesa STK push deposits. 
-                No Heroku environment variables or duplicate keys needed.
-              </p>
             </div>
+          )}
 
-            <form onSubmit={handleSaveGateway} className="space-y-4 rounded-lg border border-line bg-panel p-5">
-              <div className="flex items-center justify-between border-b border-line pb-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-ink">Payd M-Pesa API Credentials</h2>
-                  <p className="text-[11px] text-ink-3">app.payd.money REST STK Push & Webhook Gateway</p>
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 5: BETS & LEDGER
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'bets' && (
+            <div className="space-y-4">
+              {/* Bets KPI Strip */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                  <div className="text-xs font-semibold text-[#8e96a4]">Filtered Bets</div>
+                  <div className="mt-1 text-xl font-bold text-white tabular-nums">{betsMetrics?.totalBets ?? betsTotal}</div>
+                  <div className="mt-0.5 text-[11px] text-[#8e96a4] tabular-nums">
+                    Won: {betsMetrics?.countWon ?? 0} • Lost: {betsMetrics?.countLost ?? 0}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className={`size-2 rounded-full ${paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'bg-brand' : 'bg-amber-500'}`}></span>
-                  <span className={paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'text-brand font-medium' : 'text-amber-500 font-medium'}>
-                    {paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'Active & Configured' : 'Setup Required'}
+
+                <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                  <div className="text-xs font-semibold text-[#8e96a4]">Total Wagered</div>
+                  <div className="mt-1 text-xl font-bold text-white tabular-nums">{formatMoney(betsMetrics?.totalWagered ?? 0)}</div>
+                  <div className="mt-0.5 text-[11px] text-[#8e96a4]">Stake volume</div>
+                </div>
+
+                <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                  <div className="text-xs font-semibold text-[#8e96a4]">Total Payouts</div>
+                  <div className="mt-1 text-xl font-bold text-[#10b981] tabular-nums">{formatMoney(betsMetrics?.totalWon ?? 0)}</div>
+                  <div className="mt-0.5 text-[11px] text-[#8e96a4]">Player winnings</div>
+                </div>
+
+                <div className="rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                  <div className="text-xs font-semibold text-[#8e96a4]">House Gross (GGR)</div>
+                  <div className={`mt-1 text-xl font-bold tabular-nums ${(betsMetrics?.houseGross ?? 0) >= 0 ? 'text-[#10b981]' : 'text-[#f87171]'}`}>
+                    {formatMoney(betsMetrics?.houseGross ?? 0)}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[#8e96a4]">Net margin</div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1 rounded-md border border-[#242830] bg-[#16191f] p-3.5">
+                  <div className="text-xs font-semibold text-[#8e96a4]">Player Win Rate</div>
+                  <div className="mt-1 text-xl font-bold text-[#fbbf24] tabular-nums">{betsMetrics?.winRate ?? 0}%</div>
+                  <div className="mt-0.5 text-[11px] text-[#8e96a4] tabular-nums">Active: {betsMetrics?.countActive ?? 0}</div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="flex flex-col gap-3 rounded-md border border-[#242830] bg-[#16191f] p-3.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded border border-[#2c313c] bg-[#0d0f12] p-0.5 text-xs">
+                    {(['all', 'won', 'lost', 'active'] as const).map(st => (
+                      <button
+                        key={st}
+                        onClick={() => { setBetStatusFilter(st); setBetsPage(1) }}
+                        className={`rounded px-3 py-1 font-semibold capitalize ${
+                          betStatusFilter === st ? 'bg-[#0da84b] text-white' : 'text-[#8e96a4] hover:text-white'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex rounded border border-[#2c313c] bg-[#0d0f12] p-0.5 text-xs">
+                    {(['all', 'money', 'freebet'] as const).map(tp => (
+                      <button
+                        key={tp}
+                        onClick={() => { setBetTypeFilter(tp); setBetsPage(1) }}
+                        className={`rounded px-3 py-1 font-semibold capitalize ${
+                          betTypeFilter === tp ? 'bg-[#242933] text-white' : 'text-[#8e96a4] hover:text-white'
+                        }`}
+                      >
+                        {tp === 'all' ? 'All Stakes' : tp === 'money' ? 'Real Cash' : 'Freebet'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 sm:w-52">
+                    <Search className="absolute left-3 top-2.5 size-3.5 text-[#6e7685]" />
+                    <input
+                      type="text"
+                      value={betSearch}
+                      onChange={e => { setBetSearch(e.target.value); setBetsPage(1) }}
+                      placeholder="Player phone or username..."
+                      className="h-8 w-full rounded border border-[#2c313c] bg-[#0d0f12] pl-8 pr-3 text-xs text-white placeholder:text-[#6e7685] focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={betRoundId}
+                    onChange={e => { setBetRoundId(e.target.value); setBetsPage(1) }}
+                    placeholder="Round ID..."
+                    className="h-8 w-28 rounded border border-[#2c313c] bg-[#0d0f12] px-2.5 text-xs text-white placeholder:text-[#6e7685] focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Bets Table */}
+              <div className="overflow-hidden rounded-md border border-[#242830] bg-[#16191f]">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                        <th className="p-3">Time</th>
+                        <th className="p-3">Round</th>
+                        <th className="p-3">Player</th>
+                        <th className="p-3">Wallet</th>
+                        <th className="p-3">Stake</th>
+                        <th className="p-3">Cashout At</th>
+                        <th className="p-3">Payout</th>
+                        <th className="p-3">Player Net</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#22262e]">
+                      {betsLoading ? (
+                        <tr><td colSpan={9} className="py-10 text-center text-[#8e96a4]"><RefreshCw className="mx-auto size-5 animate-spin mb-1.5 text-[#0da84b]" />Loading bets ledger...</td></tr>
+                      ) : betsList.length === 0 ? (
+                        <tr><td colSpan={9} className="py-10 text-center text-[#8e96a4]">No bets found matching your filters.</td></tr>
+                      ) : (
+                        betsList.map(b => {
+                          const isWon = b.status === 'won'
+                          const isLost = b.status === 'lost'
+                          const profit = isWon ? (b.winAmount - b.amount) : -b.amount
+
+                          return (
+                            <tr key={b._id} className="hover:bg-[#1c2028]">
+                              <td className="p-3 font-mono text-[11px] text-[#8e96a4] whitespace-nowrap">{formatDate(b.createdAt)}</td>
+                              <td className="p-3 font-mono text-[11px] font-semibold text-[#c4c9d4] whitespace-nowrap">{b.roundId}</td>
+                              <td className="p-3">
+                                {b.userId ? (
+                                  <button
+                                    onClick={() => handleOpenUserDetail(b.userId?._id || '')}
+                                    className="text-left hover:underline"
+                                  >
+                                    <div className="font-bold text-white">{b.userId.username}</div>
+                                    <div className="font-mono text-[11px] text-[#8e96a4]">{b.userId.phone}</div>
+                                  </button>
+                                ) : (
+                                  <span className="text-[#6e7685]">—</span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  b.isFreebet ? 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]' : 'bg-[#1c2028] text-[#c4c9d4] border border-[#2c313c]'
+                                }`}>
+                                  {b.isFreebet ? 'Freebet' : 'Cash'}
+                                </span>
+                              </td>
+                              <td className="p-3 font-bold text-white tabular-nums whitespace-nowrap">KSH {b.amount}</td>
+                              <td className="p-3 font-mono font-bold tabular-nums whitespace-nowrap">
+                                {b.multiplierCaught ? <span className="text-[#10b981]">{b.multiplierCaught}x</span> : <span className="text-[#6e7685]">—</span>}
+                              </td>
+                              <td className="p-3 font-bold tabular-nums whitespace-nowrap">
+                                {isWon ? <span className="text-[#10b981]">KSH {b.winAmount}</span> : <span className="text-[#6e7685]">KSH 0</span>}
+                              </td>
+                              <td className="p-3 font-bold tabular-nums whitespace-nowrap">
+                                {isWon ? (
+                                  <span className="text-[#10b981]">+{formatMoney(profit)}</span>
+                                ) : isLost ? (
+                                  <span className="text-[#f87171]">-{formatMoney(Math.abs(profit))}</span>
+                                ) : (
+                                  <span className="text-[#6e7685]">—</span>
+                                )}
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
+                                <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                  isWon
+                                    ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                                    : isLost
+                                    ? 'bg-[#2a1215] text-[#f87171] border border-[#541b21]'
+                                    : 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                                }`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {betsTotalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-[#242830] bg-[#1c2028] px-4 py-2.5 text-xs">
+                    <span className="text-[#8e96a4] tabular-nums">
+                      Showing {(betsPage - 1) * 25 + 1}–{Math.min(betsPage * 25, betsTotal)} of {betsTotal}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setBetsPage(p => Math.max(1, p - 1))}
+                        disabled={betsPage <= 1}
+                        className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <span className="px-2 font-semibold text-[#c4c9d4] tabular-nums">{betsPage} / {betsTotalPages}</span>
+                      <button
+                        onClick={() => setBetsPage(p => Math.min(betsTotalPages, p + 1))}
+                        disabled={betsPage >= betsTotalPages}
+                        className="rounded border border-[#2c313c] bg-[#14171c] px-3 py-1 font-semibold text-white hover:bg-[#242933] disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 6: ODDS ENGINE CONTROL
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'odds' && (
+            <div className="mx-auto max-w-4xl space-y-5">
+              {oddsToast && (
+                <div
+                  className={`flex items-center justify-between rounded border p-3.5 text-xs font-semibold ${
+                    oddsToast.type === 'success'
+                      ? 'border-[#0da84b] bg-[#102618] text-[#34d399]'
+                      : 'border-[#dc2626] bg-[#2a1215] text-[#f87171]'
+                  }`}
+                >
+                  <span>{oddsToast.message}</span>
+                  <button onClick={() => setOddsToast(null)} className="text-[#8e96a4] hover:text-white">
+                    <X className="size-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Live Engine Status Bar */}
+              <div className={`rounded-md border p-5 ${oddsEngine?.enabled ? 'border-[#0da84b] bg-[#102217]' : 'border-[#242830] bg-[#16191f]'}`}>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3.5">
+                    <div className={`flex size-10 shrink-0 items-center justify-center rounded ${oddsEngine?.enabled ? 'bg-[#0da84b] text-white' : 'bg-[#242830] text-[#8e96a4]'}`}>
+                      <Zap className="size-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-white">
+                          {oddsEngine?.enabled ? 'Promotional Odds Override Active' : 'Standard Provably Fair Mode'}
+                        </h2>
+                        <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          oddsEngine?.enabled ? 'bg-[#0da84b] text-white' : 'bg-[#242830] text-[#8e96a4]'
+                        }`}>
+                          {oddsEngine?.enabled ? 'BOOST ON' : 'NORMAL'}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-[#b4bcc8]">
+                        {oddsEngine?.enabled ? (
+                          <>
+                            Targeting{' '}
+                            <strong className="text-[#34d399] font-bold tabular-nums">
+                              {oddsEngine.mode === 'range'
+                                ? `${oddsEngine.minMultiplier.toFixed(2)}x – ${oddsEngine.maxMultiplier.toFixed(2)}x`
+                                : oddsEngine.mode === 'min_multiplier'
+                                ? `>= ${oddsEngine.minMultiplier.toFixed(2)}x`
+                                : `Exact ${oddsEngine.exactMultiplier?.toFixed(2)}x`}
+                            </strong>
+                            {oddsEngine.durationType === 'minutes' && (
+                              <span className="ml-2 font-mono text-white">
+                                ({Math.floor((oddsEngine.timeRemainingSeconds || 0) / 60)}m {((oddsEngine.timeRemainingSeconds || 0) % 60).toString().padStart(2, '0')}s left)
+                              </span>
+                            )}
+                            {oddsEngine.durationType === 'rounds' && (
+                              <span className="ml-2 font-mono text-white">
+                                ({oddsEngine.roundsRemaining}/{oddsEngine.roundsTotal} rounds left)
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          'Multipliers are currently generated using standard unadjusted SHA-256 server seeds.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {oddsEngine?.enabled ? (
+                    <button
+                      type="button"
+                      onClick={handleResetOddsRule}
+                      disabled={oddsSubmitting}
+                      className="rounded bg-[#dc2626] px-4 py-2 text-xs font-bold text-white hover:bg-[#b91c1c] disabled:opacity-50"
+                    >
+                      Reset to Normal Odds
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={fetchOddsEngine}
+                      disabled={oddsSubmitting}
+                      className="rounded border border-[#2c313c] bg-[#1c2028] px-3 py-2 text-xs font-semibold text-white hover:bg-[#242933]"
+                    >
+                      Check Status
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 1-Click Presets */}
+              <div className="rounded-md border border-[#242830] bg-[#16191f] p-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#8e96a4]">Quick Promotional Presets</h3>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyOddsRule({
+                      mode: 'range', minMultiplier: 2.0, maxMultiplier: 5.0,
+                      durationType: 'minutes', durationMinutes: 15,
+                      note: 'Active Users Reward: 2.00x - 5.00x for 15m'
+                    })}
+                    disabled={oddsSubmitting}
+                    className="rounded border border-[#2c313c] bg-[#1c2028] p-3.5 text-left hover:border-[#0da84b]"
+                  >
+                    <div className="text-xs font-bold text-[#10b981]">Player Boost</div>
+                    <div className="mt-1 text-base font-bold text-white tabular-nums">2.00x – 5.00x</div>
+                    <div className="mt-1 text-[11px] text-[#8e96a4]">15 minutes • Auto-resets</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApplyOddsRule({
+                      mode: 'range', minMultiplier: 2.0, maxMultiplier: 10.0,
+                      durationType: 'minutes', durationMinutes: 30,
+                      note: 'Happy Hour Boost: 2.00x - 10.00x for 30m'
+                    })}
+                    disabled={oddsSubmitting}
+                    className="rounded border border-[#2c313c] bg-[#1c2028] p-3.5 text-left hover:border-[#0da84b]"
+                  >
+                    <div className="text-xs font-bold text-[#fbbf24]">Happy Hour</div>
+                    <div className="mt-1 text-base font-bold text-white tabular-nums">2.00x – 10.00x</div>
+                    <div className="mt-1 text-[11px] text-[#8e96a4]">30 minutes • Auto-resets</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApplyOddsRule({
+                      mode: 'range', minMultiplier: 2.0, maxMultiplier: 4.0,
+                      durationType: 'rounds', roundsTotal: 10,
+                      note: '10 Rounds Streak: 2.00x - 4.00x'
+                    })}
+                    disabled={oddsSubmitting}
+                    className="rounded border border-[#2c313c] bg-[#1c2028] p-3.5 text-left hover:border-[#0da84b]"
+                  >
+                    <div className="text-xs font-bold text-[#34d399]">10-Round Streak</div>
+                    <div className="mt-1 text-base font-bold text-white tabular-nums">2.00x – 4.00x</div>
+                    <div className="mt-1 text-[11px] text-[#8e96a4]">Next 10 rounds</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApplyOddsRule({
+                      mode: 'min_multiplier', minMultiplier: 2.0, maxMultiplier: 50.0,
+                      durationType: 'minutes', durationMinutes: 10,
+                      note: 'Over 2.00x Floor: 10m'
+                    })}
+                    disabled={oddsSubmitting}
+                    className="rounded border border-[#2c313c] bg-[#1c2028] p-3.5 text-left hover:border-[#0da84b]"
+                  >
+                    <div className="text-xs font-bold text-[#60a5fa]">2x Minimum Floor</div>
+                    <div className="mt-1 text-base font-bold text-white tabular-nums">&ge; 2.00x</div>
+                    <div className="mt-1 text-[11px] text-[#8e96a4]">10 minutes • Auto-resets</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Rule Builder */}
+              <form onSubmit={e => { e.preventDefault(); handleApplyOddsRule() }} className="rounded-md border border-[#242830] bg-[#16191f] p-5 space-y-4">
+                <div className="border-b border-[#242830] pb-3">
+                  <h3 className="text-sm font-bold text-white">Custom Odds Rule</h3>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#c4c9d4]">Mode</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'range', label: 'Range (Min–Max)' },
+                      { id: 'min_multiplier', label: 'Minimum Floor' },
+                      { id: 'exact', label: 'Exact Target' }
+                    ].map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setOddsMode(m.id as any)}
+                        className={`rounded border py-2 text-xs font-semibold ${
+                          oddsMode === m.id
+                            ? 'border-[#0da84b] bg-[#102618] text-[#34d399]'
+                            : 'border-[#2c313c] bg-[#0d0f12] text-[#8e96a4] hover:text-white'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {oddsMode === 'range' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Min Multiplier (x)</label>
+                      <input
+                        type="number" step="0.1" min="1.01" max="100"
+                        value={oddsMin} onChange={e => setOddsMin(e.target.value)}
+                        className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Max Multiplier (x)</label>
+                      <input
+                        type="number" step="0.1" min="1.01" max="200"
+                        value={oddsMax} onChange={e => setOddsMax(e.target.value)}
+                        className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {oddsMode === 'min_multiplier' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Minimum Guaranteed Multiplier (x)</label>
+                    <input
+                      type="number" step="0.1" min="1.01" max="100"
+                      value={oddsMin} onChange={e => setOddsMin(e.target.value)}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {oddsMode === 'exact' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Exact Crash Multiplier (x)</label>
+                    <input
+                      type="number" step="0.05" min="1.01" max="100"
+                      value={oddsExact} onChange={e => setOddsExact(e.target.value)}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#c4c9d4]">Duration Control</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'minutes', label: 'Minutes Timer' },
+                      { id: 'rounds', label: 'Round Count' },
+                      { id: 'scheduled_window', label: 'Date/Time Window' }
+                    ].map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setOddsDurationType(d.id as any)}
+                        className={`rounded border py-2 text-xs font-semibold ${
+                          oddsDurationType === d.id
+                            ? 'border-[#0da84b] bg-[#102618] text-[#34d399]'
+                            : 'border-[#2c313c] bg-[#0d0f12] text-[#8e96a4] hover:text-white'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {oddsDurationType === 'minutes' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Active Duration (Minutes)</label>
+                    <input
+                      type="number" min="1" max="1440"
+                      value={oddsDurationMinutes} onChange={e => setOddsDurationMinutes(e.target.value)}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {oddsDurationType === 'rounds' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Number of Rounds</label>
+                    <input
+                      type="number" min="1" max="500"
+                      value={oddsRoundsTotal} onChange={e => setOddsRoundsTotal(e.target.value)}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {oddsDurationType === 'scheduled_window' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Start Time</label>
+                      <input
+                        type="datetime-local"
+                        value={oddsScheduledStart} onChange={e => setOddsScheduledStart(e.target.value)}
+                        className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">End Time</label>
+                      <input
+                        type="datetime-local"
+                        value={oddsScheduledEnd} onChange={e => setOddsScheduledEnd(e.target.value)}
+                        className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Audit Note</label>
+                  <input
+                    type="text"
+                    value={oddsNote} onChange={e => setOddsNote(e.target.value)}
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={oddsSubmitting}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded bg-[#0da84b] text-xs font-bold uppercase tracking-wider text-white hover:bg-[#0b9240] disabled:opacity-50"
+                >
+                  <Zap className="size-4" />
+                  <span>Activate Odds Rule</span>
+                </button>
+              </form>
+
+              {/* Audit Logs */}
+              <div className="rounded-md border border-[#242830] bg-[#16191f]">
+                <div className="border-b border-[#242830] px-4 py-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#8e96a4]">Odds Engine Audit Log</h3>
+                </div>
+                {oddsAuditLogs.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[#8e96a4]">No odds override history recorded.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#242830] bg-[#1c2028] text-[11px] font-bold uppercase text-[#8e96a4]">
+                          <th className="p-3">Activated</th>
+                          <th className="p-3">Mode</th>
+                          <th className="p-3">Target</th>
+                          <th className="p-3">Duration</th>
+                          <th className="p-3">State</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#22262e]">
+                        {oddsAuditLogs.map((log, i) => (
+                          <tr key={i} className="hover:bg-[#1c2028]">
+                            <td className="p-3 text-[#8e96a4] tabular-nums">{new Date(log.activatedAt).toLocaleString()}</td>
+                            <td className="p-3 font-semibold text-white capitalize">{log.mode}</td>
+                            <td className="p-3 font-bold text-[#10b981] tabular-nums">
+                              {log.mode === 'range' ? `${log.minMultiplier}x – ${log.maxMultiplier || 5}x` : `>= ${log.minMultiplier}x`}
+                            </td>
+                            <td className="p-3 text-[#c4c9d4]">
+                              {log.durationType === 'minutes' ? `${log.durationMinutes}m` : log.durationType === 'rounds' ? `${log.roundsTotal} rounds` : 'Window'}
+                            </td>
+                            <td className="p-3">
+                              {log.expiredAt ? (
+                                <span className="text-[#8e96a4]">Completed ({log.reason || 'Done'})</span>
+                              ) : (
+                                <span className="font-bold text-[#10b981]">Active</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 7: PAYD GATEWAY CONFIGURATION
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'gateway' && (
+            <div className="mx-auto max-w-2xl space-y-4">
+              <form onSubmit={handleSaveGateway} className="space-y-4 rounded-md border border-[#242830] bg-[#16191f] p-5">
+                <div className="flex items-center justify-between border-b border-[#242830] pb-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Payd M-Pesa STK Credentials</h2>
+                    <p className="text-xs text-[#8e96a4]">Stored in MongoDB and applied immediately to all deposit requests</p>
+                  </div>
+                  <span className={`rounded px-2.5 py-1 text-xs font-bold ${
+                    paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured)
+                      ? 'bg-[#102618] text-[#34d399] border border-[#164e30]'
+                      : 'bg-[#2b2111] text-[#fbbf24] border border-[#523c16]'
+                  }`}>
+                    {paymentConfig.paydApiUsername && (isPasswordConfigured || isSecretConfigured) ? 'Configured' : 'Incomplete'}
                   </span>
                 </div>
-              </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">
-                  Payd API Username (<span className="font-mono text-brand">API_USERNAME</span>)
-                </label>
-                <input
-                  type="text"
-                  value={paymentConfig.paydApiUsername}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiUsername: e.target.value }))}
-                  placeholder="e.g. your_api_username"
-                  required
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">Found in your Payd account (app.payd.money) under API Credentials.</p>
-              </div>
-
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
-                  <span>Payd Password (<span className="font-mono text-brand">PASSWORD</span>)</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowApiPassword(!showApiPassword)}
-                    className="flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink"
-                  >
-                    {showApiPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                    {showApiPassword ? 'Hide' : 'Show'}
-                  </button>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Payd API Username</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.paydApiUsername}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiUsername: e.target.value }))}
+                    placeholder="e.g. your_api_username"
+                    required
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
                 </div>
-                <input
-                  type={showApiPassword ? 'text' : 'password'}
-                  value={newApiPassword}
-                  onChange={e => setNewApiPassword(e.target.value)}
-                  placeholder={isPasswordConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing password)' : 'Enter Payd password...'}
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">
-                  Password provided for your Payd API account. Secured in database and never exposed publicly.
-                </p>
-              </div>
 
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
-                  <span>Payd API Secret (<span className="font-mono text-brand">API_SECRET</span>)</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowApiSecret(!showApiSecret)}
-                    className="flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink"
-                  >
-                    {showApiSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                    {showApiSecret ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                <input
-                  type={showApiSecret ? 'text' : 'password'}
-                  value={newApiSecret}
-                  onChange={e => setNewApiSecret(e.target.value)}
-                  placeholder={isSecretConfigured ? '•••••••••••••••••••••••• (Leave blank to keep existing secret)' : 'Enter Payd API secret...'}
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">
-                  API Secret provided by Payd (app.payd.money). Kept secure on backend for authenticated requests.
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">
-                  Payd Wallet Username / Identifier (<span className="font-mono text-brand">optional</span>)
-                </label>
-                <input
-                  type="text"
-                  value={paymentConfig.paydWalletUsername}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydWalletUsername: e.target.value }))}
-                  placeholder="Leave blank to use API Username"
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">Your Payd wallet username if different from API username.</p>
-              </div>
-
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs font-medium text-ink-2">
-                  <span>Payd API Base URL</span>
-                  <div className="flex gap-2 text-[10px]">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#c4c9d4]">
+                    <span>Payd API Password</span>
                     <button
                       type="button"
-                      onClick={() => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: 'https://api.mypayd.app/api/v2/payments' }))}
-                      className="rounded bg-raised px-1.5 py-0.5 text-brand hover:underline"
+                      onClick={() => setShowApiPassword(!showApiPassword)}
+                      className="flex items-center gap-1 text-xs text-[#8e96a4] hover:text-white"
                     >
-                      Production Default
+                      {showApiPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      <span>{showApiPassword ? 'Hide' : 'Show'}</span>
                     </button>
+                  </div>
+                  <input
+                    type={showApiPassword ? 'text' : 'password'}
+                    value={newApiPassword}
+                    onChange={e => setNewApiPassword(e.target.value)}
+                    placeholder={isPasswordConfigured ? 'Configured (leave blank to keep existing)' : 'Enter Payd API password'}
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#c4c9d4]">
+                    <span>Payd API Secret (Bearer Token)</span>
                     <button
                       type="button"
-                      onClick={() => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: 'https://sandbox.mypayd.app/api/v2/payments' }))}
-                      className="rounded bg-raised px-1.5 py-0.5 text-amber-500 hover:underline"
+                      onClick={() => setShowApiSecret(!showApiSecret)}
+                      className="flex items-center gap-1 text-xs text-[#8e96a4] hover:text-white"
                     >
-                      Sandbox Preset
+                      {showApiSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      <span>{showApiSecret ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type={showApiSecret ? 'text' : 'password'}
+                    value={newApiSecret}
+                    onChange={e => setNewApiSecret(e.target.value)}
+                    placeholder={isSecretConfigured ? 'Configured (leave blank to keep existing)' : 'Optional Bearer Secret'}
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Payd Wallet Username</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.paydWalletUsername}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, paydWalletUsername: e.target.value }))}
+                    placeholder="Merchant wallet username"
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Payd REST Endpoint URL</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.paydApiBaseUrl}
+                    onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: e.target.value }))}
+                    required
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                  />
+                </div>
+
+                <div className="rounded border border-[#242830] bg-[#0d0f12] p-3 text-xs space-y-2">
+                  <div className="font-semibold text-[#c4c9d4]">Webhook Callback Endpoint</div>
+                  <div className="flex items-center justify-between gap-2 rounded border border-[#242830] bg-[#16191f] px-3 py-2 font-mono text-xs text-[#10b981]">
+                    <span className="truncate">{typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/payd` : '/api/webhooks/payd'}</span>
+                    <button type="button" onClick={copyWebhookUrl} className="text-[#8e96a4] hover:text-white">
+                      {copiedWebhook ? <Check className="size-4 text-[#10b981]" /> : <Copy className="size-4" />}
                     </button>
                   </div>
                 </div>
-                <input
-                  type="text"
-                  value={paymentConfig.paydApiBaseUrl}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, paydApiBaseUrl: e.target.value }))}
-                  placeholder="https://api.mypayd.app/api/v2/payments"
-                  required
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 font-mono text-xs text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">The Payd Collections REST API endpoint.</p>
-              </div>
 
-              {/* Webhook Endpoint Info */}
-              <div className="rounded-md border border-line bg-field p-3 text-xs space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-brand">
-                  <Shield className="size-3.5" />
-                  <span>Webhook Callback: Fully Automatic</span>
-                </div>
-                <p className="text-[11px] text-ink-2 leading-relaxed">
-                  You <strong>do not need to configure a webhook URL inside the Payd dashboard</strong>. Payd’s M-Pesa STK Push API accepts the callback URL dynamically with every transaction request. Our system automatically attaches this URL to every STK push so Payd posts payments back directly:
-                </p>
-                <div className="flex items-center justify-between gap-2 rounded bg-raised px-2.5 py-1.5 font-mono text-[11px] text-brand">
-                  <span className="truncate">{typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/payd` : '/api/webhooks/payd'}</span>
+                <div className="flex justify-end pt-2">
                   <button
-                    type="button"
-                    onClick={copyWebhookUrl}
-                    className="flex items-center gap-1 text-ink-2 hover:text-ink"
-                    title="Copy URL"
+                    type="submit"
+                    disabled={paymentLoading}
+                    className="flex h-10 items-center gap-2 rounded bg-[#0da84b] px-5 text-xs font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
                   >
-                    {copiedWebhook ? <Check className="size-3.5 text-brand" /> : <Copy className="size-3.5" />}
+                    {paymentLoading ? <RefreshCw className="size-4 animate-spin" /> : 'Save Gateway Credentials'}
                   </button>
                 </div>
-                <p className="text-[11px] text-ink-3">
-                  When a customer enters their M-Pesa PIN, Safaricom informs Payd, which immediately delivers confirmation to this endpoint to credit the user balance instantly.
-                </p>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={paymentLoading}
-                  className="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
-                >
-                  {paymentLoading ? <RefreshCw className="size-3.5 animate-spin" /> : 'Save Payd Configuration'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            TAB 5: GAME & SYSTEM SETTINGS
-            ══════════════════════════════════════════════════════════════ */}
-        {activeTab === 'settings' && (
-          <div className="mx-auto max-w-xl space-y-4">
-            <form onSubmit={handleSaveSystemSettings} className="space-y-4 rounded-lg border border-line bg-panel p-5">
-              <h2 className="border-b border-line pb-3 text-sm font-semibold text-ink">General System & Limits Configuration</h2>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">Company / Brand Name</label>
-                <input
-                  type="text"
-                  value={paymentConfig.companyName}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, companyName: e.target.value }))}
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink-2">WhatsApp Support Number</label>
-                <input
-                  type="text"
-                  value={paymentConfig.whatsappSupport}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, whatsappSupport: e.target.value }))}
-                  placeholder="254712345678"
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">Include international country code prefix (e.g. 254).</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Deposit (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.minDeposit}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, minDeposit: Number(e.target.value) }))}
-                    min={1}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Lowest allowed deposit amount.</p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Withdrawal (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.minWithdrawal}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, minWithdrawal: Number(e.target.value) }))}
-                    min={1}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Lowest allowed payout amount.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 border-t border-line/60 pt-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Freebet Unlock Deposit (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.freebetUnlockAmount}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, freebetUnlockAmount: Number(e.target.value) }))}
-                    min={1}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Required deposit to unlock free bets (default: 50).</p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Welcome Freebet Bonus (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.initialFreebet}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, initialFreebet: Number(e.target.value) }))}
-                    min={0}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Bonus credited on registration (default: 150).</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 border-t border-line/60 pt-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Referral Reward (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.referralReward}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, referralReward: Number(e.target.value) }))}
-                    min={0}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Cash credited to referrer when friend deposits.</p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-2">Minimum Bet (KSH)</label>
-                  <input
-                    type="number"
-                    value={paymentConfig.minBet}
-                    onChange={e => setPaymentConfig(prev => ({ ...prev, minBet: Number(e.target.value) }))}
-                    min={1}
-                    className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-3">Lowest single bet allowed (default: 10).</p>
-                </div>
-              </div>
-
-              <div className="border-t border-line/60 pt-3">
-                <label className="mb-1 block text-xs font-medium text-ink-2">Maximum Bet (KSH)</label>
-                <input
-                  type="number"
-                  value={paymentConfig.maxBet}
-                  onChange={e => setPaymentConfig(prev => ({ ...prev, maxBet: Number(e.target.value) }))}
-                  min={100}
-                  className="h-10 w-full rounded-md border border-line bg-field px-3 text-xs text-ink focus:border-brand focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-ink-3">Maximum single bet allowed per round (default: 10,000).</p>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={paymentLoading}
-                  className="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-xs font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50"
-                >
-                  {paymentLoading ? <RefreshCw className="size-3.5 animate-spin" /> : 'Save System Settings'}
-                </button>
-              </div>
-            </form>
-
-            {/* Sentry Logging & Error Diagnostic Card */}
-            <div className="space-y-3 rounded-lg border border-line bg-panel p-5">
-              <h2 className="border-b border-line pb-3 text-sm font-semibold text-ink flex items-center justify-between">
-                <span>Sentry Diagnostics &amp; Error Tracking</span>
-                <span className="text-[11px] font-normal text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">Active</span>
-              </h2>
-              <p className="text-xs text-ink-2 leading-relaxed">
-                Test real-time error logging, performance monitoring, and session replay integration. Clicking the button below sends a structured log (<code className="text-amber-400">Sentry.logger.info</code>), increments a counter metric (<code className="text-amber-400">Sentry.metrics.count</code>), and throws an error to your Sentry dashboard.
-              </p>
-              <div className="pt-2 flex items-center gap-3">
-                <ErrorButton />
-                <span className="text-[11px] text-ink-3">DSN: ingest.us.sentry.io/4512272155738112</span>
-              </div>
+              </form>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              TAB 8: SYSTEM SETTINGS
+              ══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'settings' && (
+            <div className="mx-auto max-w-2xl">
+              <form onSubmit={handleSaveSystemSettings} className="space-y-4 rounded-md border border-[#242830] bg-[#16191f] p-5">
+                <h2 className="border-b border-[#242830] pb-3 text-sm font-bold text-white">Platform Limits & Brand Configuration</h2>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Brand Name</label>
+                    <input
+                      type="text"
+                      value={paymentConfig.companyName}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, companyName: e.target.value }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">WhatsApp Support Number</label>
+                    <input
+                      type="text"
+                      value={paymentConfig.whatsappSupport}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, whatsappSupport: e.target.value }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 font-mono text-xs text-white focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Minimum Deposit (KSH)</label>
+                    <input
+                      type="number" min={1}
+                      value={paymentConfig.minDeposit}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, minDeposit: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Minimum Withdrawal (KSH)</label>
+                    <input
+                      type="number" min={1}
+                      value={paymentConfig.minWithdrawal}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, minWithdrawal: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Freebet Unlock Deposit (KSH)</label>
+                    <input
+                      type="number" min={1}
+                      value={paymentConfig.freebetUnlockAmount}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, freebetUnlockAmount: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Signup Freebet Bonus (KSH)</label>
+                    <input
+                      type="number" min={0}
+                      value={paymentConfig.initialFreebet}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, initialFreebet: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Referral Bonus (KSH)</label>
+                    <input
+                      type="number" min={0}
+                      value={paymentConfig.referralReward}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, referralReward: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Minimum Bet (KSH)</label>
+                    <input
+                      type="number" min={1}
+                      value={paymentConfig.minBet}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, minBet: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Maximum Bet (KSH)</label>
+                    <input
+                      type="number" min={100}
+                      value={paymentConfig.maxBet}
+                      onChange={e => setPaymentConfig(prev => ({ ...prev, maxBet: Number(e.target.value) }))}
+                      className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={paymentLoading}
+                    className="flex h-10 items-center gap-2 rounded bg-[#0da84b] px-5 text-xs font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
+                  >
+                    {paymentLoading ? <RefreshCw className="size-4 animate-spin" /> : 'Save System Settings'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* ══════════════════════════════════════════════════════════════
-          MODAL: ADJUST USER BALANCE
+          MODAL 1: ADJUST USER BALANCE
           ══════════════════════════════════════════════════════════════ */}
       {balanceModalUser && (
-        <div className="wallet-overlay">
-          <div className="wallet-modal max-w-md">
-            <div className="wallet-header">
-              <span className="wallet-title">ADJUST USER BALANCE</span>
-              <button className="wallet-close" onClick={() => setBalanceModalUser(null)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-md border border-[#2c313c] bg-[#16191f] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#242830] bg-[#1c2028] px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-white">Adjust Player Balance</span>
+              <button onClick={() => setBalanceModalUser(null)} className="text-[#8e96a4] hover:text-white">
+                <X className="size-4" />
+              </button>
             </div>
-            <div className="wallet-body">
-              {/* User Financial Cards */}
-              <div className="wallet-cards">
-                <div className="wallet-card">
-                  <div className="card-label">CURRENT BALANCE</div>
-                  <div className="card-amount">KSH <span>{balanceModalUser.balance.toFixed(2)}</span></div>
-                </div>
-                <div className="wallet-card">
-                  <span className="freebet-status">{balanceModalUser.freebetLocked ? '(locked)' : '(unlocked)'}</span>
-                  <div className="card-label">FREEBET BONUS</div>
-                  <div className="card-amount">KSH <span>{balanceModalUser.freebet.toFixed(2)}</span></div>
-                </div>
-              </div>
 
-              <div className="mb-3 px-1 text-xs text-[#a0a6b1]">
-                Player: <span className="font-bold text-white">{balanceModalUser.username}</span> ({balanceModalUser.phone})
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between rounded border border-[#242830] bg-[#0d0f12] p-3 text-xs">
+                <div>
+                  <div className="font-bold text-white">{balanceModalUser.username}</div>
+                  <div className="font-mono text-[#8e96a4]">{balanceModalUser.phone}</div>
+                </div>
+                <div className="text-right tabular-nums">
+                  <div className="text-[11px] text-[#8e96a4]">Current Balance</div>
+                  <div className="text-sm font-bold text-[#10b981]">KSH {balanceModalUser.balance.toFixed(2)}</div>
+                </div>
               </div>
 
               <form onSubmit={handleAdjustBalance} className="space-y-3">
-                <div className="wallet-tabs-wrapper">
-                  <div className="wallet-tabs w-full">
+                <div className="grid grid-cols-3 gap-1.5 rounded border border-[#2c313c] bg-[#0d0f12] p-1">
+                  {(['credit', 'debit', 'set'] as const).map(t => (
                     <button
+                      key={t}
                       type="button"
-                      onClick={() => setBalanceType('credit')}
-                      className={`tab-btn ${balanceType === 'credit' ? 'active' : ''}`}
+                      onClick={() => setBalanceType(t)}
+                      className={`rounded py-1.5 text-xs font-bold capitalize ${
+                        balanceType === t ? 'bg-[#0da84b] text-white' : 'text-[#8e96a4] hover:text-white'
+                      }`}
                     >
-                      + Credit
+                      {t === 'credit' ? '+ Credit' : t === 'debit' ? '- Debit' : '= Set Exact'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setBalanceType('debit')}
-                      className={`tab-btn ${balanceType === 'debit' ? 'active' : ''}`}
-                    >
-                      - Debit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBalanceType('set')}
-                      className={`tab-btn ${balanceType === 'set' ? 'active' : ''}`}
-                    >
-                      = Set Balance
-                    </button>
-                  </div>
+                  ))}
                 </div>
 
                 <div>
-                  <label className="section-label">
-                    {balanceType === 'set' ? 'Exact New Balance (KSH)' : 'Amount to Adjust (KSH)'}
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">
+                    {balanceType === 'set' ? 'New Wallet Balance (KSH)' : 'Adjustment Amount (KSH)'}
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min={balanceType === 'set' ? "0" : "0.01"}
-                    value={balanceAmount}
-                    onChange={e => setBalanceAmount(e.target.value)}
-                    placeholder={balanceType === 'set' ? "e.g. 500" : "e.g. 100"}
-                    required
-                    className="verify-input"
+                    type="number" step="0.01" min={balanceType === 'set' ? '0' : '0.01'}
+                    value={balanceAmount} onChange={e => setBalanceAmount(e.target.value)}
+                    placeholder="0.00" required
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="section-label">Reason / Audit Note</label>
+                  <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Audit Reason</label>
                   <input
                     type="text"
-                    value={balanceReason}
-                    onChange={e => setBalanceReason(e.target.value)}
-                    placeholder="e.g. Manual payment top-up or correction"
-                    className="verify-input"
+                    value={balanceReason} onChange={e => setBalanceReason(e.target.value)}
+                    placeholder="e.g. Manual M-Pesa top-up verification"
+                    className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-xs text-white focus:border-[#0da84b] focus:outline-none"
                   />
                 </div>
 
-                <div className="pt-2">
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setBalanceModalUser(null)}
+                    className="rounded border border-[#2c313c] bg-[#1c2028] px-4 py-2 text-xs font-semibold text-[#c4c9d4] hover:text-white"
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="submit"
                     disabled={isSubmittingBalance || !balanceAmount}
-                    className="btn-deposit"
+                    className="rounded bg-[#0da84b] px-4 py-2 text-xs font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
                   >
-                    {isSubmittingBalance ? 'SAVING...' : 'APPLY BALANCE ADJUSTMENT'}
+                    {isSubmittingBalance ? 'Saving...' : 'Apply Balance'}
                   </button>
                 </div>
               </form>
@@ -3368,183 +3004,182 @@ export default function AdminDashboard() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          MODAL: ADJUST USER FREEBET
+          MODAL 2: ADJUST USER FREEBET
           ══════════════════════════════════════════════════════════════ */}
       {freebetModalUser && (
-        <div className="wallet-overlay">
-          <div className="wallet-modal max-w-md">
-            <div className="wallet-header">
-              <span className="wallet-title">ADJUST FREEBET BONUS</span>
-              <button className="wallet-close" onClick={() => setFreebetModalUser(null)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-md border border-[#2c313c] bg-[#16191f] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#242830] bg-[#1c2028] px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-white">Manage Player Freebet</span>
+              <button onClick={() => setFreebetModalUser(null)} className="text-[#8e96a4] hover:text-white">
+                <X className="size-4" />
+              </button>
             </div>
-            <div className="wallet-body">
-              <div className="wallet-cards">
-                <div className="wallet-card">
-                  <span className="freebet-status">{freebetModalUser.freebetLocked ? '(locked)' : '(unlocked)'}</span>
-                  <div className="card-label">CURRENT FREEBET</div>
-                  <div className="card-amount">KSH <span>{freebetModalUser.freebet.toFixed(2)}</span></div>
-                </div>
-                <div className="wallet-card">
-                  <div className="card-label">REAL BALANCE</div>
-                  <div className="card-amount">KSH <span>{freebetModalUser.balance.toFixed(2)}</span></div>
-                </div>
+
+            <form onSubmit={handleAdjustFreebet} className="p-4 space-y-4">
+              <div className="text-xs text-[#8e96a4]">
+                Player: <strong className="text-white">{freebetModalUser.username}</strong> ({freebetModalUser.phone})
               </div>
 
-              <div className="mb-3 px-1 text-xs text-[#a0a6b1]">
-                Player: <span className="font-bold text-white">{freebetModalUser.username}</span> ({freebetModalUser.phone})
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">Freebet Balance (KSH)</label>
+                <input
+                  type="number" min="0"
+                  value={freebetAmount} onChange={e => setFreebetAmount(e.target.value)}
+                  required
+                  className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm font-bold text-white tabular-nums focus:border-[#0da84b] focus:outline-none"
+                />
               </div>
 
-              <form onSubmit={handleAdjustFreebet} className="space-y-3">
-                <div>
-                  <label className="section-label">Freebet Amount (KSH)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={freebetAmount}
-                    onChange={e => setFreebetAmount(e.target.value)}
-                    required
-                    className="verify-input"
-                  />
-                </div>
+              <label className="flex items-center gap-2.5 text-xs text-[#e5e7eb] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={freebetLocked}
+                  onChange={e => setFreebetLocked(e.target.checked)}
+                  className="size-4 accent-[#0da84b]"
+                />
+                <span>Keep freebet locked until player completes qualifying deposit</span>
+              </label>
 
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="lockCheckbox"
-                    checked={freebetLocked}
-                    onChange={e => setFreebetLocked(e.target.checked)}
-                    className="size-4 accent-[#00eb5b]"
-                  />
-                  <label htmlFor="lockCheckbox" className="text-xs text-[#d8dce2] cursor-pointer">
-                    Require deposit to unlock (Locked)
-                  </label>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingFreebet}
-                    className="btn-deposit"
-                  >
-                    {isSubmittingFreebet ? 'SAVING...' : 'UPDATE FREEBET'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setFreebetModalUser(null)}
+                  className="rounded border border-[#2c313c] bg-[#1c2028] px-4 py-2 text-xs font-semibold text-[#c4c9d4]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingFreebet}
+                  className="rounded bg-[#0da84b] px-4 py-2 text-xs font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
+                >
+                  {isSubmittingFreebet ? 'Saving...' : 'Update Freebet'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          MODAL: RESET USER PASSWORD
+          MODAL 3: RESET USER PASSWORD
           ══════════════════════════════════════════════════════════════ */}
       {passwordModalUser && (
-        <div className="wallet-overlay">
-          <div className="wallet-modal max-w-md">
-            <div className="wallet-header">
-              <span className="wallet-title">RESET USER PASSWORD</span>
-              <button className="wallet-close" onClick={() => setPasswordModalUser(null)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-md border border-[#2c313c] bg-[#16191f] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#242830] bg-[#1c2028] px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-white">Reset Player Password</span>
+              <button onClick={() => setPasswordModalUser(null)} className="text-[#8e96a4] hover:text-white">
+                <X className="size-4" />
+              </button>
             </div>
-            <div className="wallet-body">
-              <p className="mb-3 text-xs text-[#a0a6b1]">
-                Set new password for <span className="font-bold text-white">{passwordModalUser.username}</span> ({passwordModalUser.phone})
-              </p>
 
-              <form onSubmit={handleResetPassword} className="space-y-3">
-                <div>
-                  <label className="section-label">New Password</label>
-                  <input
-                    type="text"
-                    value={newPasswordVal}
-                    onChange={e => setNewPasswordVal(e.target.value)}
-                    placeholder="Min 4 characters"
-                    required
-                    minLength={4}
-                    className="verify-input"
-                  />
-                </div>
+            <form onSubmit={handleResetPassword} className="p-4 space-y-4">
+              <div className="text-xs text-[#8e96a4]">
+                Set a new login password for <strong className="text-white">{passwordModalUser.username}</strong> ({passwordModalUser.phone})
+              </div>
 
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingPassword || !newPasswordVal}
-                    className="btn-deposit"
-                  >
-                    {isSubmittingPassword ? 'SAVING...' : 'RESET PASSWORD'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#c4c9d4]">New Password</label>
+                <input
+                  type="text" minLength={4} required
+                  value={newPasswordVal} onChange={e => setNewPasswordVal(e.target.value)}
+                  placeholder="Minimum 4 characters"
+                  className="h-10 w-full rounded border border-[#2c313c] bg-[#0d0f12] px-3 text-sm text-white focus:border-[#0da84b] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPasswordModalUser(null)}
+                  className="rounded border border-[#2c313c] bg-[#1c2028] px-4 py-2 text-xs font-semibold text-[#c4c9d4]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPassword || !newPasswordVal}
+                  className="rounded bg-[#0da84b] px-4 py-2 text-xs font-bold text-white hover:bg-[#0b9240] disabled:opacity-50"
+                >
+                  {isSubmittingPassword ? 'Saving...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          MODAL: USER DETAIL DRILLDOWN
+          MODAL 4: PLAYER INSPECTOR & LEDGER RECONCILIATION
           ══════════════════════════════════════════════════════════════ */}
       {selectedUserForDetail && (
-        <div className="wallet-overlay">
-          <div className="wallet-modal max-w-2xl">
-            <div className="wallet-header">
-              <span className="wallet-title">PLAYER INSPECTOR: {selectedUserForDetail.user.username}</span>
-              <button className="wallet-close" onClick={() => setSelectedUserForDetail(null)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-md border border-[#2c313c] bg-[#16191f] overflow-hidden my-auto">
+            <div className="flex items-center justify-between border-b border-[#242830] bg-[#1c2028] px-4 py-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                  Player Inspector: {selectedUserForDetail.user.username}
+                </span>
+                <span className="ml-2 font-mono text-xs text-[#8e96a4]">({selectedUserForDetail.user.phone})</span>
+              </div>
+              <button onClick={() => setSelectedUserForDetail(null)} className="text-[#8e96a4] hover:text-white">
+                <X className="size-4" />
+              </button>
             </div>
-            <div className="wallet-body space-y-4">
-              <div className="flex justify-between text-xs text-[#a0a6b1] px-1">
-                <span>Phone: <b className="text-white">{selectedUserForDetail.user.phone}</b></span>
-                <span>Joined: {formatDate(selectedUserForDetail.user.createdAt)}</span>
-              </div>
 
-              {/* Financial Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                <div className="wallet-card">
-                  <div className="card-label">BALANCE</div>
-                  <div className="card-amount">KSH <span>{selectedUserForDetail.user.balance.toFixed(2)}</span></div>
+            <div className="p-4 space-y-4 max-h-[82vh] overflow-y-auto">
+              {/* Summary Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 tabular-nums">
+                <div className="rounded border border-[#242830] bg-[#0d0f12] p-3">
+                  <div className="text-[11px] font-semibold text-[#8e96a4]">WALLET BALANCE</div>
+                  <div className="mt-1 text-sm font-bold text-[#10b981]">KSH {selectedUserForDetail.user.balance.toFixed(2)}</div>
                 </div>
-                <div className="wallet-card">
-                  <div className="card-label">TOTAL BETS</div>
-                  <div className="text-sm font-bold text-white">{selectedUserForDetail.stats.totalBets}</div>
+                <div className="rounded border border-[#242830] bg-[#0d0f12] p-3">
+                  <div className="text-[11px] font-semibold text-[#8e96a4]">TOTAL BETS</div>
+                  <div className="mt-1 text-sm font-bold text-white">{selectedUserForDetail.stats.totalBets}</div>
                 </div>
-                <div className="wallet-card">
-                  <div className="card-label">WAGERED</div>
-                  <div className="text-sm font-bold text-white">KSH {selectedUserForDetail.stats.totalWagered.toFixed(2)}</div>
+                <div className="rounded border border-[#242830] bg-[#0d0f12] p-3">
+                  <div className="text-[11px] font-semibold text-[#8e96a4]">TOTAL WAGERED</div>
+                  <div className="mt-1 text-sm font-bold text-white">KSH {selectedUserForDetail.stats.totalWagered.toFixed(2)}</div>
                 </div>
-                <div className="wallet-card">
-                  <div className="card-label">WON</div>
-                  <div className="card-amount">KSH <span>{selectedUserForDetail.stats.totalWon.toFixed(2)}</span></div>
+                <div className="rounded border border-[#242830] bg-[#0d0f12] p-3">
+                  <div className="text-[11px] font-semibold text-[#8e96a4]">TOTAL WON</div>
+                  <div className="mt-1 text-sm font-bold text-[#10b981]">KSH {selectedUserForDetail.stats.totalWon.toFixed(2)}</div>
                 </div>
               </div>
 
-              {/* Ledger Audit & Balance Reconciliation Card */}
-              <div className="rounded-lg border border-[#32353b] bg-[#1a1c1e] p-3 space-y-2">
+              {/* Balance Reconciliation Tool */}
+              <div className="rounded border border-[#2c313c] bg-[#0d0f12] p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wide">
-                    <Scale className="size-3.5 text-[#00eb5b]" />
-                    <span>Balance Ledger Audit</span>
+                  <div className="flex items-center gap-2 text-xs font-bold text-white">
+                    <Scale className="size-4 text-[#10b981]" />
+                    <span>Wallet Ledger Reconciliation</span>
                   </div>
                   <button
                     onClick={() => handleReconcileUser(selectedUserForDetail.user._id, false)}
                     disabled={isReconciling}
-                    className="flex items-center gap-1 rounded bg-[#282a2e] px-2.5 py-1 text-[11px] font-medium text-[#d1d5db] hover:bg-[#32353b] hover:text-white disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded border border-[#2c313c] bg-[#1c2028] px-3 py-1 text-xs font-semibold text-white hover:bg-[#242933] disabled:opacity-50"
                   >
                     <RefreshCw className={`size-3 ${isReconciling ? 'animate-spin' : ''}`} />
-                    Audit Ledger
+                    <span>Run Audit</span>
                   </button>
                 </div>
 
                 {reconcileAudit && (
-                  <div className="rounded bg-[#282a2e] p-2.5 text-xs space-y-2">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
-                      <div>Deposits: <b className="text-[#00eb5b]">+{formatMoney(reconcileAudit.totalDeposits)}</b></div>
-                      <div>Withdrawals: <b className="text-[#ff5c6c]">-{formatMoney(reconcileAudit.totalWithdrawals)}</b></div>
-                      <div>Wagered: <b className="text-white">-{formatMoney(reconcileAudit.realWagered)}</b></div>
-                      <div>Won Payout: <b className="text-[#00eb5b]">+{formatMoney(reconcileAudit.realWonPayout)}</b></div>
+                  <div className="rounded border border-[#242830] bg-[#16191f] p-3 text-xs space-y-2 tabular-nums">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>Deposits: <strong className="text-[#10b981]">+{formatMoney(reconcileAudit.totalDeposits)}</strong></div>
+                      <div>Withdrawals: <strong className="text-[#f87171]">-{formatMoney(reconcileAudit.totalWithdrawals)}</strong></div>
+                      <div>Wagered: <strong className="text-white">-{formatMoney(reconcileAudit.realWagered)}</strong></div>
+                      <div>Payouts: <strong className="text-[#10b981]">+{formatMoney(reconcileAudit.realWonPayout)}</strong></div>
                     </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-[#32353b] text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#242830] pt-2">
                       <div>
-                        Expected: <b className="text-white">{formatMoney(reconcileAudit.calculatedBalance)}</b> • Current: <b className="text-[#a0a6b1]">{formatMoney(reconcileAudit.currentBalance)}</b>
+                        Expected: <strong className="text-white">{formatMoney(reconcileAudit.calculatedBalance)}</strong> • Actual: <strong className="text-[#8e96a4]">{formatMoney(reconcileAudit.currentBalance)}</strong>
                         {reconcileAudit.discrepancy !== 0 && (
-                          <span className="ml-2 font-bold text-amber-400">
+                          <span className="ml-2 font-bold text-[#fbbf24]">
                             (Diff: {reconcileAudit.discrepancy > 0 ? '+' : ''}{formatMoney(reconcileAudit.discrepancy)})
                           </span>
                         )}
@@ -3553,9 +3188,9 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleReconcileUser(selectedUserForDetail.user._id, true)}
                           disabled={isReconciling}
-                          className="rounded bg-[#00eb5b] px-2.5 py-1 text-[11px] font-bold text-[#091e0f] hover:bg-[#00c84d] disabled:opacity-50 shadow"
+                          className="rounded bg-[#0da84b] px-3 py-1 text-xs font-bold text-white hover:bg-[#0b9240]"
                         >
-                          {isReconciling ? 'SYNCING...' : 'APPLY ACCURATE BALANCE'}
+                          Sync Accurate Balance
                         </button>
                       )}
                     </div>
@@ -3565,35 +3200,31 @@ export default function AdminDashboard() {
 
               {/* Recent Bets */}
               <div>
-                <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Bets</h4>
-                <div className="max-h-40 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e]">
+                <h4 className="mb-1.5 text-xs font-bold uppercase text-[#8e96a4]">Recent Bets</h4>
+                <div className="max-h-40 overflow-y-auto rounded border border-[#242830] bg-[#0d0f12]">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#282a2e] text-[10px] text-[#a0a6b1] sticky top-0">
+                    <thead className="bg-[#1c2028] text-[11px] font-bold text-[#8e96a4] sticky top-0">
                       <tr>
-                        <th className="p-2">Amount</th>
-                        <th className="p-2">Status</th>
+                        <th className="p-2">Stake</th>
+                        <th className="p-2">Result</th>
                         <th className="p-2">Multiplier</th>
-                        <th className="p-2">Win Amount</th>
+                        <th className="p-2">Payout</th>
                         <th className="p-2">Time</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#32353b]/50">
+                    <tbody className="divide-y divide-[#22262e] tabular-nums">
                       {selectedUserForDetail.recentBets.length === 0 ? (
-                        <tr><td colSpan={5} className="p-3 text-center text-[#8c939e]">No bets found</td></tr>
+                        <tr><td colSpan={5} className="p-4 text-center text-[#6e7685]">No bets recorded</td></tr>
                       ) : (
                         selectedUserForDetail.recentBets.map(b => (
                           <tr key={b._id}>
-                            <td className="p-2 font-semibold text-white">KSH {b.amount}</td>
+                            <td className="p-2 font-bold text-white">KSH {b.amount}</td>
                             <td className="p-2">
-                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-                                b.status === 'won' ? 'bg-[#00eb5b]/15 text-[#00eb5b]' : 'bg-[#ff1e38]/15 text-[#ff5c6c]'
-                              }`}>
-                                {b.status}
-                              </span>
+                              <span className={b.status === 'won' ? 'font-bold text-[#10b981]' : 'text-[#f87171]'}>{b.status}</span>
                             </td>
-                            <td className="p-2 text-[#a0a6b1]">{b.multiplierCaught ? `${b.multiplierCaught}x` : '—'}</td>
-                            <td className="p-2 font-semibold text-[#00eb5b]">KSH {b.winAmount || 0}</td>
-                            <td className="p-2 text-[#8c939e]">{formatDate(b.createdAt)}</td>
+                            <td className="p-2 text-[#c4c9d4]">{b.multiplierCaught ? `${b.multiplierCaught}x` : '—'}</td>
+                            <td className="p-2 font-bold text-[#10b981]">KSH {b.winAmount || 0}</td>
+                            <td className="p-2 text-[#8e96a4]">{formatDate(b.createdAt)}</td>
                           </tr>
                         ))
                       )}
@@ -3602,18 +3233,18 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Recent Deposits & Withdrawals side by side */}
+              {/* Recent Cashier Activity */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Deposits</h4>
-                  <div className="max-h-36 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e] p-2.5 space-y-1.5">
+                  <h4 className="mb-1.5 text-xs font-bold uppercase text-[#8e96a4]">Recent Deposits</h4>
+                  <div className="max-h-36 overflow-y-auto rounded border border-[#242830] bg-[#0d0f12] p-2 space-y-1.5 tabular-nums">
                     {selectedUserForDetail.recentDeposits.length === 0 ? (
-                      <p className="text-center text-[#8c939e] py-3 text-xs">No deposits</p>
+                      <p className="py-4 text-center text-xs text-[#6e7685]">No deposits</p>
                     ) : (
                       selectedUserForDetail.recentDeposits.map(d => (
-                        <div key={d._id} className="flex justify-between items-center text-xs p-1.5 rounded bg-[#282a2e]">
-                          <span className="font-bold text-[#00eb5b]">+KSH {d.amount}</span>
-                          <span className="text-[#8c939e] text-[10px]">{d.status} • {formatDate(d.createdAt)}</span>
+                        <div key={d._id} className="flex items-center justify-between rounded bg-[#16191f] px-2.5 py-1.5 text-xs">
+                          <span className="font-bold text-[#10b981]">+KSH {d.amount}</span>
+                          <span className="text-[11px] text-[#8e96a4]">{d.status} • {formatDate(d.createdAt)}</span>
                         </div>
                       ))
                     )}
@@ -3621,29 +3252,20 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h4 className="mb-2 font-bold text-[#e4e6eb] text-xs uppercase tracking-wide">Recent Withdrawals</h4>
-                  <div className="max-h-36 overflow-y-auto rounded-lg border border-[#32353b] bg-[#1a1c1e] p-2.5 space-y-1.5">
+                  <h4 className="mb-1.5 text-xs font-bold uppercase text-[#8e96a4]">Recent Withdrawals</h4>
+                  <div className="max-h-36 overflow-y-auto rounded border border-[#242830] bg-[#0d0f12] p-2 space-y-1.5 tabular-nums">
                     {selectedUserForDetail.recentWithdrawals.length === 0 ? (
-                      <p className="text-center text-[#8c939e] py-3 text-xs">No withdrawals</p>
+                      <p className="py-4 text-center text-xs text-[#6e7685]">No withdrawals</p>
                     ) : (
                       selectedUserForDetail.recentWithdrawals.map(w => (
-                        <div key={w._id} className="flex justify-between items-center text-xs p-1.5 rounded bg-[#282a2e]">
-                          <span className="font-bold text-[#ff5c6c]">-KSH {w.amount}</span>
-                          <span className="text-[#8c939e] text-[10px]">{w.status} • {formatDate(w.createdAt)}</span>
+                        <div key={w._id} className="flex items-center justify-between rounded bg-[#16191f] px-2.5 py-1.5 text-xs">
+                          <span className="font-bold text-[#f87171]">-KSH {w.amount}</span>
+                          <span className="text-[11px] text-[#8e96a4]">{w.status} • {formatDate(w.createdAt)}</span>
                         </div>
                       ))
                     )}
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-2 text-right">
-                <button
-                  onClick={() => setSelectedUserForDetail(null)}
-                  className="rounded-lg bg-[#282a2e] border border-[#32353b] px-5 py-2 text-xs font-semibold text-white hover:bg-[#32353b]"
-                >
-                  Close
-                </button>
               </div>
             </div>
           </div>
