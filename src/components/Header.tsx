@@ -34,17 +34,30 @@ export function Header({ user, onLogin, onRegister, onLogout, onDeposit, activeW
       <header className="sticky top-0 z-40 border-b border-line bg-page pt-[env(safe-area-inset-top)]">
         <div className="flex h-14 items-center justify-between gap-2 pl-2 pr-2.5 sm:pl-3 sm:pr-4 lg:pl-3.5 lg:pr-5">
           {/* Brand + support */}
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="flex min-w-0 flex-col justify-center sm:flex-row sm:items-center sm:gap-3.5">
             <Link to="/" className="flex shrink-0 items-center rounded-md">
-              <img src="/logo.png" alt={config.brandName} className="h-[24px] w-auto object-contain sm:h-[26px] lg:h-[28px]" />
+              <img src="/logo.png" alt={config.brandName} className="h-[20px] w-auto object-contain sm:h-[26px] lg:h-[28px]" />
               <span className="sr-only">{config.brandName} home</span>
             </Link>
 
+            {/* Mobile: Directly below the site logo */}
             <a
-              href={`https://wa.me/${config.whatsappSupportNumber}`}
+              href={`https://wa.me/${(config.whatsappSupportNumber || '254719897373').replace(/\D/g, '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden h-8 items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-xs font-medium text-ink-2 transition-colors hover:bg-field hover:text-ink md:flex"
+              className="mt-0.5 flex items-center gap-1 text-[9.5px] font-semibold text-whatsapp transition-opacity hover:opacity-80 active:opacity-60 sm:hidden"
+              aria-label="WhatsApp Support"
+            >
+              <WhatsAppIcon className="size-2.5 shrink-0 text-whatsapp" />
+              <span className="leading-none tracking-tight whitespace-nowrap">WhatsApp Support</span>
+            </a>
+
+            {/* Desktop / Tablet: Beside the site logo */}
+            <a
+              href={`https://wa.me/${(config.whatsappSupportNumber || '254719897373').replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden h-8 items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-xs font-medium text-ink-2 transition-colors hover:bg-field hover:text-ink sm:flex"
             >
               <WhatsAppIcon className="size-3.5 text-whatsapp" />
               <span>Support</span>
