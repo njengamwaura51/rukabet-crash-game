@@ -3,6 +3,7 @@ import { Link } from 'wouter'
 import { Check, ChevronLeft, Copy, Gift, KeyRound, Link2, MessageCircle, Ticket } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useConfig } from '@/hooks/useConfig'
+import { formatWhatsAppUrl } from '@/lib/utils'
 
 /** Shared frame for the account pages: back link, title, single column. */
 function PageShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
@@ -353,10 +354,9 @@ export function BonusesPage() {
 // Kept for old links: redirects straight to WhatsApp support
 export function SupportPage() {
   const { config } = useConfig()
-  const phone = config.whatsappSupportNumber || '254713934411'
   useEffect(() => {
-    window.location.href = `https://wa.me/${phone}`
-  }, [phone])
+    window.location.href = formatWhatsAppUrl(config.whatsappSupportNumber)
+  }, [config.whatsappSupportNumber])
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-page px-6 text-center text-ink">

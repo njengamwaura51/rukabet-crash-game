@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'wouter'
 import { Gift, LifeBuoy, LogOut, User, Users } from 'lucide-react'
 import { useConfig } from '@/hooks/useConfig'
+import { formatWhatsAppUrl } from '@/lib/utils'
 
 interface MenuDropdownProps {
   username: string
@@ -35,7 +36,7 @@ export function MenuDropdown({ username, isLoggedIn, onClose, onLogout }: MenuDr
   }, [onClose])
 
   const handleSupportClick = () => {
-    window.open(`https://wa.me/${config.whatsappSupportNumber}`, '_blank', 'noopener,noreferrer')
+    window.open(formatWhatsAppUrl(config.whatsappSupportNumber), '_blank', 'noopener,noreferrer')
     onClose()
   }
 

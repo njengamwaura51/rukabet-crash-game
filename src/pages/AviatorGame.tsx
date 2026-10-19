@@ -112,7 +112,7 @@ export default function AviatorGame() {
             <div className="grid w-full max-w-full shrink-0 grid-cols-1 gap-2 lg:grid-cols-2">
               <BetPanel
                 panelId={1}
-                defaultAmount={25}
+                defaultAmount={10}
                 currency="KSH"
                 gamePhase={game.phase}
                 currentMultiplier={game.multiplier}
@@ -125,7 +125,7 @@ export default function AviatorGame() {
               />
               <BetPanel
                 panelId={2}
-                defaultAmount={18}
+                defaultAmount={10}
                 currency="KSH"
                 gamePhase={game.phase}
                 currentMultiplier={game.multiplier}
